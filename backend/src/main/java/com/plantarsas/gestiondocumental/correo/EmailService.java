@@ -7,5 +7,6 @@ public interface EmailService {
     void enviar(String destinatario, String asunto, String cuerpo);
 
     void enviar(Collection<String> destinatarios, String asunto, String cuerpo);
+
 }
 
