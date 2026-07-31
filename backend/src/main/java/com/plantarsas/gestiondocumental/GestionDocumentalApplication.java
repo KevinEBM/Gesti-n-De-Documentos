@@ -1,4 +1,4 @@
-package com.plantarsas.gestiondocumental;
+package main.java.com.plantarsas.gestiondocumental;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
