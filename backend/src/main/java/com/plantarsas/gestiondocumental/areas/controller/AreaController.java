@@ -1,2 +1,4 @@
-package com.plantarsas.gestiondocumental.areas.controller;
+package main.java.com.plantarsas.gestiondocumental.areas.controller;
 
+public class AreaController {
+}

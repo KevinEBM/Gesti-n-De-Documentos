@@ -1,2 +1,4 @@
-package com.plantarsas.gestiondocumental.areas.dto;
+package main.java.com.plantarsas.gestiondocumental.areas.dto;
 
+public class AreaRequest {
+}

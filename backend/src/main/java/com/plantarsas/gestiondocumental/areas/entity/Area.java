@@ -1,2 +1,4 @@
-package com.plantarsas.gestiondocumental.areas.entity;
+package main.java.com.plantarsas.gestiondocumental.areas.entity;
 
+public class Area {
+}
