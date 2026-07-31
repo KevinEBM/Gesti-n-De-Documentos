@@ -1,6 +1,7 @@
 @import "tailwindcss" source(none);
-@source "../src";
 @import "tw-animate-css";
+
+@source "../src";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -111,6 +112,7 @@
 
 .dark {
     --background: oklch(0.129 0.042 264.695);
+    --surface: oklch(0.20 0.03 250);
     --foreground: oklch(0.984 0.003 247.858);
     --card: oklch(0.208 0.042 265.755);
     --card-foreground: oklch(0.984 0.003 247.858);
@@ -124,6 +126,10 @@
     --muted-foreground: oklch(0.704 0.04 256.788);
     --accent: oklch(0.279 0.041 260.031);
     --accent-foreground: oklch(0.984 0.003 247.858);
+    --success: oklch(0.68 0.13 158);
+    --success-foreground: oklch(0.17 0.03 158);
+    --warning: oklch(0.78 0.14 75);
+    --warning-foreground: oklch(0.22 0.05 75);
     --destructive: oklch(0.704 0.191 22.216);
     --destructive-foreground: oklch(0.984 0.003 247.858);
     --border: oklch(1 0 0 / 10%);
@@ -146,12 +152,12 @@
 
 @layer base {
     * {
-        border-color: var(--color-border);
+        border-color: var(--border);
     }
 
     body {
-        background-color: var(--color-background);
-        color: var(--color-foreground);
+        background-color: var(--background);
+        color: var(--foreground);
         font-family: var(--font-sans);
         -webkit-font-smoothing: antialiased;
     }
@@ -160,12 +166,4 @@
         font-family: var(--font-display);
         letter-spacing: -0.01em;
     }
-}
-
-.dark {
-    --surface: oklch(0.20 0.03 250);
-    --success: oklch(0.68 0.13 158);
-    --success-foreground: oklch(0.17 0.03 158);
-    --warning: oklch(0.78 0.14 75);
-    --warning-foreground: oklch(0.22 0.05 75);
 }
