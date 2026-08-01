@@ -1,5 +1,5 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { FileUp } from "lucide-react";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { ArrowLeft, FileUp, Upload } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -20,231 +20,312 @@ export const Route = createFileRoute("/app/publicar")({
             { title: "Publicar documento — Intranet documental" },
             {
                 name: "description",
-                content:
-                    "Formulario para registrar un documento interno: área responsable, áreas autorizadas, categoría, tipo, versión y estado.",
+                content: "Registra y publica un nuevo documento en la intranet documental.",
             },
             { property: "og:title", content: "Publicar documento — Intranet documental" },
-            { property: "og:description", content: "Registra y publica documentos internos con control de versiones." },
         ],
     }),
-    component: Publicar,
+    component: PublicarDocumento,
 });
 
-function Publicar() {
-    const { areas, categorias, tipos, crearDocumento, sesion, permisos } = useIntranet();
+export function PublicarDocumento() {
     const navigate = useNavigate();
+    const store = useIntranet();
+    const { areas, categorias, tipos, permisos } = store;
 
-    const [errores, setErrores] = useState<Record<string, string>>({});
-    const [form, setForm] = useState({
-        nombre: "",
-        descripcion: "",
-        archivo: "",
-        areaId: "",
-        categoriaId: "",
-        tipoId: "",
-        version: "1.0",
-        fechaPublicacion: new Date().toISOString().slice(0, 10),
-        estado: "publicado" as Estado,
-    });
+    // Detectar la función de publicación según el nombre expuesto en tu store
+    const publicarFn =
+        (store as any).publicarDocumento ||
+        (store as any).crearDocumento ||
+        (store as any).agregarDocumento;
+
+    // Fecha actual predeterminada (YYYY-MM-DD)
+    const fechaHoy = new Date().toISOString().split("T")[0];
+
+    // Estados de la sección 1: Información
+    const [nombre, setNombre] = useState("");
+    const [descripcion, setDescripcion] = useState("");
+    const [archivo, setArchivo] = useState<File | null>(null);
+
+    // Estados de la sección 2: Clasificación y visibilidad
+    const [areaId, setAreaId] = useState("");
+    const [categoriaId, setCategoriaId] = useState("");
+    const [tipoId, setTipoId] = useState("");
     const [visibleTodas, setVisibleTodas] = useState(false);
     const [autorizadas, setAutorizadas] = useState<string[]>([]);
 
-    const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
+    // Estados de la sección 3: Versión y estado
+    const [version, setVersion] = useState("1.0");
+    const [fechaPublicacion, setFechaPublicacion] = useState(fechaHoy);
+    const [estado, setEstado] = useState<Estado>("publicado");
 
-    if (!permisos.publicarDocumentos) {
+    const [subiendo, setSubiendo] = useState(false);
+
+    if (!permisos?.actualizarDocumentos) {
         return (
             <AppShell titulo="Publicar documento">
                 <Card>
                     <CardContent className="py-14 text-center text-sm text-muted-foreground">
-                        No cuentas con permisos para publicar documentos.
+                        No cuentas con permisos para publicar nuevos documentos.
                     </CardContent>
                 </Card>
             </AppShell>
         );
     }
 
-    const publicar = () => {
-        const e: Record<string, string> = {};
-        if (!form.nombre.trim()) e.nombre = "Ingresa el nombre del documento.";
-        if (form.descripcion.trim().length < 10) e.descripcion = "La descripción debe tener al menos 10 caracteres.";
-        if (!form.archivo.trim()) e.archivo = "Selecciona el archivo del documento.";
-        if (!form.areaId) e.areaId = "Selecciona el área responsable.";
-        if (!form.categoriaId) e.categoriaId = "Selecciona la categoría.";
-        if (!form.tipoId) e.tipoId = "Selecciona el tipo de documento.";
-        if (!/^\d+(\.\d+)?$/.test(form.version)) e.version = "Usa un formato de versión válido, por ejemplo 1.0.";
-        if (!form.fechaPublicacion) e.fechaPublicacion = "Indica la fecha de publicación.";
-        if (!visibleTodas && autorizadas.length === 0)
-            e.autorizadas = "Agrega al menos un área autorizada o marca «Visible para todas las áreas».";
-        setErrores(e);
-        if (Object.keys(e).length) return;
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
 
-        crearDocumento({
-            ...form,
-            visibleTodas,
-            areasAutorizadas: visibleTodas ? [] : autorizadas,
-            publicadoPor: sesion?.nombre ?? "Administrador",
-        });
-        toast.success(
-            form.estado === "publicado" ? "Documento publicado correctamente" : "Borrador guardado correctamente",
-            { description: form.nombre },
-        );
-        navigate({ to: "/app/gestion-documentos" });
+        // Validaciones
+        if (!nombre.trim()) return toast.error("El nombre del documento es obligatorio.");
+        if (!areaId) return toast.error("Selecciona un área responsable.");
+        if (!categoriaId) return toast.error("Selecciona una categoría.");
+        if (!tipoId) return toast.error("Selecciona un tipo de documento.");
+        if (!visibleTodas && autorizadas.length === 0) {
+            return toast.error("Selecciona al menos un área autorizada o marca 'Visible para todas las áreas'.");
+        }
+        if (!archivo) return toast.error("Debes adjuntar un archivo para el documento.");
+
+        setSubiendo(true);
+
+        try {
+            const nuevoDocumento = {
+                nombre: nombre.trim(),
+                descripcion: descripcion.trim(),
+                areaId,
+                categoriaId,
+                tipoId,
+                visibleTodas,
+                areasAutorizadas: visibleTodas ? [] : autorizadas,
+                archivo: archivo.name,
+                version,
+                fechaPublicacion,
+                estado,
+            };
+
+            if (typeof publicarFn === "function") {
+                publicarFn(nuevoDocumento);
+            } else {
+                console.warn("No se encontró una función de publicación directa en useIntranet().");
+            }
+
+            toast.success("Documento publicado exitosamente");
+            navigate({ to: "/app/gestion-documentos" });
+        } catch (error) {
+            console.error("Error al publicar:", error);
+            toast.error("Ocurrió un error al intentar publicar el documento.");
+        } finally {
+            setSubiendo(false);
+        }
     };
 
     return (
-        <AppShell titulo="Publicar documento" descripcion="Registra un nuevo documento en la intranet">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-base">Información del documento</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <Campo label="Nombre del documento" error={errores.nombre}>
-                        <Input
-                            value={form.nombre}
-                            onChange={(e) => set("nombre", e.target.value)}
-                            placeholder="Ej. Manual de seguridad y salud en el trabajo"
-                        />
-                    </Campo>
+        <AppShell
+            titulo="Publicar nuevo documento"
+            descripcion="Diligencia los metadatos del documento y adjunta el archivo oficial."
+        >
+            <div className="space-y-6 max-w-4xl mx-auto pb-10">
+                <div>
+                    <Button asChild variant="ghost" size="sm" className="gap-2">
+                        <Link to="/app/gestion-documentos">
+                            <ArrowLeft className="size-4" /> Volver a gestión de documentos
+                        </Link>
+                    </Button>
+                </div>
 
-                    <Campo label="Descripción" error={errores.descripcion}>
-                        <Textarea
-                            rows={4}
-                            value={form.descripcion}
-                            onChange={(e) => set("descripcion", e.target.value)}
-                            placeholder="Describe brevemente el alcance y propósito del documento"
-                        />
-                    </Campo>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* TARJETA 1: Información del documento */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base font-bold">Información del documento</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-5">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="nombre">
+                                    Nombre del documento <span className="text-destructive">*</span>
+                                </Label>
+                                <Input
+                                    id="nombre"
+                                    placeholder="Ej: PR-L&D-PG-01 PROGRAMA LIMPIEZA Y DESINFECCIÓN V5"
+                                    value={nombre}
+                                    onChange={(e) => setNombre(e.target.value)}
+                                />
+                            </div>
 
-                    <Campo label="Archivo" error={errores.archivo}>
-                        <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border bg-secondary/40 px-4 py-7 text-center hover:border-primary/40">
-                            <FileUp className="size-5 text-muted-foreground" />
-                            <span className="text-sm font-medium">{form.archivo || "Haz clic para seleccionar el archivo"}</span>
-                            <span className="text-xs text-muted-foreground">PDF, DOCX o XLSX (simulado)</span>
-                            <input
-                                type="file"
-                                className="hidden"
-                                onChange={(e) => set("archivo", e.target.files?.[0]?.name ?? "")}
-                            />
-                        </label>
-                    </Campo>
-                </CardContent>
-            </Card>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="descripcion">Descripción / Alcance</Label>
+                                <Textarea
+                                    id="descripcion"
+                                    rows={3}
+                                    placeholder="Describe brevemente el alcance y propósito del documento…"
+                                    value={descripcion}
+                                    onChange={(e) => setDescripcion(e.target.value)}
+                                />
+                            </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-base">Clasificación y visibilidad</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="grid gap-5 sm:grid-cols-3">
-                        <Campo label="Área responsable" error={errores.areaId}>
-                            <Selector
-                                value={form.areaId}
-                                onChange={(v) => set("areaId", v)}
-                                opciones={areas.filter((a) => a.activo)}
-                            />
-                        </Campo>
-                        <Campo label="Categoría" error={errores.categoriaId}>
-                            <Selector
-                                value={form.categoriaId}
-                                onChange={(v) => set("categoriaId", v)}
-                                opciones={categorias.filter((c) => c.activo)}
-                            />
-                        </Campo>
-                        <Campo label="Tipo de documento" error={errores.tipoId}>
-                            <Selector
-                                value={form.tipoId}
-                                onChange={(v) => set("tipoId", v)}
-                                opciones={tipos.filter((t) => t.activo)}
-                            />
-                        </Campo>
-                    </div>
+                            <div className="space-y-1.5 pt-2">
+                                <Label>
+                                    Archivo adjunto <span className="text-destructive">*</span>
+                                </Label>
+                                <label
+                                    htmlFor="archivo-input"
+                                    className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 p-6 text-center cursor-pointer hover:bg-accent/50 transition-colors"
+                                >
+                                    <FileUp className="size-8 text-muted-foreground" />
+                                    <span className="text-sm font-medium text-foreground">
+                                        {archivo ? archivo.name : "Haz clic para seleccionar el archivo"}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">PDF, DOCX o XLSX (simulado)</span>
+                                    <input
+                                        id="archivo-input"
+                                        type="file"
+                                        className="hidden"
+                                        accept=".pdf,.doc,.docx,.xls,.xlsx"
+                                        onChange={(e) => {
+                                            if (e.target.files && e.target.files[0]) {
+                                                setArchivo(e.target.files[0]);
+                                            }
+                                        }}
+                                    />
+                                </label>
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                    <Campo label="Áreas autorizadas para visualizar" error={errores.autorizadas}>
-                        <AreasAutorizadas
-                            areas={areas}
-                            seleccionadas={autorizadas}
-                            onChange={setAutorizadas}
-                            visibleTodas={visibleTodas}
-                            onVisibleTodas={setVisibleTodas}
-                        />
-                    </Campo>
-                </CardContent>
-            </Card>
+                    {/* TARJETA 2: Clasificación y visibilidad */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base font-bold">Clasificación y visibilidad</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-5">
+                            <div className="grid gap-4 sm:grid-cols-3">
+                                <div className="space-y-1.5">
+                                    <Label>
+                                        Área responsable <span className="text-destructive">*</span>
+                                    </Label>
+                                    <Select value={areaId} onValueChange={setAreaId}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Seleccionar…" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {areas.map((a) => (
+                                                <SelectItem key={a.id} value={a.id}>
+                                                    {a.nombre}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-base">Versión y estado</CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-5 sm:grid-cols-3">
-                    <Campo label="Versión" error={errores.version}>
-                        <Input value={form.version} onChange={(e) => set("version", e.target.value)} placeholder="1.0" />
-                        <p className="text-xs text-muted-foreground">Se sugiere 1.0 para la primera publicación.</p>
-                    </Campo>
-                    <Campo label="Fecha de publicación" error={errores.fechaPublicacion}>
-                        <Input
-                            type="date"
-                            value={form.fechaPublicacion}
-                            onChange={(e) => set("fechaPublicacion", e.target.value)}
-                        />
-                    </Campo>
-                    <Campo label="Estado">
-                        <Select value={form.estado} onValueChange={(v) => set("estado", v)}>
-                            <SelectTrigger className="w-full">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="borrador">Borrador</SelectItem>
-                                <SelectItem value="publicado">Publicado</SelectItem>
-                                <SelectItem value="inactivo">Inactivo</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </Campo>
-                </CardContent>
-            </Card>
+                                <div className="space-y-1.5">
+                                    <Label>
+                                        Categoría <span className="text-destructive">*</span>
+                                    </Label>
+                                    <Select value={categoriaId} onValueChange={setCategoriaId}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Seleccionar…" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {categorias.map((c) => (
+                                                <SelectItem key={c.id} value={c.id}>
+                                                    {c.nombre}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
 
-            <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => navigate({ to: "/app/gestion-documentos" })}>
-                    Cancelar
-                </Button>
-                <Button onClick={publicar}>
-                    {form.estado === "publicado" ? "Publicar documento" : "Guardar"}
-                </Button>
+                                <div className="space-y-1.5">
+                                    <Label>
+                                        Tipo de documento <span className="text-destructive">*</span>
+                                    </Label>
+                                    <Select value={tipoId} onValueChange={setTipoId}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Seleccionar…" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {tipos.map((t) => (
+                                                <SelectItem key={t.id} value={t.id}>
+                                                    {t.nombre}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 pt-2">
+                                <Label>Áreas autorizadas para visualizar</Label>
+                                <AreasAutorizadas
+                                    idCheckbox="publicar-visible-todas"
+                                    areas={areas}
+                                    seleccionadas={autorizadas}
+                                    onChange={setAutorizadas}
+                                    visibleTodas={visibleTodas}
+                                    onVisibleTodas={setVisibleTodas}
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* TARJETA 3: Versión y estado */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base font-bold">Versión y estado</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="grid gap-4 sm:grid-cols-3">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="version">Versión</Label>
+                                    <Input
+                                        id="version"
+                                        value={version}
+                                        onChange={(e) => setVersion(e.target.value)}
+                                        placeholder="1.0"
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Se sugiere 1.0 para la primera publicación.
+                                    </p>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="fecha">Fecha de publicación</Label>
+                                    <Input
+                                        id="fecha"
+                                        type="date"
+                                        value={fechaPublicacion}
+                                        onChange={(e) => setFechaPublicacion(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <Label>Estado</Label>
+                                    <Select value={estado} onValueChange={(v) => setEstado(v as Estado)}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="publicado">Publicado</SelectItem>
+                                            <SelectItem value="borrador">Borrador</SelectItem>
+                                            <SelectItem value="inactivo">Inactivo</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-4 border-t">
+                                <Button asChild variant="outline" type="button">
+                                    <Link to="/app/gestion-documentos">Cancelar</Link>
+                                </Button>
+                                <Button type="submit" disabled={subiendo} className="gap-2">
+                                    <Upload className="size-4" />
+                                    {subiendo ? "Publicando..." : "Publicar documento"}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </form>
             </div>
         </AppShell>
-    );
-}
-
-function Campo({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
-    return (
-        <div className="space-y-1.5">
-            <Label>{label}</Label>
-            {children}
-            {error && <p className="text-xs text-destructive">{error}</p>}
-        </div>
-    );
-}
-
-function Selector({
-                      value,
-                      onChange,
-                      opciones,
-                  }: {
-    value: string;
-    onChange: (v: string) => void;
-    opciones: { id: string; nombre: string }[];
-}) {
-    return (
-        <Select value={value} onValueChange={onChange}>
-            <SelectTrigger className="w-full">
-                <SelectValue placeholder="Seleccionar…" />
-            </SelectTrigger>
-            <SelectContent>
-                {opciones.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>
-                        {o.nombre}
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
     );
 }
