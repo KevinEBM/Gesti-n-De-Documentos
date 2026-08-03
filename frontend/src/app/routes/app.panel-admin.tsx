@@ -1,3 +1,5 @@
+import logoImg from "../resources/portada-logo.png";
+
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Activity, FileStack, Files, Settings2, Upload, Users } from "lucide-react";
 

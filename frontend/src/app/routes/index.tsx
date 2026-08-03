@@ -1,5 +1,8 @@
+import logoImg from "../resources/portada-logo.png";
+import fondoImg from "../resources/fondo-inicio-sesion.png";
+
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { FileText, Lock, Mail, ShieldCheck } from "lucide-react";
+import { Lock, Mail, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -36,7 +39,6 @@ const demos = [
         detalle: "Consulta de documentos vigentes de su área",
     },
 ];
-
 
 function Login() {
     const { iniciarSesion, sesion } = useIntranet();
@@ -78,44 +80,73 @@ function Login() {
     };
 
     return (
-        <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
-            <div className="relative hidden flex-col justify-between bg-sidebar p-12 text-sidebar-foreground lg:flex">
+        /*
+          COLOR PRINCIPAL DE TODO LO DEMÁS: #f2eee2
+        */
+        <div className="grid min-h-screen lg:grid-cols-[0.6fr_1fr]" style={{ backgroundColor: "#f2eee2" }}>
+
+            {/* SECCIÓN IZQUIERDA*/}
+            <div
+                className="relative hidden flex-col justify-between p-8 text-sidebar-foreground lg:flex transition-colors duration-200 border-r-10 border-[#b99a79]"
+                style={{
+                    backgroundColor: "#e5e8d3",
+                    color: "#112639"
+                }}
+            >
                 <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-                        <FileText className="size-5" />
-                    </div>
-                    <div>
-                        <p className="font-semibold text-sidebar-accent-foreground">Grupo Andina S.A.</p>
-                        <p className="text-xs text-sidebar-foreground/60">Intranet documental</p>
+
+                    <div className="flex h-60 w-auto items-center justify-center overflow-hidden rounded-md p-1">
+                        <img
+                            src={logoImg}
+                            alt="Logo Plantar"
+                            className="size-full object-contain"
+                        />
                     </div>
                 </div>
 
                 <div className="max-w-md space-y-5">
-                    <h2 className="text-3xl font-semibold leading-tight text-sidebar-accent-foreground">
-                        Un solo lugar para la documentación interna de la organización.
+                    <h2 className="text-4xl font-semibold leading-tight">
+                        Un solo lugar para la documentación interna de la empresa.
                     </h2>
-                    <p className="text-sm leading-relaxed text-sidebar-foreground/70">
-                        Consulta manuales, políticas, protocolos y procedimientos vigentes de tu área, con control de versiones y
+                    <p className="text-sm leading-relaxed opacity-90">
+                        Consulta manuales, políticas, protocolos y procedimientos vigentes de su área, con control de versiones y
                         notificaciones cuando se publiquen actualizaciones.
                     </p>
-                    <ul className="space-y-2 text-sm text-sidebar-foreground/70">
+                    <ul className="space-y-2 text-sm opacity-90">
                         <li>· Documentos organizados por área, categoría y tipo</li>
                         <li>· Historial de versiones siempre disponible</li>
                         <li>· Acceso restringido a personal autorizado</li>
                     </ul>
                 </div>
 
-                <p className="flex items-center gap-2 text-xs text-sidebar-foreground/50">
+                {/*<p className="flex items-center gap-2 text-xs opacity-70">
                     <ShieldCheck className="size-4" />
                     Prototipo de demostración con datos ficticios.
-                </p>
+                </p> */}
             </div>
 
-            <div className="flex items-center justify-center px-5 py-12">
-                <div className="w-full max-w-sm">
+            {/* SECCIÓN DERECHA: Formulario de Login */}
+            <div className="relative flex items-center justify-center px-5 py-12 overflow-hidden">
+
+                {/* IMAGEN DE FONDO INFERIOR DERECHA */}
+                <div className="absolute bottom-100% right-0 pointer-events-none hidden lg:block max-h-[100%] w-auto z-0">
+                    <img
+                        src={fondoImg}
+                        alt="Ilustración decorativa inferior"
+                        className="h-full w-auto object-contain object-bottom"
+                    />
+                </div>
+
+                {/* CONTENEDOR OPACO DEL FORMULARIO */}
+                <div className="w-full max-w-sm relative z-10 bg-white/95 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-border/50">
+                    {/* SECCIÓN MÓVIL */}
                     <div className="mb-8 flex items-center gap-3 lg:hidden">
-                        <div className="flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                            <FileText className="size-5" />
+                        <div className="flex h-10 w-auto items-center justify-center overflow-hidden rounded-md p-1">
+                            <img
+                                src={logoImg}
+                                alt="Logo Grupo Andina"
+                                className="size-full object-contain"
+                            />
                         </div>
                         <div>
                             <p className="font-semibold">Grupo Andina S.A.</p>
@@ -138,7 +169,7 @@ function Login() {
                                     type="email"
                                     autoComplete="email"
                                     placeholder="nombre@empresa.com"
-                                    className="pl-9"
+                                    className="pl-9 bg-white"
                                     value={correo}
                                     onChange={(e) => setCorreo(e.target.value)}
                                     aria-invalid={!!errores.correo}
@@ -156,7 +187,7 @@ function Login() {
                                     type="password"
                                     autoComplete="current-password"
                                     placeholder="••••••••"
-                                    className="pl-9"
+                                    className="pl-9 bg-white"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     aria-invalid={!!errores.password}
@@ -176,22 +207,17 @@ function Login() {
                             </Alert>
                         )}
 
-                        <Button type="submit" className="w-full">
+                        {/* Botón de Iniciar Sesión */}
+                        <Button
+                            type="submit"
+                            className="w-full text-white font-medium transition-opacity hover:opacity-90"
+                            style={{ backgroundColor: "#289248" }}
+                        >
                             Iniciar sesión
                         </Button>
-
-                        <button
-                            type="button"
-                            onClick={() =>
-                                setAviso("Se enviaron las instrucciones de recuperación a tu correo institucional (simulado).")
-                            }
-                            className="block w-full text-center text-sm text-primary underline-offset-4 hover:underline"
-                        >
-                            ¿Olvidaste tu contraseña?
-                        </button>
                     </form>
 
-                    <div className="mt-8 rounded-lg border border-border bg-surface p-4">
+                    <div className="mt-8 rounded-lg border border-border bg-white p-4 shadow-sm">
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Usuarios de demostración
                         </p>
@@ -201,15 +227,15 @@ function Login() {
                                     key={d.correo}
                                     type="button"
                                     onClick={() => usarDemo(d)}
-                                    className="flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-secondary"
+                                    className="flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted/50"
                                 >
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium">{d.correo}</span>
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {d.rol} · {d.detalle}
-                    </span>
-                  </span>
-                                    <span className="ml-3 shrink-0 text-xs font-medium text-primary">Usar</span>
+                                    <span className="min-w-0">
+                                        <span className="block truncate text-sm font-medium">{d.correo}</span>
+                                        <span className="block truncate text-xs text-muted-foreground">
+                                          {d.rol} · {d.detalle}
+                                        </span>
+                                    </span>
+                                    <span className="ml-3 shrink-0 text-xs font-medium" style={{ color: "#289248" }}>Usar</span>
                                 </button>
                             ))}
                         </div>

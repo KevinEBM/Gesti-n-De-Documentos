@@ -21,6 +21,7 @@ import { Route as AppGestionDocumentosRouteImport } from './routes/app.gestion-d
 import { Route as AppDocumentosRouteImport } from './routes/app.documentos'
 import { Route as AppDocumentoIdRouteImport } from './routes/app.documento.$id'
 
+
 const AppRoute = AppRouteImport.update({
     id: '/app',
     path: '/app',

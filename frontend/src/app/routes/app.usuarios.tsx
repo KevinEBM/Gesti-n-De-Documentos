@@ -109,7 +109,7 @@ function Usuarios() {
                         <SelectTrigger>
                             <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-white text-slate-900 dark:bg-zinc-900 dark:text-zinc-50 shadow-2xl border border-slate-200 dark:border-zinc-800 z-[99999]">
                             <SelectItem value={TODOS}>Todos los roles</SelectItem>
                             <SelectItem value="administrador">Administrador</SelectItem>
                             <SelectItem value="jefe_area">Jefe de área</SelectItem>
@@ -195,7 +195,7 @@ function Usuarios() {
                                     <SelectTrigger className="w-full">
                                         <SelectValue placeholder="Seleccionar…" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="bg-white text-slate-900 dark:bg-zinc-900 dark:text-zinc-50 shadow-2xl border border-slate-200 dark:border-zinc-800 z-[99999]">
                                         {areas.map((a) => (
                                             <SelectItem key={a.id} value={a.id}>
                                                 {a.nombre}
@@ -211,7 +211,7 @@ function Usuarios() {
                                     <SelectTrigger className="w-full">
                                         <SelectValue />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="bg-white text-slate-900 dark:bg-zinc-900 dark:text-zinc-50 shadow-2xl border border-slate-200 dark:border-zinc-800 z-[99999]">
                                         <SelectItem value="jefe_area">Jefe de área</SelectItem>
                                         <SelectItem value="administrativo">Administrativo</SelectItem>
                                         <SelectItem value="administrador">Administrador</SelectItem>
@@ -228,7 +228,7 @@ function Usuarios() {
                                 <SelectTrigger className="w-full">
                                     <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="bg-white text-slate-900 dark:bg-zinc-900 dark:text-zinc-50 shadow-2xl border border-slate-200 dark:border-zinc-800 z-[99999]">
                                     <SelectItem value="activo">Activo</SelectItem>
                                     <SelectItem value="inactivo">Inactivo</SelectItem>
                                 </SelectContent>

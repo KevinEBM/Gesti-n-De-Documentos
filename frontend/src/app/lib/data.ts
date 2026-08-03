@@ -89,7 +89,12 @@ export const areasIniciales: Area[] = [
     { id: "a2", nombre: "Financiera", descripcion: "Contabilidad, tesorería y presupuesto", activo: true },
     { id: "a3", nombre: "Tecnología", descripcion: "Infraestructura y sistemas de información", activo: true },
     { id: "a4", nombre: "Calidad", descripcion: "Sistema de gestión de calidad", activo: true },
-    { id: "a5", nombre: "Operaciones", descripcion: "Procesos operativos y logística", activo: false },
+    { id: "a5", nombre: "Operaciones", descripcion: "Procesos operativos y logística", activo: true },
+    { id: "a6", nombre: "Ambiental",descripcion: "input solem",activo:true},
+    { id: "a7", nombre: "Ambiental2",descripcion: "input solem2",activo:true},
+    { id: "a8", nombre: "Ambiental3",descripcion: "input solem3",activo:true},
+    { id: "a9", nombre: "Ambiental4",descripcion: "input solem4",activo:true},
+
 ];
 
 export const categoriasIniciales: Categoria[] = [

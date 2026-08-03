@@ -1,16 +1,19 @@
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, FileUp, Upload } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, Save, FileUp, Upload } from "lucide-react";
+import React, { useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/AppShell";
 import { AreasAutorizadas } from "@/components/AreasAutorizadas";
+import { DropzoneArea } from "@/components/ui/drop-zonearea";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+
 import type { Estado } from "@/lib/data";
 import { useIntranet } from "@/lib/store";
 
@@ -25,10 +28,10 @@ export const Route = createFileRoute("/app/publicar")({
             { property: "og:title", content: "Publicar documento — Intranet documental" },
         ],
     }),
-    component: PublicarDocumento,
+    component: NuevoDocumentoPage,
 });
 
-export function PublicarDocumento() {
+function NuevoDocumentoPage() {
     const navigate = useNavigate();
     const store = useIntranet();
     const { areas, categorias, tipos, permisos } = store;
@@ -73,11 +76,12 @@ export function PublicarDocumento() {
         );
     }
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
         // Validaciones
         if (!nombre.trim()) return toast.error("El nombre del documento es obligatorio.");
+        if (!descripcion.trim()) return toast.error("La descripción del documento es obligatoria.");
         if (!areaId) return toast.error("Selecciona un área responsable.");
         if (!categoriaId) return toast.error("Selecciona una categoría.");
         if (!tipoId) return toast.error("Selecciona un tipo de documento.");
@@ -89,6 +93,17 @@ export function PublicarDocumento() {
         setSubiendo(true);
 
         try {
+            const formData = new FormData();
+            formData.append("nombre", nombre.trim());
+            formData.append("descripcion", descripcion.trim());
+            formData.append("areaId", areaId);
+            formData.append("categoriaId", categoriaId);
+            formData.append("tipoId", tipoId);
+            formData.append("archivo", archivo);
+
+            // Simulación de carga
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+
             const nuevoDocumento = {
                 nombre: nombre.trim(),
                 descripcion: descripcion.trim(),
@@ -124,13 +139,21 @@ export function PublicarDocumento() {
             titulo="Publicar nuevo documento"
             descripcion="Diligencia los metadatos del documento y adjunta el archivo oficial."
         >
-            <div className="space-y-6 max-w-4xl mx-auto pb-10">
-                <div>
-                    <Button asChild variant="ghost" size="sm" className="gap-2">
+            <div className="space-y-6 max-w-4xl mx-auto pb-10 p-4 md:p-6">
+
+                {/* Encabezado y Navegación */}
+                <div className="flex items-center space-x-4 mb-4">
+                    <Button variant="outline" size="icon" asChild>
                         <Link to="/app/gestion-documentos">
-                            <ArrowLeft className="size-4" /> Volver a gestión de documentos
+                            <ArrowLeft className="w-5 h-5" />
                         </Link>
                     </Button>
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight">Cargar Nuevo Documento</h1>
+                        <p className="text-muted-foreground text-sm">
+                            Completa los metadatos y adjunta el archivo correspondiente.
+                        </p>
+                    </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -138,6 +161,9 @@ export function PublicarDocumento() {
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base font-bold">Información del documento</CardTitle>
+                            <CardDescription>
+                                Los metadatos permitirán clasificar y buscar el archivo fácilmente.
+                            </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-5">
                             <div className="space-y-1.5">
@@ -153,7 +179,9 @@ export function PublicarDocumento() {
                             </div>
 
                             <div className="space-y-1.5">
-                                <Label htmlFor="descripcion">Descripción / Alcance</Label>
+                                <Label htmlFor="descripcion">
+                                    Descripción / Alcance <span className="text-destructive">*</span>
+                                </Label>
                                 <Textarea
                                     id="descripcion"
                                     rows={3}
@@ -163,31 +191,30 @@ export function PublicarDocumento() {
                                 />
                             </div>
 
-                            <div className="space-y-1.5 pt-2">
-                                <Label>
-                                    Archivo adjunto <span className="text-destructive">*</span>
-                                </Label>
-                                <label
-                                    htmlFor="archivo-input"
-                                    className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 p-6 text-center cursor-pointer hover:bg-accent/50 transition-colors"
-                                >
-                                    <FileUp className="size-8 text-muted-foreground" />
-                                    <span className="text-sm font-medium text-foreground">
-                                        {archivo ? archivo.name : "Haz clic para seleccionar el archivo"}
+                            <Separator />
+
+                            {/* Zona de Carga de Archivo */}
+                            <div className="space-y-3 pt-2">
+                                <div className="flex flex-col">
+                                    <Label className="text-sm font-medium">
+                                        Archivo Adjunto <span className="text-destructive">*</span>
+                                    </Label>
+                                    <span className="text-xs text-muted-foreground mb-2">
+                                        Por seguridad institucional, solo se permiten formatos PDF, Word o Excel.
                                     </span>
-                                    <span className="text-xs text-muted-foreground">PDF, DOCX o XLSX (simulado)</span>
-                                    <input
-                                        id="archivo-input"
-                                        type="file"
-                                        className="hidden"
-                                        accept=".pdf,.doc,.docx,.xls,.xlsx"
-                                        onChange={(e) => {
-                                            if (e.target.files && e.target.files[0]) {
-                                                setArchivo(e.target.files[0]);
-                                            }
-                                        }}
-                                    />
-                                </label>
+                                </div>
+                                <DropzoneArea
+                                    selectedFile={archivo}
+                                    onFileSelect={setArchivo}
+                                    accept={{
+                                        'application/pdf': ['.pdf'],
+                                        'application/msword': ['.doc'],
+                                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+                                        'application/vnd.ms-excel': ['.xls'],
+                                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx']
+                                    }}
+                                    maxSize={10 * 1024 * 1024} // 10 MB límite
+                                />
                             </div>
                         </CardContent>
                     </Card>
@@ -314,12 +341,18 @@ export function PublicarDocumento() {
                             </div>
 
                             <div className="flex justify-end gap-3 pt-4 border-t">
-                                <Button asChild variant="outline" type="button">
+                                <Button asChild variant="outline" type="button" disabled={subiendo}>
                                     <Link to="/app/gestion-documentos">Cancelar</Link>
                                 </Button>
                                 <Button type="submit" disabled={subiendo} className="gap-2">
-                                    <Upload className="size-4" />
-                                    {subiendo ? "Publicando..." : "Publicar documento"}
+                                    {subiendo ? (
+                                        "Guardando..."
+                                    ) : (
+                                        <>
+                                            <Save className="size-4 mr-2" />
+                                            Guardar Documento
+                                        </>
+                                    )}
                                 </Button>
                             </div>
                         </CardContent>
