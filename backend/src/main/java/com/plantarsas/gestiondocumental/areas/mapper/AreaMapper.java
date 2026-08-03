@@ -1,4 +1,4 @@
-package com.plantarsas.gestiondocumental.areas.mapper;
+package main.java.com.plantarsas.gestiondocumental.areas.mapper;
 
 public class AreaMapper {
 }
