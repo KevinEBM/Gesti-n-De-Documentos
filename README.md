@@ -1,4 +1,4 @@
-# Sistema Interno de Gestion Documental
+cla# Sistema Interno de Gestion Documental
 
 Sistema interno para organizar, publicar, versionar y consultar documentos corporativos de Plantar S.A.S. El repositorio separa el backend Spring Boot del frontend React/Vite para que ambos puedan evolucionar de forma independiente.
 

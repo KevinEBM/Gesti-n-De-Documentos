@@ -1,11 +1,16 @@
 package com.plantarsas.gestiondocumental.security;
 
+import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
+
 public interface JwtService {
 
-    String generarToken(String sujeto);
+    String generarToken(Long id, String correo, RolEnum rol);
 
-    String obtenerSujeto(String token);
+    Long obtenerIdUsuario(String token);
+
+    String obtenerCorreo(String token);
+
+    RolEnum obtenerRol(String token);
 
     boolean esTokenValido(String token);
 }
-

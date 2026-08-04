@@ -1,4 +1,14 @@
 package com.plantarsas.gestiondocumental.auth.dto;
 
-public record LoginResponse() {
+import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
+
+public record LoginResponse(
+        String token,
+        String tipo,
+        Long id,
+        String correo,
+        String nombres,
+        String apellidos,
+        RolEnum rol
+) {
 }

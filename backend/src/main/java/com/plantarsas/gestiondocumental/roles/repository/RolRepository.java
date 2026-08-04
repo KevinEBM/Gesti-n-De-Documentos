@@ -1,4 +1,7 @@
 package com.plantarsas.gestiondocumental.roles.repository;
 
-public interface RolRepository {
+import com.plantarsas.gestiondocumental.roles.entity.Rol;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface RolRepository extends JpaRepository<Rol, Long> {
 }
