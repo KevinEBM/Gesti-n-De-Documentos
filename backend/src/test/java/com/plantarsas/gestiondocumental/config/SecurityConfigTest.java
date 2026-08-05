@@ -43,6 +43,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Clock;
+import java.time.ZoneOffset;
+
 @ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = SecurityConfigTest.ConfiguracionSeguridadTest.class)
 @WebAppConfiguration
@@ -56,6 +59,9 @@ class SecurityConfigTest {
 
     @Autowired
     private WebApplicationContext webApplicationContext;
+
+    @Autowired
+    private Clock clock;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -119,6 +125,12 @@ class SecurityConfigTest {
     }
 
     @Test
+    void clockBean_debeExistirYSerUTC() {
+        assertThat(clock).isNotNull();
+        assertThat(clock.getZone()).isEqualTo(ZoneOffset.UTC);
+    }
+
+    @Test
     void solicitudSinHeaderBearer_noDebeConsultarJwtServiceNiUsuarioRepository() throws Exception {
         mockMvc.perform(get("/api/prueba/protegida"))
                 .andExpect(status().isUnauthorized());
@@ -141,6 +153,7 @@ class SecurityConfigTest {
     @EnableWebSecurity
     @Import({
             SecurityConfig.class,
+            ClockConfig.class,
             JwtAuthenticationFilter.class,
             JwtAuthenticationEntryPoint.class,
             JwtAccessDeniedHandler.class,
