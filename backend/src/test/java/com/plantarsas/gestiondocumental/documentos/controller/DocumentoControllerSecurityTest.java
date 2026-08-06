@@ -1,40 +1,37 @@
 package com.plantarsas.gestiondocumental.documentos.controller;
 
 /*
- * PROPUESTA — no forma parte del código fuente todavía.
+ * PROPUESTA — extiende el archivo real actual, aún no copiada al repositorio.
  *
- * DocumentoController.java está vacío en este momento (no existe ningún endpoint). Este archivo
- * describe, mediante pruebas MockMvc, el contrato que se espera que implemente el endpoint de
- * publicación inicial multipart, siguiendo el patrón de TipoDocumentoControllerSecurityTest.
+ * DocumentoController ya implementa el endpoint de publicación inicial (POST /api/documentos).
+ * Esta propuesta agrega la cobertura MockMvc para el endpoint de publicación de nuevas versiones:
  *
- * Contrato asumido para DocumentoController (a implementar):
- *   - POST /api/documentos, multipart/form-data.
- *   - Parte "metadata": JSON que mapea a DocumentoPublicacionInicialRequest, resuelto con
- *     @Valid @RequestPart (obligatoria; su ausencia debe producir 400 mediante el comportamiento
- *     por defecto de MissingServletRequestPartException, que ya trae @ResponseStatus(BAD_REQUEST)).
- *   - Parte "archivo": MultipartFile resuelto con @RequestPart (obligatoria, mismo mecanismo de 400
- *     por ausencia).
+ *   - POST /api/documentos/{id}/versiones, multipart/form-data.
+ *   - Parte "metadata": JSON que mapea a NuevaVersionDocumentoRequest, resuelto con
+ *     @Valid @RequestPart (obligatoria; su ausencia produce 400 mediante el comportamiento por
+ *     defecto de MissingServletRequestPartException).
+ *   - Parte "archivo": MultipartFile resuelto con @RequestPart (obligatoria, mismo mecanismo de 400).
+ *   - @PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser.
  *   - @PreAuthorize("hasRole('ADMINISTRADOR')") en el método.
- *   - El controlador debe rechazar explícitamente un archivo vacío (archivo.isEmpty()) con 400
- *     ANTES de invocar a DocumentoService (a diferencia de DocumentoServiceImpl, que delega esa
- *     validación al StorageService; aquí se exige un fallo rápido sin llegar al servicio).
+ *   - Mismo fast-fail de archivo.isEmpty() -> 400 antes de invocar al servicio, mismo patrón de
+ *     try-with-resources e IOException -> UncheckedIOException que publicarInicial.
  *   - Éxito: 201 con ApiResponse.exitosa(DocumentoResponse).
  *
- * Requisito adicional sobre GlobalExceptionHandler (aún no existe):
- *   - @ExceptionHandler(MaxUploadSizeExceededException.class) -> 413 (PAYLOAD_TOO_LARGE).
- *     Sin este handler, esta excepción cae en el manejador genérico de Exception y responde 500.
- *
- * La prueba 11 (MaxUploadSizeExceededException) stubea el servicio para lanzar esa excepción.
- * En producción la excepción normalmente se origina en el resolutor de multipart antes de llegar
- * al controlador, no en el servicio; aquí se usa el mock del servicio únicamente como mecanismo
- * para verificar el mapeo de esa excepción a 413 en GlobalExceptionHandler a través de MockMvc.
+ * A diferencia de la publicación inicial, este endpoint NO requiere ningún handler nuevo en
+ * GlobalExceptionHandler: los 9 handlers actuales ya cubren BusinessException (incluye
+ * ResourceNotFoundException y el caso de estado inválido), MissingServletRequestPartException,
+ * MaxUploadSizeExceededException y el catch-all de Exception (que es, a propósito, el destino
+ * correcto de IllegalStateException cuando el servicio detecta la inconsistencia interna de una
+ * versión vigente ausente).
  */
 
 import com.plantarsas.gestiondocumental.config.SecurityConfig;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
+import com.plantarsas.gestiondocumental.documentos.dto.NuevaVersionDocumentoRequest;
 import com.plantarsas.gestiondocumental.documentos.service.DocumentoService;
 import com.plantarsas.gestiondocumental.exception.BusinessException;
 import com.plantarsas.gestiondocumental.exception.GlobalExceptionHandler;
+import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 import com.plantarsas.gestiondocumental.security.JwtAccessDeniedHandler;
 import com.plantarsas.gestiondocumental.security.JwtAuthenticationEntryPoint;
@@ -47,6 +44,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -63,10 +61,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -74,9 +74,11 @@ import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
@@ -105,6 +107,22 @@ class DocumentoControllerSecurityTest {
 
     private static final String METADATA_JSON_MALFORMADO =
             "{\"codigo\":\"PROC-001\", \"titulo\": ";
+
+    private static final Long DOCUMENTO_ID = 10L;
+
+    private static final String URL_NUEVA_VERSION = "/api/documentos/" + DOCUMENTO_ID + "/versiones";
+
+    private static final String METADATA_NUEVA_VERSION_VALIDA_JSON =
+            "{\"descripcionCambio\":\"Corrección de erratas\"}";
+
+    private static final String METADATA_NUEVA_VERSION_DESCRIPCION_VACIA_JSON =
+            "{\"descripcionCambio\":\"\"}";
+
+    private static final String METADATA_NUEVA_VERSION_DESCRIPCION_DEMASIADO_LARGA_JSON =
+            "{\"descripcionCambio\":\"" + "a".repeat(501) + "\"}";
+
+    private static final String METADATA_NUEVA_VERSION_JSON_MALFORMADO =
+            "{\"descripcionCambio\": ";
 
     @MockitoBean
     private DocumentoService documentoService;
@@ -320,6 +338,272 @@ class DocumentoControllerSecurityTest {
                 .andExpect(status().isInternalServerError());
 
         verifyNoInteractions(documentoService);
+    }
+
+    // ------------------------------------------------------------------
+    // POST /api/documentos/{id}/versiones
+    // ------------------------------------------------------------------
+
+    private MockMultipartFile metadataNuevaVersionValida() {
+        return new MockMultipartFile(
+                "metadata", "", "application/json", METADATA_NUEVA_VERSION_VALIDA_JSON.getBytes()
+        );
+    }
+
+    private MockMultipartFile metadataNuevaVersionDescripcionVacia() {
+        return new MockMultipartFile(
+                "metadata", "", "application/json", METADATA_NUEVA_VERSION_DESCRIPCION_VACIA_JSON.getBytes()
+        );
+    }
+
+    private MockMultipartFile metadataNuevaVersionDescripcionDemasiadoLarga() {
+        return new MockMultipartFile(
+                "metadata", "", "application/json",
+                METADATA_NUEVA_VERSION_DESCRIPCION_DEMASIADO_LARGA_JSON.getBytes()
+        );
+    }
+
+    private MockMultipartFile metadataNuevaVersionConJsonMalformado() {
+        return new MockMultipartFile(
+                "metadata", "", "application/json", METADATA_NUEVA_VERSION_JSON_MALFORMADO.getBytes()
+        );
+    }
+
+    @Test
+    void publicarNuevaVersion_sinAutenticacion_debeResponder401() throws Exception {
+        mockMvc.perform(multipart(URL_NUEVA_VERSION)
+                        .file(metadataNuevaVersionValida())
+                        .file(archivoValido()))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    @WithMockUser(roles = "JEFE_AREA")
+    void publicarNuevaVersion_conJefeArea_debeResponder403() throws Exception {
+        mockMvc.perform(multipart(URL_NUEVA_VERSION)
+                        .file(metadataNuevaVersionValida())
+                        .file(archivoValido()))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMINISTRATIVO")
+    void publicarNuevaVersion_conAdministrativo_debeResponder403() throws Exception {
+        mockMvc.perform(multipart(URL_NUEVA_VERSION)
+                        .file(metadataNuevaVersionValida())
+                        .file(archivoValido()))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    void publicarNuevaVersion_conAdministradorYSolicitudValida_debeResponder201() throws Exception {
+        when(documentoService.publicarNuevaVersion(
+                anyLong(), any(), any(), anyString(), any(InputStream.class), anyString(), anyLong()
+        )).thenReturn(respuestaDePrueba());
+
+        mockMvc.perform(multipart(URL_NUEVA_VERSION)
+                        .file(metadataNuevaVersionValida())
+                        .file(archivoValido())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isCreated());
+
+        verify(documentoService).publicarNuevaVersion(
+                eq(DOCUMENTO_ID), any(), any(), anyString(), any(InputStream.class), anyString(), anyLong()
+        );
+    }
+
+    @Test
+    void publicarNuevaVersion_sinMetadata_debeResponder400() throws Exception {
+        mockMvc.perform(multipart(URL_NUEVA_VERSION)
+                        .file(archivoValido())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    void publicarNuevaVersion_sinArchivo_debeResponder400() throws Exception {
+        mockMvc.perform(multipart(URL_NUEVA_VERSION)
+                        .file(metadataNuevaVersionValida())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    void publicarNuevaVersion_conMetadataJsonInvalido_debeResponder400() throws Exception {
+        mockMvc.perform(multipart(URL_NUEVA_VERSION)
+                        .file(metadataNuevaVersionConJsonMalformado())
+                        .file(archivoValido())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    void publicarNuevaVersion_conDescripcionCambioVacia_debeResponder400() throws Exception {
+        mockMvc.perform(multipart(URL_NUEVA_VERSION)
+                        .file(metadataNuevaVersionDescripcionVacia())
+                        .file(archivoValido())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    void publicarNuevaVersion_conDescripcionCambioDemasiadoLarga_debeResponder400() throws Exception {
+        mockMvc.perform(multipart(URL_NUEVA_VERSION)
+                        .file(metadataNuevaVersionDescripcionDemasiadoLarga())
+                        .file(archivoValido())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    void publicarNuevaVersion_conArchivoVacio_debeResponder400YNoInvocarServicio() throws Exception {
+        mockMvc.perform(multipart(URL_NUEVA_VERSION)
+                        .file(metadataNuevaVersionValida())
+                        .file(archivoVacio())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    void publicarNuevaVersion_conDocumentoInexistente_debeResponder404() throws Exception {
+        when(documentoService.publicarNuevaVersion(
+                anyLong(), any(), any(), anyString(), any(InputStream.class), anyString(), anyLong()
+        )).thenThrow(new ResourceNotFoundException("No existe un documento con id " + DOCUMENTO_ID));
+
+        mockMvc.perform(multipart(URL_NUEVA_VERSION)
+                        .file(metadataNuevaVersionValida())
+                        .file(archivoValido())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void publicarNuevaVersion_conDocumentoInactivo_debeResponder400() throws Exception {
+        when(documentoService.publicarNuevaVersion(
+                anyLong(), any(), any(), anyString(), any(InputStream.class), anyString(), anyLong()
+        )).thenThrow(new BusinessException(
+                "El documento 'PROC-001' no permite publicar nuevas versiones en su estado actual"
+        ));
+
+        mockMvc.perform(multipart(URL_NUEVA_VERSION)
+                        .file(metadataNuevaVersionValida())
+                        .file(archivoValido())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void publicarNuevaVersion_conDocumentoObsoleto_debeResponder400() throws Exception {
+        when(documentoService.publicarNuevaVersion(
+                anyLong(), any(), any(), anyString(), any(InputStream.class), anyString(), anyLong()
+        )).thenThrow(new BusinessException(
+                "El documento 'PROC-002' no permite publicar nuevas versiones en su estado actual"
+        ));
+
+        mockMvc.perform(multipart(URL_NUEVA_VERSION)
+                        .file(metadataNuevaVersionValida())
+                        .file(archivoValido())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void publicarNuevaVersion_conArchivoRechazadoPorTamano_debeResponder413() throws Exception {
+        when(documentoService.publicarNuevaVersion(
+                anyLong(), any(), any(), anyString(), any(InputStream.class), anyString(), anyLong()
+        )).thenThrow(new BusinessException("El archivo supera el tamaño máximo permitido", HttpStatus.PAYLOAD_TOO_LARGE));
+
+        mockMvc.perform(multipart(URL_NUEVA_VERSION)
+                        .file(metadataNuevaVersionValida())
+                        .file(archivoValido())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isPayloadTooLarge());
+    }
+
+    @Test
+    void publicarNuevaVersion_conIOExceptionAlLeerArchivo_debeResponder500() throws Exception {
+        mockMvc.perform(multipart(URL_NUEVA_VERSION)
+                        .file(metadataNuevaVersionValida())
+                        .file(archivoQueFallaAlLeer())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isInternalServerError());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    void publicarNuevaVersion_debeEnviarLosSieteArgumentosCorrectosYLeerElArchivoAntesDeCerrarlo()
+            throws Exception {
+        ArgumentCaptor<Long> idCaptor = ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<NuevaVersionDocumentoRequest> metadataCaptor =
+                ArgumentCaptor.forClass(NuevaVersionDocumentoRequest.class);
+        ArgumentCaptor<AuthenticatedUser> usuarioCaptor = ArgumentCaptor.forClass(AuthenticatedUser.class);
+        ArgumentCaptor<String> nombreCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> mimeCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Long> tamanoCaptor = ArgumentCaptor.forClass(Long.class);
+        byte[][] bytesLeidosDentroDelServicio = new byte[1][];
+
+        when(documentoService.publicarNuevaVersion(
+                idCaptor.capture(), metadataCaptor.capture(), usuarioCaptor.capture(),
+                nombreCaptor.capture(), any(InputStream.class), mimeCaptor.capture(), tamanoCaptor.capture()
+        )).thenAnswer(invocacion -> {
+            InputStream contenidoArchivo = invocacion.getArgument(4);
+            bytesLeidosDentroDelServicio[0] = contenidoArchivo.readAllBytes();
+            return respuestaDePrueba();
+        });
+
+        mockMvc.perform(multipart(URL_NUEVA_VERSION)
+                        .file(metadataNuevaVersionValida())
+                        .file(archivoValido())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isCreated());
+
+        assertThat(idCaptor.getValue()).isEqualTo(DOCUMENTO_ID);
+        assertThat(metadataCaptor.getValue().descripcionCambio()).isEqualTo("Corrección de erratas");
+        assertThat(usuarioCaptor.getValue().rol()).isEqualTo(RolEnum.ADMINISTRADOR);
+        assertThat(nombreCaptor.getValue()).isEqualTo("documento.pdf");
+        assertThat(mimeCaptor.getValue()).isEqualTo("application/pdf");
+        assertThat(tamanoCaptor.getValue()).isEqualTo((long) "contenido".getBytes().length);
+        assertThat(bytesLeidosDentroDelServicio[0]).isEqualTo("contenido".getBytes());
+    }
+
+    @Test
+    void publicarNuevaVersion_conExito_debeResponderConEstructuraApiResponseValida() throws Exception {
+        when(documentoService.publicarNuevaVersion(
+                anyLong(), any(), any(), anyString(), any(InputStream.class), anyString(), anyLong()
+        )).thenReturn(respuestaDePrueba());
+
+        MvcResult result = mockMvc.perform(multipart(URL_NUEVA_VERSION)
+                        .file(metadataNuevaVersionValida())
+                        .file(archivoValido())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString());
+        assertThat(json.get("exito").asBoolean()).isTrue();
+        assertThat(json.get("mensaje").isNull()).isTrue();
+        assertThat(json.get("datos").get("codigo").asText()).isEqualTo("PROC-001");
+        assertThat(json.get("errores").isNull()).isTrue();
+        assertThat(json.get("fechaHora").asText()).isNotBlank();
     }
 
     @Configuration
