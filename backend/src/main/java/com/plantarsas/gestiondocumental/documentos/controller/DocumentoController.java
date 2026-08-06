@@ -2,6 +2,7 @@ package com.plantarsas.gestiondocumental.documentos.controller;
 
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoPublicacionInicialRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
+import com.plantarsas.gestiondocumental.documentos.dto.NuevaVersionDocumentoRequest;
 import com.plantarsas.gestiondocumental.documentos.service.DocumentoService;
 import com.plantarsas.gestiondocumental.exception.BusinessException;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
@@ -13,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -56,5 +58,35 @@ public class DocumentoController {
         }
 
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.exitosa(creado));
+    }
+
+    @PostMapping(path = "/{id}/versiones", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<ApiResponse<DocumentoResponse>> publicarNuevaVersion(
+            @PathVariable Long id,
+            @Valid @RequestPart("metadata") NuevaVersionDocumentoRequest metadata,
+            @RequestPart("archivo") MultipartFile archivo,
+            @AuthenticationPrincipal AuthenticatedUser usuarioAutenticado
+    ) {
+        if (archivo.isEmpty()) {
+            throw new BusinessException("El archivo no puede estar vacío", HttpStatus.BAD_REQUEST);
+        }
+
+        DocumentoResponse actualizado;
+        try (InputStream contenidoArchivo = archivo.getInputStream()) {
+            actualizado = documentoService.publicarNuevaVersion(
+                    id,
+                    metadata,
+                    usuarioAutenticado,
+                    archivo.getOriginalFilename(),
+                    contenidoArchivo,
+                    archivo.getContentType(),
+                    archivo.getSize()
+            );
+        } catch (IOException e) {
+            throw new UncheckedIOException("No se pudo leer el archivo de la nueva versión", e);
+        }
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.exitosa(actualizado));
     }
 }
