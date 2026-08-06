@@ -3,6 +3,7 @@ package com.plantarsas.gestiondocumental.documentos.service;
 import com.plantarsas.gestiondocumental.areas.entity.Area;
 import com.plantarsas.gestiondocumental.areas.service.AreaLookupService;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoPublicacionInicialRequest;
+import com.plantarsas.gestiondocumental.documentos.dto.NuevaVersionDocumentoRequest;
 import com.plantarsas.gestiondocumental.documentos.entity.Documento;
 import com.plantarsas.gestiondocumental.documentos.entity.DocumentoArea;
 import com.plantarsas.gestiondocumental.documentos.entity.VersionDocumento;
@@ -28,6 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -46,9 +48,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -61,6 +66,10 @@ class DocumentoServiceImplTest {
     private static final Long TIPO_DOCUMENTO_ID = 3L;
     private static final Long USUARIO_ID = 4L;
     private static final String RUTA_ALMACENADA = "550e8400-e29b-41d4-a716-446655440000.pdf";
+
+    private static final Long DOCUMENTO_ID = 10L;
+    private static final String RUTA_ARCHIVO_ANTERIOR = "ruta-anterior.pdf";
+    private static final String RUTA_ARCHIVO_NUEVO = "660e8400-e29b-41d4-a716-446655440111.pdf";
 
     @Mock
     private DocumentoRepository documentoRepository;
@@ -634,5 +643,574 @@ class DocumentoServiceImplTest {
         verify(versionDocumentoRepository).save(versionCaptor.capture());
         assertThat(versionCaptor.getValue().getNumeroVersion()).isEqualTo(1);
         assertThat(versionCaptor.getValue().isVigente()).isTrue();
+    }
+
+    // ------------------------------------------------------------------
+    // publicarNuevaVersion
+    // ------------------------------------------------------------------
+
+    private NuevaVersionDocumentoRequest requestNuevaVersionValido() {
+        return new NuevaVersionDocumentoRequest("  Corrección de erratas  ");
+    }
+
+    private Documento documentoPublicadoDePrueba() {
+        return new Documento(
+                "PROC-001", "Título", "Descripción",
+                mock(Subprograma.class), mock(TipoDocumento.class), usuarioPersistidoMock()
+        );
+    }
+
+    private DocumentoArea documentoAreaDePrueba(Documento documento) {
+        return new DocumentoArea(documento, mock(Area.class));
+    }
+
+    private VersionDocumento versionVigenteDePrueba(Documento documento) {
+        return new VersionDocumento(
+                documento, 3, "v1.pdf", RUTA_ARCHIVO_ANTERIOR, RUTA_ARCHIVO_ANTERIOR,
+                "application/pdf", 100L, "Descripción anterior", usuarioPersistidoMock()
+        );
+    }
+
+    private StoredFile archivoNuevoGuardadoDePrueba() {
+        return new StoredFile("v2.pdf", RUTA_ARCHIVO_NUEVO, "application/pdf", 20L, "hash-nuevo");
+    }
+
+    private void stubBusquedasPreviasNuevaVersion(
+            Documento documento, DocumentoArea documentoArea, VersionDocumento vigenteActual, Usuario usuario
+    ) {
+        when(documentoRepository.buscarPorIdConBloqueoPesimista(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(documentoAreaRepository.findByDocumento_Id(DOCUMENTO_ID)).thenReturn(Optional.of(documentoArea));
+        when(versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(DOCUMENTO_ID))
+                .thenReturn(Optional.of(vigenteActual));
+        when(usuarioRepository.findById(USUARIO_ID)).thenReturn(Optional.of(usuario));
+    }
+
+    private void stubAlmacenamientoYPersistenciaExitosaNuevaVersion(int ultimoNumeroVersion) throws IOException {
+        when(versionDocumentoRepository.obtenerUltimoNumeroVersion(DOCUMENTO_ID)).thenReturn(ultimoNumeroVersion);
+        when(storageService.guardar(anyString(), any(InputStream.class), anyString(), anyLong()))
+                .thenReturn(archivoNuevoGuardadoDePrueba());
+        when(versionDocumentoRepository.save(any(VersionDocumento.class))).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    @Test
+    void publicarNuevaVersion_debePublicarNuevaVersionCorrectamente() throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        stubAlmacenamientoYPersistenciaExitosaNuevaVersion(3);
+
+        documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        );
+
+        ArgumentCaptor<VersionDocumento> versionCaptor = ArgumentCaptor.forClass(VersionDocumento.class);
+        verify(versionDocumentoRepository).save(versionCaptor.capture());
+        assertThat(versionCaptor.getValue().getNumeroVersion()).isEqualTo(4);
+        assertThat(versionCaptor.getValue().isVigente()).isTrue();
+        assertThat(vigenteActual.isVigente()).isFalse();
+        verify(versionDocumentoRepository, times(2)).flush();
+    }
+
+    @Test
+    void publicarNuevaVersion_debeRechazarUsuarioNulo() {
+        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), null,
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        )).isInstanceOf(UnauthorizedException.class);
+
+        verifyNoInteractions(documentoRepository, storageService);
+    }
+
+    @Test
+    void publicarNuevaVersion_debeRechazarUsuarioConRolJefeArea() {
+        AuthenticatedUser jefeArea = new AuthenticatedUser(USUARIO_ID, "jefe@plantarsas.com", RolEnum.JEFE_AREA);
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), jefeArea,
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        )).isInstanceOf(UnauthorizedException.class);
+
+        verifyNoInteractions(documentoRepository, storageService);
+    }
+
+    @Test
+    void publicarNuevaVersion_debeRechazarUsuarioConRolAdministrativo() {
+        AuthenticatedUser administrativo = new AuthenticatedUser(USUARIO_ID, "aux@plantarsas.com", RolEnum.ADMINISTRATIVO);
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), administrativo,
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        )).isInstanceOf(UnauthorizedException.class);
+
+        verifyNoInteractions(documentoRepository, storageService);
+    }
+
+    @Test
+    void publicarNuevaVersion_debeLanzarNotFoundSiDocumentoNoExiste() {
+        when(documentoRepository.buscarPorIdConBloqueoPesimista(DOCUMENTO_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        )).isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void publicarNuevaVersion_debeLanzarBusinessExceptionSiDocumentoInactivo() {
+        Documento documento = documentoPublicadoDePrueba();
+        documento.cambiarEstado(DocumentoEstado.INACTIVO);
+        when(documentoRepository.buscarPorIdConBloqueoPesimista(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        )).isInstanceOf(BusinessException.class);
+
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void publicarNuevaVersion_debeLanzarBusinessExceptionSiDocumentoObsoleto() {
+        Documento documento = documentoPublicadoDePrueba();
+        documento.cambiarEstado(DocumentoEstado.OBSOLETO);
+        when(documentoRepository.buscarPorIdConBloqueoPesimista(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        )).isInstanceOf(BusinessException.class);
+
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void publicarNuevaVersion_debeLanzarNotFoundSiDocumentoAreaNoExiste() {
+        Documento documento = documentoPublicadoDePrueba();
+        when(documentoRepository.buscarPorIdConBloqueoPesimista(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(documentoAreaRepository.findByDocumento_Id(DOCUMENTO_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        )).isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void publicarNuevaVersion_debeLanzarIllegalStateExceptionSiNoHayVersionVigente() {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        when(documentoRepository.buscarPorIdConBloqueoPesimista(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(documentoAreaRepository.findByDocumento_Id(DOCUMENTO_ID)).thenReturn(Optional.of(documentoArea));
+        when(versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(DOCUMENTO_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        )).isInstanceOf(IllegalStateException.class);
+
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void publicarNuevaVersion_debeLanzarNotFoundSiUsuarioAutenticadoYaNoExiste() {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        when(documentoRepository.buscarPorIdConBloqueoPesimista(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(documentoAreaRepository.findByDocumento_Id(DOCUMENTO_ID)).thenReturn(Optional.of(documentoArea));
+        when(versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(DOCUMENTO_ID))
+                .thenReturn(Optional.of(vigenteActual));
+        when(usuarioRepository.findById(USUARIO_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        )).isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void publicarNuevaVersion_debePropagarBusinessExceptionSiArchivoVacio() throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        when(versionDocumentoRepository.obtenerUltimoNumeroVersion(DOCUMENTO_ID)).thenReturn(3);
+        when(storageService.guardar(anyString(), any(InputStream.class), anyString(), anyLong()))
+                .thenThrow(new BusinessException("El archivo no puede estar vacío"));
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "vacio.txt", contenidoDePrueba(), "text/plain", 0L
+        )).isInstanceOf(BusinessException.class);
+
+        verify(versionDocumentoRepository, never()).save(any(VersionDocumento.class));
+    }
+
+    @Test
+    void publicarNuevaVersion_debePropagarBusinessExceptionSiArchivoSuperaQuinceMB() throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        when(versionDocumentoRepository.obtenerUltimoNumeroVersion(DOCUMENTO_ID)).thenReturn(3);
+        when(storageService.guardar(anyString(), any(InputStream.class), anyString(), anyLong()))
+                .thenThrow(new BusinessException("El archivo supera el tamaño máximo permitido"));
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "grande.pdf", contenidoDePrueba(), "application/pdf", 999_999_999L
+        )).isInstanceOf(BusinessException.class);
+
+        verify(versionDocumentoRepository, never()).save(any(VersionDocumento.class));
+    }
+
+    @Test
+    void publicarNuevaVersion_debeLanzarUncheckedIOExceptionSiFallaElAlmacenamiento() throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        when(versionDocumentoRepository.obtenerUltimoNumeroVersion(DOCUMENTO_ID)).thenReturn(3);
+        when(storageService.guardar(anyString(), any(InputStream.class), anyString(), anyLong()))
+                .thenThrow(new IOException("disco lleno"));
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        )).isInstanceOf(UncheckedIOException.class);
+
+        verify(versionDocumentoRepository, never()).save(any(VersionDocumento.class));
+    }
+
+    @Test
+    void publicarNuevaVersion_debeCalcularNumeroDeVersionComoUltimoMasUno() throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        stubAlmacenamientoYPersistenciaExitosaNuevaVersion(7);
+
+        documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        );
+
+        ArgumentCaptor<VersionDocumento> versionCaptor = ArgumentCaptor.forClass(VersionDocumento.class);
+        verify(versionDocumentoRepository).save(versionCaptor.capture());
+        assertThat(versionCaptor.getValue().getNumeroVersion()).isEqualTo(8);
+    }
+
+    @Test
+    void publicarNuevaVersion_debeMarcarVersionAnteriorComoNoVigente() throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        stubAlmacenamientoYPersistenciaExitosaNuevaVersion(3);
+
+        documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        );
+
+        assertThat(vigenteActual.isVigente()).isFalse();
+    }
+
+    @Test
+    void publicarNuevaVersion_debeCrearNuevaVersionConVigenteVerdadero() throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        stubAlmacenamientoYPersistenciaExitosaNuevaVersion(3);
+
+        documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        );
+
+        ArgumentCaptor<VersionDocumento> versionCaptor = ArgumentCaptor.forClass(VersionDocumento.class);
+        verify(versionDocumentoRepository).save(versionCaptor.capture());
+        assertThat(versionCaptor.getValue().isVigente()).isTrue();
+    }
+
+    @Test
+    void publicarNuevaVersion_debeRegistrarUsuarioAutenticadoComoPublicador() throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        stubAlmacenamientoYPersistenciaExitosaNuevaVersion(3);
+
+        documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        );
+
+        ArgumentCaptor<VersionDocumento> versionCaptor = ArgumentCaptor.forClass(VersionDocumento.class);
+        verify(versionDocumentoRepository).save(versionCaptor.capture());
+        assertThat(versionCaptor.getValue().getPublicadoPor()).isEqualTo(usuarioPersistido);
+    }
+
+    @Test
+    void publicarNuevaVersion_debeNormalizarDescripcionCambioConTrim() throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        stubAlmacenamientoYPersistenciaExitosaNuevaVersion(3);
+
+        documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        );
+
+        ArgumentCaptor<VersionDocumento> versionCaptor = ArgumentCaptor.forClass(VersionDocumento.class);
+        verify(versionDocumentoRepository).save(versionCaptor.capture());
+        assertThat(versionCaptor.getValue().getDescripcionCambio()).isEqualTo("Corrección de erratas");
+    }
+
+    @Test
+    void publicarNuevaVersion_debeEjecutarLosDosFlushEnElOrdenObligatorio() throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        stubAlmacenamientoYPersistenciaExitosaNuevaVersion(3);
+
+        documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        );
+
+        InOrder orden = inOrder(versionDocumentoRepository);
+        orden.verify(versionDocumentoRepository).flush();
+        orden.verify(versionDocumentoRepository).save(any(VersionDocumento.class));
+        orden.verify(versionDocumentoRepository).flush();
+    }
+
+    @Test
+    void publicarNuevaVersion_debeEliminarArchivoNuevoSiFallaElPrimerFlush() throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        when(versionDocumentoRepository.obtenerUltimoNumeroVersion(DOCUMENTO_ID)).thenReturn(3);
+        when(storageService.guardar(anyString(), any(InputStream.class), anyString(), anyLong()))
+                .thenReturn(archivoNuevoGuardadoDePrueba());
+        doThrow(new DataIntegrityViolationException("violación en primer flush"))
+                .when(versionDocumentoRepository).flush();
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        )).isInstanceOf(DataIntegrityViolationException.class);
+
+        verify(storageService).eliminar(RUTA_ARCHIVO_NUEVO);
+        verify(versionDocumentoRepository, never()).save(any(VersionDocumento.class));
+    }
+
+    @Test
+    void publicarNuevaVersion_debeEliminarArchivoNuevoSiFallaElSaveDeNuevaVersion() throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        when(versionDocumentoRepository.obtenerUltimoNumeroVersion(DOCUMENTO_ID)).thenReturn(3);
+        when(storageService.guardar(anyString(), any(InputStream.class), anyString(), anyLong()))
+                .thenReturn(archivoNuevoGuardadoDePrueba());
+        when(versionDocumentoRepository.save(any(VersionDocumento.class)))
+                .thenThrow(new DataIntegrityViolationException("violación de restricción"));
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        )).isInstanceOf(DataIntegrityViolationException.class);
+
+        verify(storageService).eliminar(RUTA_ARCHIVO_NUEVO);
+    }
+
+    @Test
+    void publicarNuevaVersion_debeEliminarArchivoNuevoSiFallaElSegundoFlush() throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        stubAlmacenamientoYPersistenciaExitosaNuevaVersion(3);
+        doNothing()
+                .doThrow(new DataIntegrityViolationException("violación en segundo flush"))
+                .when(versionDocumentoRepository).flush();
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        )).isInstanceOf(DataIntegrityViolationException.class);
+
+        verify(storageService).eliminar(RUTA_ARCHIVO_NUEVO);
+    }
+
+    @Test
+    void publicarNuevaVersion_debeEliminarArchivoNuevoCuandoLaSincronizacionSeCompletaConEstadoDistintoDeCommitted()
+            throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        stubAlmacenamientoYPersistenciaExitosaNuevaVersion(3);
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            documentoServiceImpl.publicarNuevaVersion(
+                    DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                    "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+            );
+
+            List<TransactionSynchronization> sincronizaciones =
+                    TransactionSynchronizationManager.getSynchronizations();
+            assertThat(sincronizaciones).hasSize(1);
+
+            sincronizaciones.get(0).afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK);
+
+            verify(storageService).eliminar(RUTA_ARCHIVO_NUEVO);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void publicarNuevaVersion_noDebeEliminarArchivoNuevoCuandoLaSincronizacionSeCompletaConCommitted()
+            throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        stubAlmacenamientoYPersistenciaExitosaNuevaVersion(3);
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            documentoServiceImpl.publicarNuevaVersion(
+                    DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                    "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+            );
+
+            List<TransactionSynchronization> sincronizaciones =
+                    TransactionSynchronizationManager.getSynchronizations();
+            assertThat(sincronizaciones).hasSize(1);
+
+            sincronizaciones.get(0).afterCompletion(TransactionSynchronization.STATUS_COMMITTED);
+
+            verify(storageService, never()).eliminar(anyString());
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void publicarNuevaVersion_nuncaDebeEliminarElArchivoDeLaVersionAnterior() throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        when(versionDocumentoRepository.obtenerUltimoNumeroVersion(DOCUMENTO_ID)).thenReturn(3);
+        when(storageService.guardar(anyString(), any(InputStream.class), anyString(), anyLong()))
+                .thenReturn(archivoNuevoGuardadoDePrueba());
+        when(versionDocumentoRepository.save(any(VersionDocumento.class)))
+                .thenThrow(new DataIntegrityViolationException("violación de restricción"));
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        )).isInstanceOf(DataIntegrityViolationException.class);
+
+        verify(storageService, never()).eliminar(RUTA_ARCHIVO_ANTERIOR);
+        verify(storageService).eliminar(RUTA_ARCHIVO_NUEVO);
+    }
+
+    @Test
+    void publicarNuevaVersion_debeConservarCodigoTituloDescripcionAreaSubprogramaYTipoDocumentalDelDocumento()
+            throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        String codigoOriginal = documento.getCodigo();
+        String tituloOriginal = documento.getTitulo();
+        String descripcionOriginal = documento.getDescripcion();
+        Subprograma subprogramaOriginal = documento.getSubprograma();
+        TipoDocumento tipoDocumentoOriginal = documento.getTipoDocumento();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        Area areaOriginal = documentoArea.getArea();
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        stubAlmacenamientoYPersistenciaExitosaNuevaVersion(3);
+
+        documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        );
+
+        assertThat(documento.getCodigo()).isEqualTo(codigoOriginal);
+        assertThat(documento.getTitulo()).isEqualTo(tituloOriginal);
+        assertThat(documento.getDescripcion()).isEqualTo(descripcionOriginal);
+        assertThat(documento.getSubprograma()).isEqualTo(subprogramaOriginal);
+        assertThat(documento.getTipoDocumento()).isEqualTo(tipoDocumentoOriginal);
+        assertThat(documentoArea.getArea()).isEqualTo(areaOriginal);
+        verify(documentoRepository, never()).save(any(Documento.class));
+    }
+
+    @Test
+    void publicarNuevaVersion_debeUsarBusquedaConBloqueoPesimista() throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        stubAlmacenamientoYPersistenciaExitosaNuevaVersion(3);
+
+        documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        );
+
+        verify(documentoRepository).buscarPorIdConBloqueoPesimista(DOCUMENTO_ID);
+        verify(documentoRepository, never()).findById(any());
+    }
+
+    @Test
+    void publicarNuevaVersion_noDebeAlmacenarArchivoCuandoFallaUnaValidacionPrevia() {
+        Documento documento = documentoPublicadoDePrueba();
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        when(documentoRepository.buscarPorIdConBloqueoPesimista(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(documentoAreaRepository.findByDocumento_Id(DOCUMENTO_ID)).thenReturn(Optional.of(documentoArea));
+        when(versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(DOCUMENTO_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        )).isInstanceOf(IllegalStateException.class);
+
+        verifyNoInteractions(storageService);
     }
 }
