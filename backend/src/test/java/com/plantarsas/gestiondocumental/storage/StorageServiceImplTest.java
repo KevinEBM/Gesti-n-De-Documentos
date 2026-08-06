@@ -114,6 +114,20 @@ class StorageServiceImplTest {
     }
 
     @Test
+    void guardar_debeAceptarArchivoDeTamanoMaximoExacto() throws Exception {
+        byte[] contenido = new byte[(int) MAX_FILE_SIZE_BYTES];
+
+        StoredFile resultado = storageServiceImpl.guardar(
+                "limite.txt",
+                new ByteArrayInputStream(contenido),
+                "text/plain",
+                MAX_FILE_SIZE_BYTES
+        );
+
+        assertThat(resultado.tamanoBytes()).isEqualTo(MAX_FILE_SIZE_BYTES);
+    }
+
+    @Test
     void cargar_debeRetornarElContenidoDeUnArchivoExistente() throws Exception {
         byte[] contenido = "contenido a leer".getBytes(StandardCharsets.UTF_8);
         StoredFile guardado = storageServiceImpl.guardar(
