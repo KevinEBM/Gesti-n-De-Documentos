@@ -4,6 +4,7 @@ import com.plantarsas.gestiondocumental.areas.entity.Area;
 import com.plantarsas.gestiondocumental.areas.service.AreaLookupService;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoPublicacionInicialRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
+import com.plantarsas.gestiondocumental.documentos.dto.NuevaVersionDocumentoRequest;
 import com.plantarsas.gestiondocumental.documentos.entity.Documento;
 import com.plantarsas.gestiondocumental.documentos.entity.DocumentoArea;
 import com.plantarsas.gestiondocumental.documentos.entity.VersionDocumento;
@@ -15,6 +16,7 @@ import com.plantarsas.gestiondocumental.exception.BusinessException;
 import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
 import com.plantarsas.gestiondocumental.exception.UnauthorizedException;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
+import com.plantarsas.gestiondocumental.shared.enums.DocumentoEstado;
 import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
 import com.plantarsas.gestiondocumental.storage.StorageService;
 import com.plantarsas.gestiondocumental.storage.StoredFile;
@@ -136,6 +138,101 @@ public class DocumentoServiceImpl implements DocumentoService {
             documentoRepository.flush();
 
             return documentoMapper.toResponse(documento, documentoArea, version);
+        } catch (RuntimeException e) {
+            eliminarSilenciosamente(archivoGuardado.ruta());
+            throw e;
+        }
+    }
+
+    @Override
+    @Transactional
+    public DocumentoResponse publicarNuevaVersion(
+            Long documentoId,
+            NuevaVersionDocumentoRequest request,
+            AuthenticatedUser usuarioAutenticado,
+            String nombreArchivoOriginal,
+            InputStream contenidoArchivo,
+            String tipoMimeArchivo,
+            long tamanoBytesArchivo
+    ) {
+        if (usuarioAutenticado == null) {
+            throw new UnauthorizedException(
+                    "Se requiere un usuario autenticado para publicar una nueva versión"
+            );
+        }
+        if (usuarioAutenticado.rol() != RolEnum.ADMINISTRADOR) {
+            throw new UnauthorizedException(
+                    "Solo el administrador puede publicar nuevas versiones"
+            );
+        }
+        if (documentoId == null || documentoId <= 0) {
+            throw new BusinessException(
+                    "El identificador del documento debe ser un valor válido",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        Documento documento = documentoRepository.buscarPorIdConBloqueoPesimista(documentoId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No existe un documento con id " + documentoId
+                ));
+
+        if (documento.getEstado() != DocumentoEstado.PUBLICADO) {
+            throw new BusinessException(
+                    "El documento '" + documento.getCodigo()
+                            + "' no permite publicar nuevas versiones en su estado actual"
+            );
+        }
+
+        DocumentoArea documentoArea = documentoAreaRepository.findByDocumento_Id(documentoId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No existe un área asignada para el documento con id " + documentoId
+                ));
+
+        VersionDocumento vigenteActual = versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(documentoId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Inconsistencia de datos: el documento con id " + documentoId
+                                + " está en estado PUBLICADO pero no tiene una versión vigente registrada"
+                ));
+
+        Usuario usuario = usuarioRepository.findById(usuarioAutenticado.id())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No existe un usuario con id " + usuarioAutenticado.id()
+                ));
+
+        int siguienteNumeroVersion = versionDocumentoRepository.obtenerUltimoNumeroVersion(documentoId) + 1;
+
+        StoredFile archivoGuardado;
+        try {
+            archivoGuardado = storageService.guardar(
+                    nombreArchivoOriginal, contenidoArchivo, tipoMimeArchivo, tamanoBytesArchivo
+            );
+        } catch (IOException e) {
+            throw new UncheckedIOException("No se pudo almacenar el archivo de la nueva versión", e);
+        }
+
+        try {
+            registrarCompensacionSiFallaLaTransaccion(archivoGuardado.ruta());
+
+            vigenteActual.marcarNoVigente();
+            versionDocumentoRepository.flush();
+
+            VersionDocumento nuevaVersion = new VersionDocumento(
+                    documento,
+                    siguienteNumeroVersion,
+                    archivoGuardado.nombreOriginal(),
+                    archivoGuardado.ruta(),
+                    archivoGuardado.ruta(),
+                    archivoGuardado.mimeType(),
+                    archivoGuardado.tamanoBytes(),
+                    request.descripcionCambio().trim(),
+                    usuario
+            );
+            versionDocumentoRepository.save(nuevaVersion);
+
+            versionDocumentoRepository.flush();
+
+            return documentoMapper.toResponse(documento, documentoArea, nuevaVersion);
         } catch (RuntimeException e) {
             eliminarSilenciosamente(archivoGuardado.ruta());
             throw e;
