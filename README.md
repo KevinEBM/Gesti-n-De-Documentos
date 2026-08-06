@@ -117,13 +117,12 @@ Los siguientes modulos estan previstos pero aun no tienen implementacion funcion
 - `security`
 - `tiposdocumento`
 - `usuarios`
-- `versiones`
 
 La base de datos contempla doce tablas: `roles`, `usuarios`, `areas`, `usuario_area`, `categorias`, `tipos_documento`, `documentos`, `documento_area`, `versiones_documento`, `notificaciones`, `codigos_verificacion` y `auditoria`. No se contempla una tabla `envios_correo`.
 
 El codigo documental pertenece a `documentos.codigo`: lo asigna el administrador en la publicacion inicial, es obligatorio, unico, sirve para buscar documentos, se conserva en todas las versiones y no debe duplicarse en `versiones_documento`.
 
-La identidad general del documento pertenece al modulo `documentos`; los archivos historicos pertenecen al modulo `versiones`. La relacion conceptual es `Documento 1 - N VersionesDocumento`.
+La identidad general del documento y su historial de versiones se gestionan dentro del modulo `documentos`, mediante la entidad `VersionDocumento`. La relacion conceptual es `Documento 1 - N VersionDocumento`.
 
 ## Almacenamiento
 
