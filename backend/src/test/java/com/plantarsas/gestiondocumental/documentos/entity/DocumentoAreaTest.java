@@ -25,4 +25,18 @@ class DocumentoAreaTest {
         assertThat(documentoArea.getDocumento()).isSameAs(documento);
         assertThat(documentoArea.getArea()).isSameAs(area);
     }
+
+    @Test
+    void principal_debeProducirEsPrincipalVerdadero() {
+        DocumentoArea documentoArea = DocumentoArea.principal(mock(Documento.class), mock(Area.class));
+
+        assertThat(documentoArea.isEsPrincipal()).isTrue();
+    }
+
+    @Test
+    void adicional_debeProducirEsPrincipalFalso() {
+        DocumentoArea documentoArea = DocumentoArea.adicional(mock(Documento.class), mock(Area.class));
+
+        assertThat(documentoArea.isEsPrincipal()).isFalse();
+    }
 }
