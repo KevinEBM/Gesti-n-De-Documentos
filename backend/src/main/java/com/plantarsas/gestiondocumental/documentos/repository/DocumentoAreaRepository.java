@@ -10,5 +10,7 @@ public interface DocumentoAreaRepository extends JpaRepository<DocumentoArea, Lo
 
     Optional<DocumentoArea> findByDocumento_Id(Long documentoId);
 
+    Optional<DocumentoArea> findByDocumento_IdAndEsPrincipalTrue(Long documentoId);
+
     List<DocumentoArea> findByArea_Id(Long areaId);
 }

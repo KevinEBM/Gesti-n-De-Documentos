@@ -1,5 +1,6 @@
 package com.plantarsas.gestiondocumental.documentos.entity;
 
+import com.plantarsas.gestiondocumental.shared.enums.DocumentoAlcance;
 import com.plantarsas.gestiondocumental.shared.enums.DocumentoEstado;
 import com.plantarsas.gestiondocumental.subprogramas.entity.Subprograma;
 import com.plantarsas.gestiondocumental.tiposdocumento.entity.TipoDocumento;
@@ -58,6 +59,10 @@ public class Documento {
     @Column(nullable = false, length = 20)
     private DocumentoEstado estado;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "alcance", nullable = false, length = 20)
+    private DocumentoAlcance alcance;
+
     @Column(name = "fecha_creacion", nullable = false, updatable = false)
     private LocalDateTime fechaCreacion;
 
@@ -72,6 +77,18 @@ public class Documento {
             TipoDocumento tipoDocumento,
             Usuario creadoPor
     ) {
+        this(codigo, titulo, descripcion, subprograma, tipoDocumento, creadoPor, DocumentoAlcance.AREA_RESPONSABLE);
+    }
+
+    public Documento(
+            String codigo,
+            String titulo,
+            String descripcion,
+            Subprograma subprograma,
+            TipoDocumento tipoDocumento,
+            Usuario creadoPor,
+            DocumentoAlcance alcance
+    ) {
         this.codigo = normalizarTexto(codigo);
         this.titulo = normalizarTexto(titulo);
         this.descripcion = normalizarTextoOpcional(descripcion);
@@ -79,6 +96,7 @@ public class Documento {
         this.tipoDocumento = tipoDocumento;
         this.creadoPor = creadoPor;
         this.estado = DocumentoEstado.PUBLICADO;
+        this.alcance = alcance;
     }
 
     public void cambiarEstado(DocumentoEstado nuevoEstado) {

@@ -43,9 +43,21 @@ public class DocumentoArea {
     private LocalDateTime fechaAsignacion;
 
     public DocumentoArea(Documento documento, Area area) {
+        this(documento, area, true);
+    }
+
+    public static DocumentoArea principal(Documento documento, Area area) {
+        return new DocumentoArea(documento, area, true);
+    }
+
+    public static DocumentoArea adicional(Documento documento, Area area) {
+        return new DocumentoArea(documento, area, false);
+    }
+
+    private DocumentoArea(Documento documento, Area area, boolean esPrincipal) {
         this.documento = documento;
         this.area = area;
-        this.esPrincipal = true;
+        this.esPrincipal = esPrincipal;
     }
 
     @PrePersist
