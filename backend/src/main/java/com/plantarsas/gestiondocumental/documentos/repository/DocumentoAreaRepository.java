@@ -8,9 +8,9 @@ import java.util.Optional;
 
 public interface DocumentoAreaRepository extends JpaRepository<DocumentoArea, Long> {
 
-    Optional<DocumentoArea> findByDocumento_Id(Long documentoId);
-
     Optional<DocumentoArea> findByDocumento_IdAndEsPrincipalTrue(Long documentoId);
+
+    List<DocumentoArea> findAllByDocumento_IdAndEsPrincipalFalse(Long documentoId);
 
     List<DocumentoArea> findByArea_Id(Long areaId);
 }

@@ -16,6 +16,7 @@ import com.plantarsas.gestiondocumental.exception.BusinessException;
 import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
 import com.plantarsas.gestiondocumental.exception.UnauthorizedException;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
+import com.plantarsas.gestiondocumental.shared.enums.DocumentoAlcance;
 import com.plantarsas.gestiondocumental.shared.enums.DocumentoEstado;
 import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
 import com.plantarsas.gestiondocumental.storage.StorageService;
@@ -37,6 +38,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.util.HashSet;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -97,6 +100,8 @@ public class DocumentoServiceImpl implements DocumentoService {
                         "No existe un usuario con id " + usuarioAutenticado.id()
                 ));
 
+        List<Area> areasAdicionales = resolverAreasAdicionales(request, area);
+
         StoredFile archivoGuardado;
         try {
             archivoGuardado = storageService.guardar(
@@ -115,12 +120,15 @@ public class DocumentoServiceImpl implements DocumentoService {
                     request.descripcion(),
                     subprograma,
                     tipoDocumento,
-                    usuario
+                    usuario,
+                    request.alcance()
             );
             documentoRepository.save(documento);
 
-            DocumentoArea documentoArea = new DocumentoArea(documento, area);
-            documentoAreaRepository.save(documentoArea);
+            DocumentoArea principal = DocumentoArea.principal(documento, area);
+            documentoAreaRepository.save(principal);
+
+            List<DocumentoArea> asociacionesAdicionales = crearAreasAdicionales(documento, areasAdicionales);
 
             VersionDocumento version = new VersionDocumento(
                     documento,
@@ -137,7 +145,7 @@ public class DocumentoServiceImpl implements DocumentoService {
 
             documentoRepository.flush();
 
-            return documentoMapper.toResponse(documento, documentoArea, version);
+            return documentoMapper.toResponse(documento, principal, asociacionesAdicionales, version);
         } catch (RuntimeException e) {
             eliminarSilenciosamente(archivoGuardado.ruta());
             throw e;
@@ -184,10 +192,12 @@ public class DocumentoServiceImpl implements DocumentoService {
             );
         }
 
-        DocumentoArea documentoArea = documentoAreaRepository.findByDocumento_Id(documentoId)
+        DocumentoArea principal = documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(documentoId)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "No existe un área asignada para el documento con id " + documentoId
+                        "No existe un área principal asignada para el documento con id " + documentoId
                 ));
+
+        List<DocumentoArea> adicionales = documentoAreaRepository.findAllByDocumento_IdAndEsPrincipalFalse(documentoId);
 
         VersionDocumento vigenteActual = versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(documentoId)
                 .orElseThrow(() -> new IllegalStateException(
@@ -232,11 +242,55 @@ public class DocumentoServiceImpl implements DocumentoService {
 
             versionDocumentoRepository.flush();
 
-            return documentoMapper.toResponse(documento, documentoArea, nuevaVersion);
+            return documentoMapper.toResponse(documento, principal, adicionales, nuevaVersion);
         } catch (RuntimeException e) {
             eliminarSilenciosamente(archivoGuardado.ruta());
             throw e;
         }
+    }
+
+    private List<Area> resolverAreasAdicionales(
+            DocumentoPublicacionInicialRequest request,
+            Area areaPrincipal
+    ) {
+        List<Long> idsAdicionales = request.areasAdicionalesIds();
+
+        if (request.alcance() != DocumentoAlcance.AREAS_ESPECIFICAS) {
+            if (!idsAdicionales.isEmpty()) {
+                throw new BusinessException(
+                        "El alcance '" + request.alcance() + "' no admite áreas adicionales"
+                );
+            }
+            return List.of();
+        }
+
+        if (idsAdicionales.isEmpty()) {
+            throw new BusinessException(
+                    "El alcance AREAS_ESPECIFICAS requiere al menos un área adicional"
+            );
+        }
+
+        if (new HashSet<>(idsAdicionales).size() != idsAdicionales.size()) {
+            throw new BusinessException(
+                    "La lista de áreas adicionales no puede contener identificadores duplicados"
+            );
+        }
+
+        if (idsAdicionales.contains(areaPrincipal.getId())) {
+            throw new BusinessException(
+                    "El área responsable no puede repetirse como área adicional"
+            );
+        }
+
+        return areaLookupService.obtenerActivasPorIds(idsAdicionales);
+    }
+
+    private List<DocumentoArea> crearAreasAdicionales(Documento documento, List<Area> areasAdicionales) {
+        List<DocumentoArea> asociaciones = areasAdicionales.stream()
+                .map(areaAdicional -> DocumentoArea.adicional(documento, areaAdicional))
+                .toList();
+        asociaciones.forEach(documentoAreaRepository::save);
+        return asociaciones;
     }
 
     private void registrarCompensacionSiFallaLaTransaccion(String ruta) {

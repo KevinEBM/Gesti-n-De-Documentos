@@ -1,17 +1,21 @@
 package com.plantarsas.gestiondocumental.documentos.mapper;
 
+import com.plantarsas.gestiondocumental.documentos.dto.AreaResumenResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.entity.Documento;
 import com.plantarsas.gestiondocumental.documentos.entity.DocumentoArea;
 import com.plantarsas.gestiondocumental.documentos.entity.VersionDocumento;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 public class DocumentoMapper {
 
     public DocumentoResponse toResponse(
             Documento documento,
-            DocumentoArea documentoArea,
+            DocumentoArea documentoAreaPrincipal,
+            List<DocumentoArea> documentoAreasAdicionales,
             VersionDocumento versionActual
     ) {
         return new DocumentoResponse(
@@ -20,8 +24,8 @@ public class DocumentoMapper {
                 documento.getTitulo(),
                 documento.getDescripcion(),
                 documento.getEstado(),
-                documentoArea.getArea().getId(),
-                documentoArea.getArea().getNombre(),
+                documentoAreaPrincipal.getArea().getId(),
+                documentoAreaPrincipal.getArea().getNombre(),
                 documento.getSubprograma().getId(),
                 documento.getSubprograma().getNombre(),
                 documento.getTipoDocumento().getId(),
@@ -35,7 +39,14 @@ public class DocumentoMapper {
                 versionActual.getPublicadoPor().getId(),
                 versionActual.getFechaPublicacion(),
                 documento.getFechaCreacion(),
-                documento.getFechaActualizacion()
+                documento.getFechaActualizacion(),
+                documento.getAlcance(),
+                documentoAreasAdicionales.stream()
+                        .map(documentoArea -> new AreaResumenResponse(
+                                documentoArea.getArea().getId(),
+                                documentoArea.getArea().getNombre()
+                        ))
+                        .toList()
         );
     }
 }

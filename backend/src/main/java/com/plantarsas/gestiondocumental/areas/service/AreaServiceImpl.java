@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -83,6 +85,39 @@ public class AreaServiceImpl implements AreaService, AreaLookupService {
             throw new BusinessException("El área '" + area.getNombre() + "' está inactiva y no puede utilizarse");
         }
         return area;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Area> obtenerActivasPorIds(List<Long> ids) {
+        List<Area> encontradas = areaRepository.findByIdIn(ids);
+        Map<Long, Area> porId = encontradas.stream()
+                .collect(Collectors.toMap(Area::getId, area -> area));
+
+        List<Long> inexistentes = ids.stream()
+                .filter(id -> !porId.containsKey(id))
+                .toList();
+        if (!inexistentes.isEmpty()) {
+            throw new ResourceNotFoundException(
+                    "No existen áreas con id " + inexistentes
+            );
+        }
+
+        List<Area> inactivas = encontradas.stream()
+                .filter(area -> !area.isActivo())
+                .toList();
+        if (!inactivas.isEmpty()) {
+            String nombres = inactivas.stream()
+                    .map(Area::getNombre)
+                    .collect(Collectors.joining(", "));
+            throw new BusinessException(
+                    "Las siguientes áreas están inactivas y no pueden utilizarse: " + nombres
+            );
+        }
+
+        return ids.stream()
+                .map(porId::get)
+                .toList();
     }
 
     private Area obtenerEntidadPorId(Long id) {
