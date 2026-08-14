@@ -1,9 +1,12 @@
 package com.plantarsas.gestiondocumental.documentos.dto;
 
+import com.plantarsas.gestiondocumental.shared.enums.DocumentoAlcance;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+
+import java.util.List;
 
 public record DocumentoPublicacionInicialRequest(
 
@@ -32,6 +35,14 @@ public record DocumentoPublicacionInicialRequest(
 
         @NotBlank(message = "La descripción de la versión inicial es obligatoria")
         @Size(max = 500, message = "La descripción de la versión no puede superar 500 caracteres")
-        String descripcionVersionInicial
+        String descripcionVersionInicial,
+
+        @NotNull(message = "El alcance es obligatorio")
+        DocumentoAlcance alcance,
+
+        @NotNull(message = "La lista de áreas adicionales es obligatoria")
+        List<@NotNull(message = "El identificador de área adicional no puede ser nulo")
+             @Positive(message = "El identificador de área adicional debe ser un identificador válido")
+             Long> areasAdicionalesIds
 ) {
 }

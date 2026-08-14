@@ -37,6 +37,7 @@ import com.plantarsas.gestiondocumental.security.JwtAccessDeniedHandler;
 import com.plantarsas.gestiondocumental.security.JwtAuthenticationEntryPoint;
 import com.plantarsas.gestiondocumental.security.JwtAuthenticationFilter;
 import com.plantarsas.gestiondocumental.security.JwtService;
+import com.plantarsas.gestiondocumental.shared.enums.DocumentoAlcance;
 import com.plantarsas.gestiondocumental.shared.enums.DocumentoEstado;
 import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
 import com.plantarsas.gestiondocumental.usuarios.repository.UsuarioRepository;
@@ -98,7 +99,8 @@ class DocumentoControllerSecurityTest {
     private static final String METADATA_VALIDA_JSON =
             "{\"codigo\":\"PROC-001\",\"titulo\":\"Titulo\",\"descripcion\":\"Descripcion\","
                     + "\"areaId\":1,\"subprogramaId\":2,\"tipoDocumentoId\":3,"
-                    + "\"descripcionVersionInicial\":\"Publicacion inicial\"}";
+                    + "\"descripcionVersionInicial\":\"Publicacion inicial\","
+                    + "\"alcance\":\"AREA_RESPONSABLE\",\"areasAdicionalesIds\":[]}";
 
     private static final String METADATA_INVALIDA_JSON =
             "{\"codigo\":\"\",\"titulo\":\"Titulo\",\"descripcion\":\"Descripcion\","
@@ -107,6 +109,18 @@ class DocumentoControllerSecurityTest {
 
     private static final String METADATA_JSON_MALFORMADO =
             "{\"codigo\":\"PROC-001\", \"titulo\": ";
+
+    private static final String METADATA_SIN_ALCANCE_JSON =
+            "{\"codigo\":\"PROC-001\",\"titulo\":\"Titulo\",\"descripcion\":\"Descripcion\","
+                    + "\"areaId\":1,\"subprogramaId\":2,\"tipoDocumentoId\":3,"
+                    + "\"descripcionVersionInicial\":\"Publicacion inicial\","
+                    + "\"areasAdicionalesIds\":[]}";
+
+    private static final String METADATA_SIN_AREAS_ADICIONALES_IDS_JSON =
+            "{\"codigo\":\"PROC-001\",\"titulo\":\"Titulo\",\"descripcion\":\"Descripcion\","
+                    + "\"areaId\":1,\"subprogramaId\":2,\"tipoDocumentoId\":3,"
+                    + "\"descripcionVersionInicial\":\"Publicacion inicial\","
+                    + "\"alcance\":\"AREA_RESPONSABLE\"}";
 
     private static final Long DOCUMENTO_ID = 10L;
 
@@ -166,6 +180,16 @@ class DocumentoControllerSecurityTest {
         return new MockMultipartFile("metadata", "", "application/json", METADATA_JSON_MALFORMADO.getBytes());
     }
 
+    private MockMultipartFile metadataSinAlcance() {
+        return new MockMultipartFile("metadata", "", "application/json", METADATA_SIN_ALCANCE_JSON.getBytes());
+    }
+
+    private MockMultipartFile metadataSinAreasAdicionalesIds() {
+        return new MockMultipartFile(
+                "metadata", "", "application/json", METADATA_SIN_AREAS_ADICIONALES_IDS_JSON.getBytes()
+        );
+    }
+
     private MockMultipartFile archivoValido() {
         return new MockMultipartFile("archivo", "documento.pdf", "application/pdf", "contenido".getBytes());
     }
@@ -197,7 +221,8 @@ class DocumentoControllerSecurityTest {
                 1L, "PROC-001", "Titulo", "Descripcion", DocumentoEstado.PUBLICADO,
                 1L, "Area", 2L, "Subprograma", 3L, "TipoDocumento",
                 1L, 1, "documento.pdf", "application/pdf", 9L,
-                "Publicacion inicial", 1L, ahora, ahora, ahora
+                "Publicacion inicial", 1L, ahora, ahora, ahora,
+                DocumentoAlcance.AREA_RESPONSABLE, List.of()
         );
     }
 
@@ -285,6 +310,28 @@ class DocumentoControllerSecurityTest {
     void publicar_conMetadataInvalida_debeResponder400() throws Exception {
         mockMvc.perform(multipart(URL_PUBLICACION_INICIAL)
                         .file(metadataInvalida())
+                        .file(archivoValido())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    void publicarInicial_sinAlcance_debeResponderBadRequest() throws Exception {
+        mockMvc.perform(multipart(URL_PUBLICACION_INICIAL)
+                        .file(metadataSinAlcance())
+                        .file(archivoValido())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    void publicarInicial_sinAreasAdicionalesIds_debeResponderBadRequest() throws Exception {
+        mockMvc.perform(multipart(URL_PUBLICACION_INICIAL)
+                        .file(metadataSinAreasAdicionalesIds())
                         .file(archivoValido())
                         .with(administradorAutenticado()))
                 .andExpect(status().isBadRequest());

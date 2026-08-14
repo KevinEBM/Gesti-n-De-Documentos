@@ -15,6 +15,7 @@ import com.plantarsas.gestiondocumental.exception.BusinessException;
 import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
 import com.plantarsas.gestiondocumental.exception.UnauthorizedException;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
+import com.plantarsas.gestiondocumental.shared.enums.DocumentoAlcance;
 import com.plantarsas.gestiondocumental.shared.enums.DocumentoEstado;
 import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
 import com.plantarsas.gestiondocumental.storage.StorageService;
@@ -48,6 +49,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -70,6 +72,9 @@ class DocumentoServiceImplTest {
     private static final Long DOCUMENTO_ID = 10L;
     private static final String RUTA_ARCHIVO_ANTERIOR = "ruta-anterior.pdf";
     private static final String RUTA_ARCHIVO_NUEVO = "660e8400-e29b-41d4-a716-446655440111.pdf";
+
+    private static final Long AREA_ADICIONAL_1_ID = 101L;
+    private static final Long AREA_ADICIONAL_2_ID = 102L;
 
     @Mock
     private DocumentoRepository documentoRepository;
@@ -123,7 +128,25 @@ class DocumentoServiceImplTest {
                 AREA_ID,
                 SUBPROGRAMA_ID,
                 TIPO_DOCUMENTO_ID,
-                "Publicación inicial"
+                "Publicación inicial",
+                DocumentoAlcance.AREA_RESPONSABLE,
+                List.of()
+        );
+    }
+
+    private DocumentoPublicacionInicialRequest requestConAlcance(
+            DocumentoAlcance alcance, List<Long> areasAdicionalesIds
+    ) {
+        return new DocumentoPublicacionInicialRequest(
+                "PROC-001",
+                "Título de prueba",
+                "Descripción de prueba",
+                AREA_ID,
+                SUBPROGRAMA_ID,
+                TIPO_DOCUMENTO_ID,
+                "Publicación inicial",
+                alcance,
+                areasAdicionalesIds
         );
     }
 
@@ -254,7 +277,7 @@ class DocumentoServiceImplTest {
     void publicarInicial_debeLanzarConflictoSiCodigoYaExisteConEspaciosYDistintoCasing() {
         DocumentoPublicacionInicialRequest request = new DocumentoPublicacionInicialRequest(
                 "  proc-001  ", "Título", "Descripción", AREA_ID, SUBPROGRAMA_ID, TIPO_DOCUMENTO_ID,
-                "Publicación inicial"
+                "Publicación inicial", DocumentoAlcance.AREA_RESPONSABLE, List.of()
         );
         when(documentoRepository.existsByCodigoIgnoreCase("proc-001")).thenReturn(true);
 
@@ -645,6 +668,279 @@ class DocumentoServiceImplTest {
         assertThat(versionCaptor.getValue().isVigente()).isTrue();
     }
 
+    @Test
+    void publicarInicial_conAreaResponsable_debeCrearSoloAsociacionPrincipal() throws IOException {
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        Usuario usuario = usuarioPersistidoMock();
+        stubValidacionesPrevias(area, subprograma, tipoDocumento, usuario);
+        stubGuardarYPersistenciaExitosos();
+
+        documentoServiceImpl.publicarInicial(
+                requestConAlcance(DocumentoAlcance.AREA_RESPONSABLE, List.of()), usuarioAdministrador(),
+                "documento.pdf", contenidoDePrueba(), "application/pdf", 9L
+        );
+
+        ArgumentCaptor<Documento> documentoCaptor = ArgumentCaptor.forClass(Documento.class);
+        verify(documentoRepository).save(documentoCaptor.capture());
+        assertThat(documentoCaptor.getValue().getAlcance()).isEqualTo(DocumentoAlcance.AREA_RESPONSABLE);
+
+        ArgumentCaptor<DocumentoArea> documentoAreaCaptor = ArgumentCaptor.forClass(DocumentoArea.class);
+        verify(documentoAreaRepository, times(1)).save(documentoAreaCaptor.capture());
+        assertThat(documentoAreaCaptor.getValue().isEsPrincipal()).isTrue();
+
+        verify(areaLookupService, never()).obtenerActivasPorIds(any());
+    }
+
+    @Test
+    void publicarInicial_conGlobal_debeCrearSoloAsociacionPrincipalSinInsertarTodasLasAreas() throws IOException {
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        Usuario usuario = usuarioPersistidoMock();
+        stubValidacionesPrevias(area, subprograma, tipoDocumento, usuario);
+        stubGuardarYPersistenciaExitosos();
+
+        documentoServiceImpl.publicarInicial(
+                requestConAlcance(DocumentoAlcance.GLOBAL, List.of()), usuarioAdministrador(),
+                "documento.pdf", contenidoDePrueba(), "application/pdf", 9L
+        );
+
+        ArgumentCaptor<Documento> documentoCaptor = ArgumentCaptor.forClass(Documento.class);
+        verify(documentoRepository).save(documentoCaptor.capture());
+        assertThat(documentoCaptor.getValue().getAlcance()).isEqualTo(DocumentoAlcance.GLOBAL);
+
+        ArgumentCaptor<DocumentoArea> documentoAreaCaptor = ArgumentCaptor.forClass(DocumentoArea.class);
+        verify(documentoAreaRepository, times(1)).save(documentoAreaCaptor.capture());
+        assertThat(documentoAreaCaptor.getValue().isEsPrincipal()).isTrue();
+
+        verify(areaLookupService, never()).obtenerActivasPorIds(any());
+    }
+
+    @Test
+    void publicarInicial_conAreasEspecificas_debeCrearPrincipalYAdicionales() throws IOException {
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        Usuario usuario = usuarioPersistidoMock();
+        stubValidacionesPrevias(area, subprograma, tipoDocumento, usuario);
+        stubGuardarYPersistenciaExitosos();
+
+        Area areaAdicional1 = mock(Area.class);
+        Area areaAdicional2 = mock(Area.class);
+        List<Long> idsAdicionales = List.of(AREA_ADICIONAL_1_ID, AREA_ADICIONAL_2_ID);
+        when(areaLookupService.obtenerActivasPorIds(idsAdicionales))
+                .thenReturn(List.of(areaAdicional1, areaAdicional2));
+
+        documentoServiceImpl.publicarInicial(
+                requestConAlcance(DocumentoAlcance.AREAS_ESPECIFICAS, idsAdicionales), usuarioAdministrador(),
+                "documento.pdf", contenidoDePrueba(), "application/pdf", 9L
+        );
+
+        verify(areaLookupService).obtenerActivasPorIds(idsAdicionales);
+
+        ArgumentCaptor<DocumentoArea> documentoAreaCaptor = ArgumentCaptor.forClass(DocumentoArea.class);
+        verify(documentoAreaRepository, times(3)).save(documentoAreaCaptor.capture());
+        List<DocumentoArea> guardadas = documentoAreaCaptor.getAllValues();
+
+        assertThat(guardadas).hasSize(3);
+        assertThat(guardadas.get(0).isEsPrincipal()).isTrue();
+        assertThat(guardadas.get(0).getArea()).isEqualTo(area);
+        assertThat(guardadas.subList(1, 3)).allSatisfy(
+                asociacion -> assertThat(asociacion.isEsPrincipal()).isFalse()
+        );
+        assertThat(guardadas.subList(1, 3).stream().map(DocumentoArea::getArea).toList())
+                .containsExactlyInAnyOrder(areaAdicional1, areaAdicional2);
+
+        ArgumentCaptor<DocumentoArea> principalCaptor = ArgumentCaptor.forClass(DocumentoArea.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<DocumentoArea>> adicionalesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(documentoMapper).toResponse(
+                any(Documento.class), principalCaptor.capture(), adicionalesCaptor.capture(), any(VersionDocumento.class)
+        );
+        assertThat(principalCaptor.getValue().isEsPrincipal()).isTrue();
+        assertThat(adicionalesCaptor.getValue()).hasSize(2);
+        assertThat(adicionalesCaptor.getValue()).allSatisfy(
+                asociacion -> assertThat(asociacion.isEsPrincipal()).isFalse()
+        );
+    }
+
+    @Test
+    void publicarInicial_debeRechazarAreaResponsableConAdicionalesNoVacias() {
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        Usuario usuario = usuarioPersistidoMock();
+        stubValidacionesPrevias(area, subprograma, tipoDocumento, usuario);
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarInicial(
+                requestConAlcance(
+                        DocumentoAlcance.AREA_RESPONSABLE,
+                        List.of(AREA_ADICIONAL_1_ID)
+                ),
+                usuarioAdministrador(),
+                "documento.pdf",
+                contenidoDePrueba(),
+                "application/pdf",
+                9L
+        )).isInstanceOf(BusinessException.class);
+
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void publicarInicial_debeRechazarGlobalConAdicionalesNoVacias() {
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        Usuario usuario = usuarioPersistidoMock();
+        stubValidacionesPrevias(area, subprograma, tipoDocumento, usuario);
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarInicial(
+                requestConAlcance(
+                        DocumentoAlcance.GLOBAL,
+                        List.of(AREA_ADICIONAL_1_ID)
+                ),
+                usuarioAdministrador(),
+                "documento.pdf",
+                contenidoDePrueba(),
+                "application/pdf",
+                9L
+        )).isInstanceOf(BusinessException.class);
+
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void publicarInicial_debeRechazarAreasEspecificasSinAdicionales() {
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        Usuario usuario = usuarioPersistidoMock();
+        stubValidacionesPrevias(area, subprograma, tipoDocumento, usuario);
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarInicial(
+                requestConAlcance(
+                        DocumentoAlcance.AREAS_ESPECIFICAS,
+                        List.of()
+                ),
+                usuarioAdministrador(),
+                "documento.pdf",
+                contenidoDePrueba(),
+                "application/pdf",
+                9L
+        )).isInstanceOf(BusinessException.class);
+
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void publicarInicial_debeRechazarAreasEspecificasConIdsDuplicados() {
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        Usuario usuario = usuarioPersistidoMock();
+        stubValidacionesPrevias(area, subprograma, tipoDocumento, usuario);
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarInicial(
+                requestConAlcance(
+                        DocumentoAlcance.AREAS_ESPECIFICAS,
+                        List.of(AREA_ADICIONAL_1_ID, AREA_ADICIONAL_1_ID)
+                ),
+                usuarioAdministrador(),
+                "documento.pdf",
+                contenidoDePrueba(),
+                "application/pdf",
+                9L
+        )).isInstanceOf(BusinessException.class);
+
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void publicarInicial_debeRechazarAreasEspecificasConPrincipalRepetidaComoAdicional() {
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        Usuario usuario = usuarioPersistidoMock();
+        stubValidacionesPrevias(area, subprograma, tipoDocumento, usuario);
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarInicial(
+                requestConAlcance(
+                        DocumentoAlcance.AREAS_ESPECIFICAS,
+                        List.of(AREA_ID)
+                ),
+                usuarioAdministrador(),
+                "documento.pdf",
+                contenidoDePrueba(),
+                "application/pdf",
+                9L
+        )).isInstanceOf(BusinessException.class);
+
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void publicarInicial_debePropagarNotFoundSiAreaAdicionalNoExiste() {
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        Usuario usuario = usuarioPersistidoMock();
+        stubValidacionesPrevias(area, subprograma, tipoDocumento, usuario);
+
+        List<Long> idsAdicionales = List.of(AREA_ADICIONAL_1_ID);
+
+        when(areaLookupService.obtenerActivasPorIds(idsAdicionales))
+                .thenThrow(new ResourceNotFoundException(
+                        "No existen áreas con id [" + AREA_ADICIONAL_1_ID + "]"
+                ));
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarInicial(
+                requestConAlcance(
+                        DocumentoAlcance.AREAS_ESPECIFICAS,
+                        idsAdicionales
+                ),
+                usuarioAdministrador(),
+                "documento.pdf",
+                contenidoDePrueba(),
+                "application/pdf",
+                9L
+        )).isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void publicarInicial_debePropagarBusinessExceptionSiAreaAdicionalEstaInactiva() {
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        Usuario usuario = usuarioPersistidoMock();
+        stubValidacionesPrevias(area, subprograma, tipoDocumento, usuario);
+
+        List<Long> idsAdicionales = List.of(AREA_ADICIONAL_1_ID);
+
+        when(areaLookupService.obtenerActivasPorIds(idsAdicionales))
+                .thenThrow(new BusinessException(
+                        "Las siguientes áreas están inactivas y no pueden utilizarse: X"
+                ));
+
+        assertThatThrownBy(() -> documentoServiceImpl.publicarInicial(
+                requestConAlcance(
+                        DocumentoAlcance.AREAS_ESPECIFICAS,
+                        idsAdicionales
+                ),
+                usuarioAdministrador(),
+                "documento.pdf",
+                contenidoDePrueba(),
+                "application/pdf",
+                9L
+        )).isInstanceOf(BusinessException.class);
+
+        verifyNoInteractions(storageService);
+    }
+
     // ------------------------------------------------------------------
     // publicarNuevaVersion
     // ------------------------------------------------------------------
@@ -679,7 +975,8 @@ class DocumentoServiceImplTest {
             Documento documento, DocumentoArea documentoArea, VersionDocumento vigenteActual, Usuario usuario
     ) {
         when(documentoRepository.buscarPorIdConBloqueoPesimista(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
-        when(documentoAreaRepository.findByDocumento_Id(DOCUMENTO_ID)).thenReturn(Optional.of(documentoArea));
+        when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID)).thenReturn(Optional.of(documentoArea));
+        when(documentoAreaRepository.findAllByDocumento_IdAndEsPrincipalFalse(DOCUMENTO_ID)).thenReturn(List.of());
         when(versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(DOCUMENTO_ID))
                 .thenReturn(Optional.of(vigenteActual));
         when(usuarioRepository.findById(USUARIO_ID)).thenReturn(Optional.of(usuario));
@@ -792,7 +1089,7 @@ class DocumentoServiceImplTest {
     void publicarNuevaVersion_debeLanzarNotFoundSiDocumentoAreaNoExiste() {
         Documento documento = documentoPublicadoDePrueba();
         when(documentoRepository.buscarPorIdConBloqueoPesimista(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
-        when(documentoAreaRepository.findByDocumento_Id(DOCUMENTO_ID)).thenReturn(Optional.empty());
+        when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
                 DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
@@ -807,7 +1104,7 @@ class DocumentoServiceImplTest {
         Documento documento = documentoPublicadoDePrueba();
         DocumentoArea documentoArea = documentoAreaDePrueba(documento);
         when(documentoRepository.buscarPorIdConBloqueoPesimista(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
-        when(documentoAreaRepository.findByDocumento_Id(DOCUMENTO_ID)).thenReturn(Optional.of(documentoArea));
+        when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID)).thenReturn(Optional.of(documentoArea));
         when(versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(DOCUMENTO_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
@@ -824,7 +1121,7 @@ class DocumentoServiceImplTest {
         DocumentoArea documentoArea = documentoAreaDePrueba(documento);
         VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
         when(documentoRepository.buscarPorIdConBloqueoPesimista(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
-        when(documentoAreaRepository.findByDocumento_Id(DOCUMENTO_ID)).thenReturn(Optional.of(documentoArea));
+        when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID)).thenReturn(Optional.of(documentoArea));
         when(versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(DOCUMENTO_ID))
                 .thenReturn(Optional.of(vigenteActual));
         when(usuarioRepository.findById(USUARIO_ID)).thenReturn(Optional.empty());
@@ -1203,7 +1500,7 @@ class DocumentoServiceImplTest {
         Documento documento = documentoPublicadoDePrueba();
         DocumentoArea documentoArea = documentoAreaDePrueba(documento);
         when(documentoRepository.buscarPorIdConBloqueoPesimista(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
-        when(documentoAreaRepository.findByDocumento_Id(DOCUMENTO_ID)).thenReturn(Optional.of(documentoArea));
+        when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID)).thenReturn(Optional.of(documentoArea));
         when(versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(DOCUMENTO_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
@@ -1212,5 +1509,55 @@ class DocumentoServiceImplTest {
         )).isInstanceOf(IllegalStateException.class);
 
         verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void publicarNuevaVersion_debeConservarAlcanceYAreasAdicionalesExistentes() throws IOException {
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        Documento documento = new Documento(
+                "PROC-001",
+                "Título",
+                "Descripción",
+                mock(Subprograma.class),
+                mock(TipoDocumento.class),
+                usuarioPersistido,
+                DocumentoAlcance.AREAS_ESPECIFICAS
+        );
+        DocumentoArea principal = DocumentoArea.principal(documento, mock(Area.class));
+        DocumentoArea adicional1 = DocumentoArea.adicional(documento, mock(Area.class));
+        DocumentoArea adicional2 = DocumentoArea.adicional(documento, mock(Area.class));
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+
+        when(documentoRepository.buscarPorIdConBloqueoPesimista(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID)).thenReturn(Optional.of(principal));
+        when(documentoAreaRepository.findAllByDocumento_IdAndEsPrincipalFalse(DOCUMENTO_ID)).thenReturn(List.of(adicional1, adicional2));
+        when(versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(DOCUMENTO_ID)).thenReturn(Optional.of(vigenteActual));
+        when(usuarioRepository.findById(USUARIO_ID)).thenReturn(Optional.of(usuarioPersistido));
+        stubAlmacenamientoYPersistenciaExitosaNuevaVersion(3);
+
+        documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        );
+
+        assertThat(documento.getAlcance()).isEqualTo(DocumentoAlcance.AREAS_ESPECIFICAS);
+
+        verify(documentoAreaRepository, never()).save(any(DocumentoArea.class));
+
+        verify(documentoAreaRepository, never()).delete(any(DocumentoArea.class));
+
+        verify(versionDocumentoRepository).save(any(VersionDocumento.class));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<DocumentoArea>> adicionalesCaptor = ArgumentCaptor.forClass(List.class);
+
+        verify(documentoMapper).toResponse(
+                eq(documento),
+                eq(principal),
+                adicionalesCaptor.capture(),
+                any(VersionDocumento.class)
+        );
+
+        assertThat(adicionalesCaptor.getValue()).containsExactlyInAnyOrder(adicional1, adicional2);
     }
 }

@@ -304,6 +304,64 @@ class AreaServiceImplTest {
         verifyNoMoreInteractions(areaRepository);
     }
 
+    @Test
+    void obtenerActivasPorIds_debeRetornarAreasActivasEnOrdenSolicitado() {
+        Area area1 = mock(Area.class);
+        when(area1.getId()).thenReturn(1L);
+        when(area1.isActivo()).thenReturn(true);
+
+        Area area2 = mock(Area.class);
+        when(area2.getId()).thenReturn(2L);
+        when(area2.isActivo()).thenReturn(true);
+
+        List<Long> idsSolicitados = List.of(2L, 1L);
+        when(areaRepository.findByIdIn(idsSolicitados)).thenReturn(List.of(area1, area2));
+
+        List<Area> resultado = areaServiceImpl.obtenerActivasPorIds(idsSolicitados);
+
+        assertThat(resultado).containsExactly(area2, area1);
+
+        verify(areaRepository).findByIdIn(idsSolicitados);
+        verifyNoMoreInteractions(areaRepository);
+    }
+
+    @Test
+    void obtenerActivasPorIds_debeLanzarNotFoundSiFaltaAlgunaArea() {
+        Area area1 = mock(Area.class);
+        when(area1.getId()).thenReturn(1L);
+
+        List<Long> idsSolicitados = List.of(1L, 2L);
+        when(areaRepository.findByIdIn(idsSolicitados)).thenReturn(List.of(area1));
+
+        assertThatThrownBy(() -> areaServiceImpl.obtenerActivasPorIds(idsSolicitados))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(areaRepository).findByIdIn(idsSolicitados);
+        verifyNoMoreInteractions(areaRepository);
+    }
+
+    @Test
+    void obtenerActivasPorIds_debeLanzarBusinessExceptionSiAlgunaAreaEstaInactiva() {
+        Area area1 = mock(Area.class);
+        when(area1.getId()).thenReturn(1L);
+        when(area1.isActivo()).thenReturn(true);
+
+        Area area2 = mock(Area.class);
+        when(area2.getId()).thenReturn(2L);
+        when(area2.isActivo()).thenReturn(false);
+        when(area2.getNombre()).thenReturn("Área 2");
+
+        List<Long> idsSolicitados = List.of(1L, 2L);
+        when(areaRepository.findByIdIn(idsSolicitados)).thenReturn(List.of(area1, area2));
+
+        assertThatThrownBy(() -> areaServiceImpl.obtenerActivasPorIds(idsSolicitados))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Las siguientes áreas están inactivas y no pueden utilizarse: Área 2");
+
+        verify(areaRepository).findByIdIn(idsSolicitados);
+        verifyNoMoreInteractions(areaRepository);
+    }
+
     private Area areaMock(Long id, String codigo, String nombre, String descripcion, boolean activo) {
         Area area = mock(Area.class);
         when(area.getId()).thenReturn(id);
