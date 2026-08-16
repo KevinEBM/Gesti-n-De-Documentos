@@ -27,7 +27,9 @@ package com.plantarsas.gestiondocumental.documentos.controller;
 
 import com.plantarsas.gestiondocumental.config.SecurityConfig;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResumenResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.NuevaVersionDocumentoRequest;
+import com.plantarsas.gestiondocumental.documentos.service.DocumentoConsultaService;
 import com.plantarsas.gestiondocumental.documentos.service.DocumentoService;
 import com.plantarsas.gestiondocumental.exception.BusinessException;
 import com.plantarsas.gestiondocumental.exception.GlobalExceptionHandler;
@@ -50,6 +52,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -86,6 +89,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -95,6 +99,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DocumentoControllerSecurityTest {
 
     private static final String URL_PUBLICACION_INICIAL = "/api/documentos";
+
+    private static final String URL_DOCUMENTOS = "/api/documentos";
 
     private static final String METADATA_VALIDA_JSON =
             "{\"codigo\":\"PROC-001\",\"titulo\":\"Titulo\",\"descripcion\":\"Descripcion\","
@@ -142,6 +148,9 @@ class DocumentoControllerSecurityTest {
     private DocumentoService documentoService;
 
     @MockitoBean
+    private DocumentoConsultaService documentoConsultaService;
+
+    @MockitoBean
     private JwtService jwtService;
 
     @MockitoBean
@@ -165,7 +174,7 @@ class DocumentoControllerSecurityTest {
 
     @AfterEach
     void limpiarMocks() {
-        reset(documentoService, jwtService, usuarioRepository);
+        reset(documentoService, documentoConsultaService, jwtService, usuarioRepository);
     }
 
     private MockMultipartFile metadataValida() {
@@ -223,6 +232,13 @@ class DocumentoControllerSecurityTest {
                 1L, 1, "documento.pdf", "application/pdf", 9L,
                 "Publicacion inicial", 1L, ahora, ahora, ahora,
                 DocumentoAlcance.AREA_RESPONSABLE, List.of()
+        );
+    }
+
+    private DocumentoResumenResponse resumenDePrueba() {
+        return new DocumentoResumenResponse(
+                1L, "PROC-001", "Titulo", DocumentoEstado.PUBLICADO, DocumentoAlcance.AREA_RESPONSABLE,
+                "Subprograma", "TipoDocumento", LocalDateTime.now()
         );
     }
 
@@ -651,6 +667,121 @@ class DocumentoControllerSecurityTest {
         assertThat(json.get("datos").get("codigo").asText()).isEqualTo("PROC-001");
         assertThat(json.get("errores").isNull()).isTrue();
         assertThat(json.get("fechaHora").asText()).isNotBlank();
+    }
+
+    // ------------------------------------------------------------------
+    // GET /api/documentos
+    // ------------------------------------------------------------------
+
+    @Test
+    void listar_sinAutenticacion_debeResponder401() throws Exception {
+        mockMvc.perform(get(URL_DOCUMENTOS))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(documentoConsultaService);
+    }
+
+    @Test
+    void listar_conAdministrador_debeResponder200() throws Exception {
+        when(documentoConsultaService.listar(any(), any()))
+                .thenReturn(new PageImpl<>(List.of(resumenDePrueba())));
+
+        mockMvc.perform(get(URL_DOCUMENTOS).with(administradorAutenticado()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "JEFE_AREA")
+    void listar_conJefeArea_debeResponder200() throws Exception {
+        when(documentoConsultaService.listar(any(), any()))
+                .thenReturn(new PageImpl<>(List.of(resumenDePrueba())));
+
+        mockMvc.perform(get(URL_DOCUMENTOS))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMINISTRATIVO")
+    void listar_conAdministrativo_debeResponder200() throws Exception {
+        when(documentoConsultaService.listar(any(), any()))
+                .thenReturn(new PageImpl<>(List.of(resumenDePrueba())));
+
+        mockMvc.perform(get(URL_DOCUMENTOS))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void listar_conPageNegativo_debeResponder400() throws Exception {
+        mockMvc.perform(get(URL_DOCUMENTOS).param("page", "-1").with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoConsultaService);
+    }
+
+    @Test
+    void listar_conSizeCero_debeResponder400() throws Exception {
+        mockMvc.perform(get(URL_DOCUMENTOS).param("size", "0").with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoConsultaService);
+    }
+
+    @Test
+    void listar_conSizeMayorAlMaximoPermitido_debeResponder400() throws Exception {
+        mockMvc.perform(get(URL_DOCUMENTOS).param("size", "101").with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoConsultaService);
+    }
+
+    // ------------------------------------------------------------------
+    // GET /api/documentos/{id}
+    // ------------------------------------------------------------------
+
+    @Test
+    void obtenerPorId_sinAutenticacion_debeResponder401() throws Exception {
+        mockMvc.perform(get(URL_DOCUMENTOS + "/" + DOCUMENTO_ID))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(documentoConsultaService);
+    }
+
+    @Test
+    void obtenerPorId_conAdministrador_debeResponder200() throws Exception {
+        when(documentoConsultaService.obtenerPorId(eq(DOCUMENTO_ID), any()))
+                .thenReturn(respuestaDePrueba());
+
+        mockMvc.perform(get(URL_DOCUMENTOS + "/" + DOCUMENTO_ID).with(administradorAutenticado()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "JEFE_AREA")
+    void obtenerPorId_conJefeArea_debeResponder200() throws Exception {
+        when(documentoConsultaService.obtenerPorId(eq(DOCUMENTO_ID), any()))
+                .thenReturn(respuestaDePrueba());
+
+        mockMvc.perform(get(URL_DOCUMENTOS + "/" + DOCUMENTO_ID))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMINISTRATIVO")
+    void obtenerPorId_conAdministrativo_debeResponder200() throws Exception {
+        when(documentoConsultaService.obtenerPorId(eq(DOCUMENTO_ID), any()))
+                .thenReturn(respuestaDePrueba());
+
+        mockMvc.perform(get(URL_DOCUMENTOS + "/" + DOCUMENTO_ID))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void obtenerPorId_conDocumentoInexistenteONoVisible_debeResponder404() throws Exception {
+        when(documentoConsultaService.obtenerPorId(eq(DOCUMENTO_ID), any()))
+                .thenThrow(new ResourceNotFoundException("No existe un documento con id " + DOCUMENTO_ID));
+
+        mockMvc.perform(get(URL_DOCUMENTOS + "/" + DOCUMENTO_ID).with(administradorAutenticado()))
+                .andExpect(status().isNotFound());
     }
 
     @Configuration

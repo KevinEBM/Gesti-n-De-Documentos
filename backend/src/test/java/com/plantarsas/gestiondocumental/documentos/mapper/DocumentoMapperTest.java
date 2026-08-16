@@ -3,6 +3,7 @@ package com.plantarsas.gestiondocumental.documentos.mapper;
 import com.plantarsas.gestiondocumental.areas.entity.Area;
 import com.plantarsas.gestiondocumental.documentos.dto.AreaResumenResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResumenResponse;
 import com.plantarsas.gestiondocumental.documentos.entity.Documento;
 import com.plantarsas.gestiondocumental.documentos.entity.DocumentoArea;
 import com.plantarsas.gestiondocumental.documentos.entity.VersionDocumento;
@@ -151,5 +152,37 @@ class DocumentoMapperTest {
                 new AreaResumenResponse(11L, "Área adicional 1"),
                 new AreaResumenResponse(12L, "Área adicional 2")
         );
+    }
+
+    @Test
+    void toResumen_debeMapearLosOchoCamposCorrectamente() {
+        Subprograma subprograma = mock(Subprograma.class);
+        when(subprograma.getNombre()).thenReturn("Subprograma de prueba");
+
+        TipoDocumento tipoDocumento = mock(TipoDocumento.class);
+        when(tipoDocumento.getNombre()).thenReturn("Tipo de prueba");
+
+        LocalDateTime fechaActualizacion = LocalDateTime.of(2026, 1, 2, 9, 0);
+
+        Documento documento = mock(Documento.class);
+        when(documento.getId()).thenReturn(1L);
+        when(documento.getCodigo()).thenReturn("PROC-001");
+        when(documento.getTitulo()).thenReturn("Título de prueba");
+        when(documento.getEstado()).thenReturn(DocumentoEstado.PUBLICADO);
+        when(documento.getAlcance()).thenReturn(DocumentoAlcance.GLOBAL);
+        when(documento.getSubprograma()).thenReturn(subprograma);
+        when(documento.getTipoDocumento()).thenReturn(tipoDocumento);
+        when(documento.getFechaActualizacion()).thenReturn(fechaActualizacion);
+
+        DocumentoResumenResponse resultado = documentoMapper.toResumen(documento);
+
+        assertThat(resultado.id()).isEqualTo(1L);
+        assertThat(resultado.codigo()).isEqualTo("PROC-001");
+        assertThat(resultado.titulo()).isEqualTo("Título de prueba");
+        assertThat(resultado.estado()).isEqualTo(DocumentoEstado.PUBLICADO);
+        assertThat(resultado.alcance()).isEqualTo(DocumentoAlcance.GLOBAL);
+        assertThat(resultado.subprogramaNombre()).isEqualTo("Subprograma de prueba");
+        assertThat(resultado.tipoDocumentoNombre()).isEqualTo("Tipo de prueba");
+        assertThat(resultado.fechaActualizacion()).isEqualTo(fechaActualizacion);
     }
 }
