@@ -26,6 +26,7 @@ package com.plantarsas.gestiondocumental.documentos.controller;
  */
 
 import com.plantarsas.gestiondocumental.config.SecurityConfig;
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoFiltroRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResumenResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.NuevaVersionDocumentoRequest;
@@ -75,6 +76,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -683,7 +685,7 @@ class DocumentoControllerSecurityTest {
 
     @Test
     void listar_conAdministrador_debeResponder200() throws Exception {
-        when(documentoConsultaService.listar(any(), any()))
+        when(documentoConsultaService.listar(any(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of(resumenDePrueba())));
 
         mockMvc.perform(get(URL_DOCUMENTOS).with(administradorAutenticado()))
@@ -693,7 +695,7 @@ class DocumentoControllerSecurityTest {
     @Test
     @WithMockUser(roles = "JEFE_AREA")
     void listar_conJefeArea_debeResponder200() throws Exception {
-        when(documentoConsultaService.listar(any(), any()))
+        when(documentoConsultaService.listar(any(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of(resumenDePrueba())));
 
         mockMvc.perform(get(URL_DOCUMENTOS))
@@ -703,7 +705,7 @@ class DocumentoControllerSecurityTest {
     @Test
     @WithMockUser(roles = "ADMINISTRATIVO")
     void listar_conAdministrativo_debeResponder200() throws Exception {
-        when(documentoConsultaService.listar(any(), any()))
+        when(documentoConsultaService.listar(any(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of(resumenDePrueba())));
 
         mockMvc.perform(get(URL_DOCUMENTOS))
@@ -732,6 +734,118 @@ class DocumentoControllerSecurityTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(documentoConsultaService);
+    }
+
+    // ------------------------------------------------------------------
+    // GET /api/documentos — filtros (Etapa 3B)
+    // ------------------------------------------------------------------
+
+    @Test
+    void listar_conAreaIdCero_debeResponder400() throws Exception {
+        mockMvc.perform(get(URL_DOCUMENTOS).param("areaId", "0").with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoConsultaService);
+    }
+
+    @Test
+    void listar_conAreaIdNegativo_debeResponder400() throws Exception {
+        mockMvc.perform(get(URL_DOCUMENTOS).param("areaId", "-1").with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoConsultaService);
+    }
+
+    @Test
+    void listar_conSubprogramaIdInvalido_debeResponder400() throws Exception {
+        mockMvc.perform(get(URL_DOCUMENTOS).param("subprogramaId", "0").with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoConsultaService);
+    }
+
+    @Test
+    void listar_conTipoDocumentoIdInvalido_debeResponder400() throws Exception {
+        mockMvc.perform(get(URL_DOCUMENTOS).param("tipoDocumentoId", "-5").with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoConsultaService);
+    }
+
+    @Test
+    void listar_conFechaDesdePosteriorAFechaHasta_debeResponder400() throws Exception {
+        mockMvc.perform(get(URL_DOCUMENTOS)
+                        .param("fechaDesde", "2026-12-31")
+                        .param("fechaHasta", "2026-01-01")
+                        .with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoConsultaService);
+    }
+
+    @Test
+    void listar_conEstadoInvalido_debeResponder400() throws Exception {
+        mockMvc.perform(get(URL_DOCUMENTOS).param("estado", "NO_EXISTE").with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoConsultaService);
+    }
+
+    @Test
+    void listar_conFechaMalFormada_debeResponder400() throws Exception {
+        mockMvc.perform(get(URL_DOCUMENTOS).param("fechaDesde", "no-es-una-fecha").with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoConsultaService);
+    }
+
+    @Test
+    void listar_debeTransferirTodosLosParametrosDeFiltroAlDTO() throws Exception {
+        ArgumentCaptor<DocumentoFiltroRequest> filtroCaptor = ArgumentCaptor.forClass(DocumentoFiltroRequest.class);
+        when(documentoConsultaService.listar(any(), filtroCaptor.capture(), any()))
+                .thenReturn(new PageImpl<>(List.of(resumenDePrueba())));
+
+        mockMvc.perform(get(URL_DOCUMENTOS)
+                        .param("codigo", "SG-SST")
+                        .param("titulo", "Procedimiento")
+                        .param("areaId", "5")
+                        .param("subprogramaId", "8")
+                        .param("tipoDocumentoId", "3")
+                        .param("estado", "PUBLICADO")
+                        .param("fechaDesde", "2026-01-01")
+                        .param("fechaHasta", "2026-12-31")
+                        .with(administradorAutenticado()))
+                .andExpect(status().isOk());
+
+        DocumentoFiltroRequest filtro = filtroCaptor.getValue();
+        assertThat(filtro.codigo()).isEqualTo("SG-SST");
+        assertThat(filtro.titulo()).isEqualTo("Procedimiento");
+        assertThat(filtro.areaId()).isEqualTo(5L);
+        assertThat(filtro.subprogramaId()).isEqualTo(8L);
+        assertThat(filtro.tipoDocumentoId()).isEqualTo(3L);
+        assertThat(filtro.estado()).isEqualTo(DocumentoEstado.PUBLICADO);
+        assertThat(filtro.fechaDesde()).isEqualTo(LocalDate.of(2026, 1, 1));
+        assertThat(filtro.fechaHasta()).isEqualTo(LocalDate.of(2026, 12, 31));
+    }
+
+    @Test
+    void listar_sinParametrosDeFiltro_debeTransferirDTOVacio() throws Exception {
+        ArgumentCaptor<DocumentoFiltroRequest> filtroCaptor = ArgumentCaptor.forClass(DocumentoFiltroRequest.class);
+        when(documentoConsultaService.listar(any(), filtroCaptor.capture(), any()))
+                .thenReturn(new PageImpl<>(List.of(resumenDePrueba())));
+
+        mockMvc.perform(get(URL_DOCUMENTOS).with(administradorAutenticado()))
+                .andExpect(status().isOk());
+
+        DocumentoFiltroRequest filtro = filtroCaptor.getValue();
+        assertThat(filtro.codigo()).isNull();
+        assertThat(filtro.titulo()).isNull();
+        assertThat(filtro.areaId()).isNull();
+        assertThat(filtro.subprogramaId()).isNull();
+        assertThat(filtro.tipoDocumentoId()).isNull();
+        assertThat(filtro.estado()).isNull();
+        assertThat(filtro.fechaDesde()).isNull();
+        assertThat(filtro.fechaHasta()).isNull();
     }
 
     // ------------------------------------------------------------------

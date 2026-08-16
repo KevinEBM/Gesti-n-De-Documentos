@@ -1,5 +1,6 @@
 package com.plantarsas.gestiondocumental.documentos.service;
 
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoFiltroRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResumenResponse;
 import com.plantarsas.gestiondocumental.documentos.entity.Documento;
@@ -37,14 +38,51 @@ public class DocumentoConsultaServiceImpl implements DocumentoConsultaService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<DocumentoResumenResponse> listar(AuthenticatedUser usuarioAutenticado, Pageable pageable) {
+    public Page<DocumentoResumenResponse> listar(
+            AuthenticatedUser usuarioAutenticado, DocumentoFiltroRequest filtro, Pageable pageable
+    ) {
         Set<Long> areaIds = obtenerAreaIds(usuarioAutenticado);
 
-        Specification<Documento> visibilidad = DocumentoSpecifications.visiblePara(usuarioAutenticado.rol(), areaIds);
-        Specification<Documento> consulta = visibilidad.and(DocumentoSpecifications.conRelacionesDeResumen());
+        Specification<Documento> base = DocumentoSpecifications.visiblePara(usuarioAutenticado.rol(), areaIds);
+        base = aplicarFiltros(base, filtro);
 
-        return documentoRepository.findAll(consulta, visibilidad, pageable)
+        Specification<Documento> consulta = base.and(DocumentoSpecifications.conRelacionesDeResumen());
+
+        return documentoRepository.findAll(consulta, base, pageable)
                 .map(documentoMapper::toResumen);
+    }
+
+    private Specification<Documento> aplicarFiltros(Specification<Documento> base, DocumentoFiltroRequest filtro) {
+        Specification<Documento> resultado = base;
+
+        if (filtro.codigo() != null && !filtro.codigo().isBlank()) {
+            resultado = resultado.and(DocumentoSpecifications.codigoContiene(filtro.codigo()));
+        }
+        if (filtro.titulo() != null && !filtro.titulo().isBlank()) {
+            resultado = resultado.and(DocumentoSpecifications.tituloContiene(filtro.titulo()));
+        }
+        if (filtro.areaId() != null) {
+            resultado = resultado.and(DocumentoSpecifications.deArea(filtro.areaId()));
+        }
+        if (filtro.subprogramaId() != null) {
+            resultado = resultado.and(DocumentoSpecifications.deSubprograma(filtro.subprogramaId()));
+        }
+        if (filtro.tipoDocumentoId() != null) {
+            resultado = resultado.and(DocumentoSpecifications.deTipoDocumento(filtro.tipoDocumentoId()));
+        }
+        if (filtro.estado() != null) {
+            resultado = resultado.and(DocumentoSpecifications.conEstado(filtro.estado()));
+        }
+        if (filtro.fechaDesde() != null) {
+            resultado = resultado.and(DocumentoSpecifications.creadoDesde(filtro.fechaDesde().atStartOfDay()));
+        }
+        if (filtro.fechaHasta() != null) {
+            resultado = resultado.and(
+                    DocumentoSpecifications.creadoAntesDe(filtro.fechaHasta().plusDays(1).atStartOfDay())
+            );
+        }
+
+        return resultado;
     }
 
     @Override
