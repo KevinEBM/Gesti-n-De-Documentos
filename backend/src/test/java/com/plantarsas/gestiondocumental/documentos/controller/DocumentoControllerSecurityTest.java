@@ -23,9 +23,16 @@ package com.plantarsas.gestiondocumental.documentos.controller;
  * MaxUploadSizeExceededException y el catch-all de Exception (que es, a propósito, el destino
  * correcto de IllegalStateException cuando el servicio detecta la inconsistencia interna de una
  * versión vigente ausente).
+ *
+ * Etapa 3C agrega la cobertura MockMvc de GET /api/documentos/{id}/descarga: misma política
+ * @PreAuthorize que listar/obtenerPorId, mismo GlobalExceptionHandler sin handlers nuevos (404
+ * indistinguible para documento inexistente/no visible, 500 para inconsistencia interna e
+ * IOException real). Lo nuevo a verificar es exclusivo de la respuesta HTTP binaria: Content-Type,
+ * Content-Disposition attachment y Content-Length calculados a partir de DocumentoArchivoDescarga.
  */
 
 import com.plantarsas.gestiondocumental.config.SecurityConfig;
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoArchivoDescarga;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoFiltroRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResumenResponse;
@@ -54,6 +61,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -74,6 +82,7 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDate;
@@ -81,6 +90,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -93,6 +103,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(SpringExtension.class)
@@ -133,6 +145,8 @@ class DocumentoControllerSecurityTest {
     private static final Long DOCUMENTO_ID = 10L;
 
     private static final String URL_NUEVA_VERSION = "/api/documentos/" + DOCUMENTO_ID + "/versiones";
+
+    private static final String URL_DESCARGA = "/api/documentos/" + DOCUMENTO_ID + "/descarga";
 
     private static final String METADATA_NUEVA_VERSION_VALIDA_JSON =
             "{\"descripcionCambio\":\"Corrección de erratas\"}";
@@ -241,6 +255,12 @@ class DocumentoControllerSecurityTest {
         return new DocumentoResumenResponse(
                 1L, "PROC-001", "Titulo", DocumentoEstado.PUBLICADO, DocumentoAlcance.AREA_RESPONSABLE,
                 "Subprograma", "TipoDocumento", LocalDateTime.now()
+        );
+    }
+
+    private DocumentoArchivoDescarga archivoDescargaDePrueba() {
+        return new DocumentoArchivoDescarga(
+                "informe.pdf", "application/pdf", 9L, new ByteArrayInputStream("contenido".getBytes())
         );
     }
 
@@ -895,6 +915,70 @@ class DocumentoControllerSecurityTest {
                 .thenThrow(new ResourceNotFoundException("No existe un documento con id " + DOCUMENTO_ID));
 
         mockMvc.perform(get(URL_DOCUMENTOS + "/" + DOCUMENTO_ID).with(administradorAutenticado()))
+                .andExpect(status().isNotFound());
+    }
+
+    // ------------------------------------------------------------------
+    // GET /api/documentos/{id}/descarga (Etapa 3C)
+    // ------------------------------------------------------------------
+
+    @Test
+    void descargarVersionVigente_sinAutenticacion_debeResponder401() throws Exception {
+        mockMvc.perform(get(URL_DESCARGA))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(documentoConsultaService);
+    }
+
+    @Test
+    void descargarVersionVigente_conAdministrador_debeResponder200() throws Exception {
+        when(documentoConsultaService.descargarVersionVigente(eq(DOCUMENTO_ID), any()))
+                .thenReturn(archivoDescargaDePrueba());
+
+        mockMvc.perform(get(URL_DESCARGA).with(administradorAutenticado()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "JEFE_AREA")
+    void descargarVersionVigente_conJefeArea_debeResponder200() throws Exception {
+        when(documentoConsultaService.descargarVersionVigente(eq(DOCUMENTO_ID), any()))
+                .thenReturn(archivoDescargaDePrueba());
+
+        mockMvc.perform(get(URL_DESCARGA))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMINISTRATIVO")
+    void descargarVersionVigente_conAdministrativo_debeResponder200() throws Exception {
+        when(documentoConsultaService.descargarVersionVigente(eq(DOCUMENTO_ID), any()))
+                .thenReturn(archivoDescargaDePrueba());
+
+        mockMvc.perform(get(URL_DESCARGA))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void descargarVersionVigente_conExito_debeIncluirHeadersDeDescargaYCuerpoCorrecto() throws Exception {
+        when(documentoConsultaService.descargarVersionVigente(eq(DOCUMENTO_ID), any()))
+                .thenReturn(archivoDescargaDePrueba());
+
+        mockMvc.perform(get(URL_DESCARGA).with(administradorAutenticado()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "application/pdf"))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("attachment")))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("informe.pdf")))
+                .andExpect(header().longValue(HttpHeaders.CONTENT_LENGTH, 9L))
+                .andExpect(content().bytes("contenido".getBytes()));
+    }
+
+    @Test
+    void descargarVersionVigente_conDocumentoInexistenteONoVisible_debeResponder404() throws Exception {
+        when(documentoConsultaService.descargarVersionVigente(eq(DOCUMENTO_ID), any()))
+                .thenThrow(new ResourceNotFoundException("No existe un documento con id " + DOCUMENTO_ID));
+
+        mockMvc.perform(get(URL_DESCARGA).with(administradorAutenticado()))
                 .andExpect(status().isNotFound());
     }
 

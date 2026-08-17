@@ -1,5 +1,6 @@
 package com.plantarsas.gestiondocumental.documentos.controller;
 
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoArchivoDescarga;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoFiltroRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoPublicacionInicialRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
@@ -14,10 +15,14 @@ import com.plantarsas.gestiondocumental.shared.dto.PageResponse;
 import com.plantarsas.gestiondocumental.shared.enums.DocumentoEstado;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -35,6 +40,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 
 @RestController
@@ -145,6 +151,25 @@ public class DocumentoController {
             @AuthenticationPrincipal AuthenticatedUser usuarioAutenticado
     ) {
         return ApiResponse.exitosa(documentoConsultaService.obtenerPorId(id, usuarioAutenticado));
+    }
+
+    @GetMapping("/{id}/descarga")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'JEFE_AREA', 'ADMINISTRATIVO')")
+    public ResponseEntity<Resource> descargarVersionVigente(
+            @PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser usuarioAutenticado
+    ) {
+        DocumentoArchivoDescarga archivo = documentoConsultaService.descargarVersionVigente(id, usuarioAutenticado);
+
+        ContentDisposition contentDisposition = ContentDisposition.attachment()
+                .filename(archivo.nombreArchivoOriginal(), StandardCharsets.UTF_8)
+                .build();
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(archivo.tipoMime()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString())
+                .contentLength(archivo.tamanoBytes())
+                .body(new InputStreamResource(archivo.contenido()));
     }
 
     private void validarPaginacion(int page, int size) {

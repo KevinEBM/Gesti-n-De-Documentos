@@ -1,5 +1,6 @@
 package com.plantarsas.gestiondocumental.documentos.service;
 
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoArchivoDescarga;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoFiltroRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResumenResponse;
@@ -14,6 +15,7 @@ import com.plantarsas.gestiondocumental.documentos.specification.DocumentoSpecif
 import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
+import com.plantarsas.gestiondocumental.storage.StorageService;
 import com.plantarsas.gestiondocumental.usuarios.repository.UsuarioAreaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -22,6 +24,9 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -35,6 +40,7 @@ public class DocumentoConsultaServiceImpl implements DocumentoConsultaService {
     private final VersionDocumentoRepository versionDocumentoRepository;
     private final UsuarioAreaRepository usuarioAreaRepository;
     private final DocumentoMapper documentoMapper;
+    private final StorageService storageService;
 
     @Override
     @Transactional(readOnly = true)
@@ -106,6 +112,33 @@ public class DocumentoConsultaServiceImpl implements DocumentoConsultaService {
                 ));
 
         return documentoMapper.toResponse(documento, principal, adicionales, versionVigente);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DocumentoArchivoDescarga descargarVersionVigente(Long documentoId, AuthenticatedUser usuarioAutenticado) {
+        buscarDocumentoVisible(documentoId, usuarioAutenticado);
+
+        VersionDocumento versionVigente = versionDocumentoRepository
+                .findByDocumento_IdAndVigenteTrue(documentoId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Inconsistencia de datos: el documento con id " + documentoId
+                                + " está en estado PUBLICADO pero no tiene una versión vigente registrada"
+                ));
+
+        InputStream contenido;
+        try {
+            contenido = storageService.cargar(versionVigente.getRutaArchivo());
+        } catch (IOException e) {
+            throw new UncheckedIOException("No se pudo leer el archivo de la versión vigente", e);
+        }
+
+        return new DocumentoArchivoDescarga(
+                versionVigente.getNombreArchivoOriginal(),
+                versionVigente.getTipoMime(),
+                versionVigente.getTamanoBytes(),
+                contenido
+        );
     }
 
     private Documento buscarDocumentoVisible(Long documentoId, AuthenticatedUser usuarioAutenticado) {
