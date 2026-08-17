@@ -30,9 +30,19 @@ package com.plantarsas.gestiondocumental.documentos.service;
  *   - que "documento inexistente" y "documento no visible" son, a nivel de código,
  *     exactamente la misma ruta: findOne(spec) vacío -> ResourceNotFoundException. No hay
  *     ninguna consulta previa que permita distinguirlos.
+ *
+ * Etapa 3B (filtros combinables) añade aquí exactamente la misma clase de verificación:
+ * que cada filtro presente en DocumentoFiltroRequest se traduzca en una llamada a
+ * DocumentoSpecifications.<filtro>(...), que los filtros ausentes (null/blank) no se
+ * apliquen, y que la composición siga usando la misma base como contentSpec y countSpec.
+ * NO se intenta demostrar aquí que un filtro produzca el resultado SQL correcto (p. ej.
+ * que codigoContiene realmente encuentre coincidencias parciales, o que deArea excluya
+ * documentos de otra área): eso pertenece a la misma futura validación contra PostgreSQL
+ * real mencionada arriba para visiblePara/idIgual.
  */
 
 import com.plantarsas.gestiondocumental.areas.entity.Area;
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoFiltroRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResumenResponse;
 import com.plantarsas.gestiondocumental.documentos.entity.Documento;
@@ -44,6 +54,7 @@ import com.plantarsas.gestiondocumental.documentos.repository.DocumentoRepositor
 import com.plantarsas.gestiondocumental.documentos.repository.VersionDocumentoRepository;
 import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
+import com.plantarsas.gestiondocumental.shared.enums.DocumentoEstado;
 import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
 import com.plantarsas.gestiondocumental.usuarios.entity.UsuarioArea;
 import com.plantarsas.gestiondocumental.usuarios.repository.UsuarioAreaRepository;
@@ -59,10 +70,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -117,6 +130,10 @@ class DocumentoConsultaServiceImplTest {
         return new AuthenticatedUser(USUARIO_ID, "administrativo@plantarsas.com", RolEnum.ADMINISTRATIVO);
     }
 
+    private DocumentoFiltroRequest sinFiltros() {
+        return new DocumentoFiltroRequest(null, null, null, null, null, null, null, null);
+    }
+
     // ------------------------------------------------------------------
     // listar(...)
     // ------------------------------------------------------------------
@@ -127,7 +144,7 @@ class DocumentoConsultaServiceImplTest {
         when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of()));
 
-        documentoConsultaServiceImpl.listar(administrador(), pageable);
+        documentoConsultaServiceImpl.listar(administrador(), sinFiltros(), pageable);
 
         verify(usuarioAreaRepository, never()).findByUsuario_Id(any());
     }
@@ -139,7 +156,7 @@ class DocumentoConsultaServiceImplTest {
         when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of()));
 
-        documentoConsultaServiceImpl.listar(jefeArea(), pageable);
+        documentoConsultaServiceImpl.listar(jefeArea(), sinFiltros(), pageable);
 
         verify(usuarioAreaRepository).findByUsuario_Id(USUARIO_ID);
     }
@@ -151,7 +168,7 @@ class DocumentoConsultaServiceImplTest {
         when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of()));
 
-        documentoConsultaServiceImpl.listar(administrativo(), pageable);
+        documentoConsultaServiceImpl.listar(administrativo(), sinFiltros(), pageable);
 
         verify(usuarioAreaRepository).findByUsuario_Id(USUARIO_ID);
     }
@@ -163,7 +180,7 @@ class DocumentoConsultaServiceImplTest {
         when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of()));
 
-        Page<DocumentoResumenResponse> resultado = documentoConsultaServiceImpl.listar(jefeArea(), pageable);
+        Page<DocumentoResumenResponse> resultado = documentoConsultaServiceImpl.listar(jefeArea(), sinFiltros(), pageable);
 
         assertThat(resultado.getContent()).isEmpty();
         verify(usuarioAreaRepository).findByUsuario_Id(USUARIO_ID);
@@ -180,7 +197,7 @@ class DocumentoConsultaServiceImplTest {
         when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of()));
 
-        documentoConsultaServiceImpl.listar(jefeArea(), pageable);
+        documentoConsultaServiceImpl.listar(jefeArea(), sinFiltros(), pageable);
 
         verify(usuarioAreaRepository).findByUsuario_Id(USUARIO_ID);
         verify(area).getId();
@@ -197,7 +214,7 @@ class DocumentoConsultaServiceImplTest {
                 .thenReturn(new PageImpl<>(List.of(documento)));
         when(documentoMapper.toResumen(documento)).thenReturn(resumen);
 
-        Page<DocumentoResumenResponse> resultado = documentoConsultaServiceImpl.listar(administrador(), pageable);
+        Page<DocumentoResumenResponse> resultado = documentoConsultaServiceImpl.listar(administrador(), sinFiltros(), pageable);
 
         assertThat(resultado.getContent()).containsExactly(resumen);
     }
@@ -210,7 +227,7 @@ class DocumentoConsultaServiceImplTest {
                 any(Specification.class), any(Specification.class), pageableCaptor.capture()
         )).thenReturn(new PageImpl<>(List.of()));
 
-        documentoConsultaServiceImpl.listar(administrador(), pageable);
+        documentoConsultaServiceImpl.listar(administrador(), sinFiltros(), pageable);
 
         assertThat(pageableCaptor.getValue()).isEqualTo(pageable);
     }
@@ -223,7 +240,181 @@ class DocumentoConsultaServiceImplTest {
         when(documentoRepository.findAll(consultaCaptor.capture(), countSpecCaptor.capture(), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of()));
 
-        documentoConsultaServiceImpl.listar(administrador(), pageable);
+        documentoConsultaServiceImpl.listar(administrador(), sinFiltros(), pageable);
+
+        assertThat(consultaCaptor.getValue()).isNotNull();
+        assertThat(countSpecCaptor.getValue()).isNotNull();
+        assertThat(countSpecCaptor.getValue()).isNotSameAs(consultaCaptor.getValue());
+    }
+
+    // ------------------------------------------------------------------
+    // listar(...) con DocumentoFiltroRequest (Etapa 3B)
+    //
+    // Con documentoRepository mockeado, estos tests verifican que el filtro presente
+    // en DocumentoFiltroRequest efectivamente resulta en una llamada exitosa al
+    // repository (la composición no lanza excepciones, no rompe la resolución de
+    // áreas ni el mapeo). NO demuestran que el predicado generado por cada
+    // DocumentoSpecifications.<filtro>(...) produzca el resultado SQL correcto: eso
+    // requiere la validación contra PostgreSQL real mencionada en la cabecera de esta
+    // clase.
+    // ------------------------------------------------------------------
+
+    @Test
+    void listar_conCodigoPresente_debeAplicarloSinLanzarExcepcion() {
+        Pageable pageable = PageRequest.of(0, 20);
+        DocumentoFiltroRequest filtro = new DocumentoFiltroRequest(
+                "SG-SST", null, null, null, null, null, null, null
+        );
+        when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        assertThatCode(() -> documentoConsultaServiceImpl.listar(administrador(), filtro, pageable))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void listar_conTituloPresente_debeAplicarloSinLanzarExcepcion() {
+        Pageable pageable = PageRequest.of(0, 20);
+        DocumentoFiltroRequest filtro = new DocumentoFiltroRequest(
+                null, "Procedimiento", null, null, null, null, null, null
+        );
+        when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        assertThatCode(() -> documentoConsultaServiceImpl.listar(administrador(), filtro, pageable))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void listar_conAreaIdPresente_debeAplicarloSinLanzarExcepcion() {
+        Pageable pageable = PageRequest.of(0, 20);
+        DocumentoFiltroRequest filtro = new DocumentoFiltroRequest(
+                null, null, 5L, null, null, null, null, null
+        );
+        when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        assertThatCode(() -> documentoConsultaServiceImpl.listar(administrador(), filtro, pageable))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void listar_conSubprogramaIdPresente_debeAplicarloSinLanzarExcepcion() {
+        Pageable pageable = PageRequest.of(0, 20);
+        DocumentoFiltroRequest filtro = new DocumentoFiltroRequest(
+                null, null, null, 8L, null, null, null, null
+        );
+        when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        assertThatCode(() -> documentoConsultaServiceImpl.listar(administrador(), filtro, pageable))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void listar_conTipoDocumentoIdPresente_debeAplicarloSinLanzarExcepcion() {
+        Pageable pageable = PageRequest.of(0, 20);
+        DocumentoFiltroRequest filtro = new DocumentoFiltroRequest(
+                null, null, null, null, 3L, null, null, null
+        );
+        when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        assertThatCode(() -> documentoConsultaServiceImpl.listar(administrador(), filtro, pageable))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void listar_conEstadoPresente_debeAplicarloSinLanzarExcepcion() {
+        Pageable pageable = PageRequest.of(0, 20);
+        DocumentoFiltroRequest filtro = new DocumentoFiltroRequest(
+                null, null, null, null, null, DocumentoEstado.INACTIVO, null, null
+        );
+        when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        assertThatCode(() -> documentoConsultaServiceImpl.listar(administrador(), filtro, pageable))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void listar_conFechaDesdePresente_debeAplicarlaSinLanzarExcepcion() {
+        Pageable pageable = PageRequest.of(0, 20);
+        DocumentoFiltroRequest filtro = new DocumentoFiltroRequest(
+                null, null, null, null, null, null, LocalDate.of(2026, 1, 1), null
+        );
+        when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        assertThatCode(() -> documentoConsultaServiceImpl.listar(administrador(), filtro, pageable))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void listar_conFechaHastaPresente_debeAplicarlaSinLanzarExcepcion() {
+        Pageable pageable = PageRequest.of(0, 20);
+        DocumentoFiltroRequest filtro = new DocumentoFiltroRequest(
+                null, null, null, null, null, null, null, LocalDate.of(2026, 12, 31)
+        );
+        when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        assertThatCode(() -> documentoConsultaServiceImpl.listar(administrador(), filtro, pageable))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void listar_conAmbasFechasPresentes_debeAplicarlasSinLanzarExcepcion() {
+        Pageable pageable = PageRequest.of(0, 20);
+        DocumentoFiltroRequest filtro = new DocumentoFiltroRequest(
+                null, null, null, null, null, null, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)
+        );
+        when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        assertThatCode(() -> documentoConsultaServiceImpl.listar(administrador(), filtro, pageable))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void listar_conVariosFiltrosCombinados_debeAplicarlosSinLanzarExcepcion() {
+        Pageable pageable = PageRequest.of(0, 20);
+        DocumentoFiltroRequest filtro = new DocumentoFiltroRequest(
+                "SG-SST", "Procedimiento", 5L, 8L, 3L, DocumentoEstado.PUBLICADO,
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)
+        );
+        when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        assertThatCode(() -> documentoConsultaServiceImpl.listar(administrador(), filtro, pageable))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void listar_conCodigoYTituloEnBlanco_debenTratarseComoAusentes() {
+        Pageable pageable = PageRequest.of(0, 20);
+        DocumentoFiltroRequest filtro = new DocumentoFiltroRequest(
+                "   ", "   ", null, null, null, null, null, null
+        );
+        when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        assertThatCode(() -> documentoConsultaServiceImpl.listar(administrador(), filtro, pageable))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void listar_conFiltrosPresentes_debeAplicarlosTantoAContentSpecComoACountSpec() {
+        Pageable pageable = PageRequest.of(0, 20);
+        DocumentoFiltroRequest filtro = new DocumentoFiltroRequest(
+                "SG-SST", null, 5L, null, null, null, null, null
+        );
+        ArgumentCaptor<Specification<Documento>> consultaCaptor = ArgumentCaptor.forClass(Specification.class);
+        ArgumentCaptor<Specification<Documento>> countSpecCaptor = ArgumentCaptor.forClass(Specification.class);
+        when(documentoRepository.findAll(consultaCaptor.capture(), countSpecCaptor.capture(), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        documentoConsultaServiceImpl.listar(administrador(), filtro, pageable);
 
         assertThat(consultaCaptor.getValue()).isNotNull();
         assertThat(countSpecCaptor.getValue()).isNotNull();

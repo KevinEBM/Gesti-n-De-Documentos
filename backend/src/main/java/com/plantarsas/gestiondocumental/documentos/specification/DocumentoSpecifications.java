@@ -13,6 +13,8 @@ import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -21,6 +23,8 @@ import java.util.Set;
  * como el detalle por id deben componer sus consultas a partir de estos predicados.
  */
 public final class DocumentoSpecifications {
+
+    private static final char CARACTER_ESCAPE_LIKE = '\\';
 
     private DocumentoSpecifications() {
     }
@@ -61,6 +65,71 @@ public final class DocumentoSpecifications {
             root.fetch("tipoDocumento", JoinType.INNER);
             return criteriaBuilder.conjunction();
         };
+    }
+
+    /**
+     * "Asociado estructuralmente a esta área" mediante documento_area (principal o
+     * adicional). NO equivale a "visible desde esta área": un documento GLOBAL solo
+     * aparece aquí si esta área es, en concreto, su área principal registrada en la
+     * publicación. La autorización sigue siendo exclusivamente visiblePara(...); este
+     * predicado es un filtro de búsqueda adicional, compuesto con AND sobre ella.
+     */
+    public static Specification<Documento> deArea(Long areaId) {
+        return (root, query, criteriaBuilder) -> criteriaBuilder.exists(
+                subconsultaAsociacionConAreas(root, query, criteriaBuilder, Set.of(areaId))
+        );
+    }
+
+    public static Specification<Documento> deSubprograma(Long subprogramaId) {
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.equal(root.get("subprograma").get("id"), subprogramaId);
+    }
+
+    public static Specification<Documento> deTipoDocumento(Long tipoDocumentoId) {
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.equal(root.get("tipoDocumento").get("id"), tipoDocumentoId);
+    }
+
+    public static Specification<Documento> conEstado(DocumentoEstado estado) {
+        return (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("estado"), estado);
+    }
+
+    public static Specification<Documento> creadoDesde(LocalDateTime desde) {
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.greaterThanOrEqualTo(root.get("fechaCreacion"), desde);
+    }
+
+    public static Specification<Documento> creadoAntesDe(LocalDateTime limiteExclusivo) {
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.lessThan(root.get("fechaCreacion"), limiteExclusivo);
+    }
+
+    public static Specification<Documento> codigoContiene(String codigo) {
+        return contieneTexto("codigo", codigo);
+    }
+
+    public static Specification<Documento> tituloContiene(String titulo) {
+        return contieneTexto("titulo", titulo);
+    }
+
+    /**
+     * LIKE '%valor%' case-insensitive con escape explícito de los comodines propios
+     * de LIKE (%, _) mediante el mecanismo de escape del propio CriteriaBuilder, para
+     * que un usuario que escriba "%" o "_" busque ese carácter literal y no lo use
+     * accidentalmente como comodín.
+     */
+    private static Specification<Documento> contieneTexto(String campo, String valor) {
+        String patron = "%" + escaparComodinesLike(valor.trim().toLowerCase(Locale.ROOT)) + "%";
+        return (root, query, criteriaBuilder) -> criteriaBuilder.like(
+                criteriaBuilder.lower(root.get(campo)), patron, CARACTER_ESCAPE_LIKE
+        );
+    }
+
+    private static String escaparComodinesLike(String valor) {
+        return valor
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
     }
 
     private static Subquery<Long> subconsultaAsociacionConAreas(

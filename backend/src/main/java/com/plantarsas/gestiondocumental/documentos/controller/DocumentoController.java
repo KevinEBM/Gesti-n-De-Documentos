@@ -1,5 +1,6 @@
 package com.plantarsas.gestiondocumental.documentos.controller;
 
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoFiltroRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoPublicacionInicialRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResumenResponse;
@@ -10,6 +11,7 @@ import com.plantarsas.gestiondocumental.exception.BusinessException;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 import com.plantarsas.gestiondocumental.shared.dto.ApiResponse;
 import com.plantarsas.gestiondocumental.shared.dto.PageResponse;
+import com.plantarsas.gestiondocumental.shared.enums.DocumentoEstado;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -33,6 +35,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/documentos")
@@ -111,12 +114,26 @@ public class DocumentoController {
     public ApiResponse<PageResponse<DocumentoResumenResponse>> listar(
             @AuthenticationPrincipal AuthenticatedUser usuarioAutenticado,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String codigo,
+            @RequestParam(required = false) String titulo,
+            @RequestParam(required = false) Long areaId,
+            @RequestParam(required = false) Long subprogramaId,
+            @RequestParam(required = false) Long tipoDocumentoId,
+            @RequestParam(required = false) DocumentoEstado estado,
+            @RequestParam(required = false) LocalDate fechaDesde,
+            @RequestParam(required = false) LocalDate fechaHasta
     ) {
         validarPaginacion(page, size);
+        validarFiltros(areaId, subprogramaId, tipoDocumentoId, fechaDesde, fechaHasta);
+
+        DocumentoFiltroRequest filtro = new DocumentoFiltroRequest(
+                codigo, titulo, areaId, subprogramaId, tipoDocumentoId, estado, fechaDesde, fechaHasta
+        );
 
         Pageable pageable = PageRequest.of(page, size, ORDEN_LISTADO);
-        Page<DocumentoResumenResponse> resultado = documentoConsultaService.listar(usuarioAutenticado, pageable);
+        Page<DocumentoResumenResponse> resultado =
+                documentoConsultaService.listar(usuarioAutenticado, filtro, pageable);
 
         return ApiResponse.exitosa(PageResponse.desde(resultado));
     }
@@ -138,6 +155,23 @@ public class DocumentoController {
             throw new BusinessException(
                     "El tamaño de página debe estar entre 1 y " + TAMANO_MAXIMO_PAGINA
             );
+        }
+    }
+
+    private void validarFiltros(
+            Long areaId, Long subprogramaId, Long tipoDocumentoId, LocalDate fechaDesde, LocalDate fechaHasta
+    ) {
+        if (areaId != null && areaId <= 0) {
+            throw new BusinessException("El identificador de área debe ser un valor positivo");
+        }
+        if (subprogramaId != null && subprogramaId <= 0) {
+            throw new BusinessException("El identificador de subprograma debe ser un valor positivo");
+        }
+        if (tipoDocumentoId != null && tipoDocumentoId <= 0) {
+            throw new BusinessException("El identificador de tipo de documento debe ser un valor positivo");
+        }
+        if (fechaDesde != null && fechaHasta != null && fechaDesde.isAfter(fechaHasta)) {
+            throw new BusinessException("La fecha inicial no puede ser posterior a la fecha final");
         }
     }
 }
