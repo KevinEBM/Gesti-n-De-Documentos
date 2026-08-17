@@ -1,5 +1,6 @@
 package com.plantarsas.gestiondocumental.documentos.service;
 
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoArchivoDescarga;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoFiltroRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResumenResponse;
@@ -14,4 +15,6 @@ public interface DocumentoConsultaService {
     );
 
     DocumentoResponse obtenerPorId(Long documentoId, AuthenticatedUser usuarioAutenticado);
+
+    DocumentoArchivoDescarga descargarVersionVigente(Long documentoId, AuthenticatedUser usuarioAutenticado);
 }

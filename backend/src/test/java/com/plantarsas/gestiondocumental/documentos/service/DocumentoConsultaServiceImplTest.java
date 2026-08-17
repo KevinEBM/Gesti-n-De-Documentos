@@ -39,9 +39,16 @@ package com.plantarsas.gestiondocumental.documentos.service;
  * que codigoContiene realmente encuentre coincidencias parciales, o que deArea excluya
  * documentos de otra área): eso pertenece a la misma futura validación contra PostgreSQL
  * real mencionada arriba para visiblePara/idIgual.
+ *
+ * Etapa 3C (descarga de la versión vigente) añade la misma clase de verificación de
+ * coordinación: que la autorización se resuelve por el mismo camino que obtenerPorId
+ * (findOne(idIgual.and(visiblePara))), que se usa la versión vigente real, que se llama a
+ * StorageService con la ruta correcta, y que una IOException real se traduce en
+ * UncheckedIOException siguiendo el mismo patrón que DocumentoServiceImpl.
  */
 
 import com.plantarsas.gestiondocumental.areas.entity.Area;
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoArchivoDescarga;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoFiltroRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResumenResponse;
@@ -56,6 +63,7 @@ import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 import com.plantarsas.gestiondocumental.shared.enums.DocumentoEstado;
 import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
+import com.plantarsas.gestiondocumental.storage.StorageService;
 import com.plantarsas.gestiondocumental.usuarios.entity.UsuarioArea;
 import com.plantarsas.gestiondocumental.usuarios.repository.UsuarioAreaRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,6 +78,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -82,6 +93,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -105,6 +117,9 @@ class DocumentoConsultaServiceImplTest {
     @Mock
     private DocumentoMapper documentoMapper;
 
+    @Mock
+    private StorageService storageService;
+
     private DocumentoConsultaServiceImpl documentoConsultaServiceImpl;
 
     @BeforeEach
@@ -114,7 +129,8 @@ class DocumentoConsultaServiceImplTest {
                 documentoAreaRepository,
                 versionDocumentoRepository,
                 usuarioAreaRepository,
-                documentoMapper
+                documentoMapper,
+                storageService
         );
     }
 
@@ -511,5 +527,77 @@ class DocumentoConsultaServiceImplTest {
 
         assertThatThrownBy(() -> documentoConsultaServiceImpl.obtenerPorId(DOCUMENTO_ID, jefeArea()))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    // ------------------------------------------------------------------
+    // descargarVersionVigente(...) (Etapa 3C)
+    // ------------------------------------------------------------------
+
+    @Test
+    void descargarVersionVigente_conDocumentoVisible_debeRetornarArchivoDeLaVersionVigente() throws Exception {
+        Documento documento = mock(Documento.class);
+        VersionDocumento version = mock(VersionDocumento.class);
+        InputStream contenido = InputStream.nullInputStream();
+
+        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
+        when(versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(DOCUMENTO_ID))
+                .thenReturn(Optional.of(version));
+        when(version.getRutaArchivo()).thenReturn("b3f1c2.pdf");
+        when(version.getNombreArchivoOriginal()).thenReturn("informe.pdf");
+        when(version.getTipoMime()).thenReturn("application/pdf");
+        when(version.getTamanoBytes()).thenReturn(1024L);
+        when(storageService.cargar("b3f1c2.pdf")).thenReturn(contenido);
+
+        DocumentoArchivoDescarga resultado =
+                documentoConsultaServiceImpl.descargarVersionVigente(DOCUMENTO_ID, jefeArea());
+
+        assertThat(resultado.nombreArchivoOriginal()).isEqualTo("informe.pdf");
+        assertThat(resultado.tipoMime()).isEqualTo("application/pdf");
+        assertThat(resultado.tamanoBytes()).isEqualTo(1024L);
+        assertThat(resultado.contenido()).isSameAs(contenido);
+        verify(storageService).cargar("b3f1c2.pdf");
+    }
+
+    @Test
+    void descargarVersionVigente_conDocumentoInexistenteONoVisible_debeLanzarResourceNotFoundExceptionSinConsultarStorage() {
+        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> documentoConsultaServiceImpl.descargarVersionVigente(DOCUMENTO_ID, jefeArea()))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void descargarVersionVigente_sinVersionVigenteRegistrada_debeLanzarIllegalStateExceptionSinConsultarStorage() {
+        Documento documento = mock(Documento.class);
+
+        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
+        when(versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(DOCUMENTO_ID))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> documentoConsultaServiceImpl.descargarVersionVigente(DOCUMENTO_ID, jefeArea()))
+                .isInstanceOf(IllegalStateException.class);
+
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void descargarVersionVigente_conIOExceptionAlLeerElArchivo_debeLanzarUncheckedIOException() throws Exception {
+        Documento documento = mock(Documento.class);
+        VersionDocumento version = mock(VersionDocumento.class);
+
+        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
+        when(versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(DOCUMENTO_ID))
+                .thenReturn(Optional.of(version));
+        when(version.getRutaArchivo()).thenReturn("b3f1c2.pdf");
+        when(storageService.cargar("b3f1c2.pdf")).thenThrow(new IOException("fallo de lectura"));
+
+        assertThatThrownBy(() -> documentoConsultaServiceImpl.descargarVersionVigente(DOCUMENTO_ID, jefeArea()))
+                .isInstanceOf(UncheckedIOException.class);
     }
 }
