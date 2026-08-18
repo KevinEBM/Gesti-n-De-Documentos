@@ -124,6 +124,22 @@ public class UsuarioServiceImpl implements UsuarioService {
         return usuarioMapper.toResponse(usuario, asignaciones);
     }
 
+    @Override
+    @Transactional
+    public void cambiarContrasena(Long usuarioId, String contrasenaActual, String nuevaContrasena) {
+        Usuario usuario = obtenerEntidadPorId(usuarioId);
+
+        if (!usuario.coincideConPassword(contrasenaActual, passwordEncoder)) {
+            throw new BusinessException("La contraseña actual no es correcta");
+        }
+
+        if (usuario.coincideConPassword(nuevaContrasena, passwordEncoder)) {
+            throw new BusinessException("La nueva contraseña debe ser diferente a la actual");
+        }
+
+        usuario.actualizarPassword(passwordEncoder.encode(nuevaContrasena));
+    }
+
     private Usuario obtenerEntidadPorId(Long id) {
         return usuarioRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
