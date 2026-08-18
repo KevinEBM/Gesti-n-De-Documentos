@@ -5,6 +5,8 @@ import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpStatus;
 
 import java.io.ByteArrayInputStream;
@@ -191,6 +193,23 @@ class StorageServiceImplTest {
     }
 
     @Test
+    void guardar_debeUsarMimeTypePorDefectoCuandoElDeclaradoEsInvalido() throws Exception {
+        byte[] contenido = "contenido".getBytes(StandardCharsets.UTF_8);
+
+        StoredFile resultado = storageServiceImpl.guardar(
+                "archivo.txt",
+                new ByteArrayInputStream(contenido),
+                "esto no es un mime",
+                contenido.length
+        );
+
+        assertThat(resultado.mimeType()).isEqualTo("application/octet-stream");
+
+        Path archivoFisico = directorioTemporal.resolve(resultado.ruta());
+        assertThat(Files.exists(archivoFisico)).isTrue();
+    }
+
+    @Test
     void guardar_debeRechazarNombreOriginalVacio() {
         assertThatThrownBy(() -> storageServiceImpl.guardar(
                 " ",
@@ -201,6 +220,38 @@ class StorageServiceImplTest {
                 .hasMessage("El nombre original del archivo es obligatorio")
                 .satisfies(ex -> assertThat(((BusinessException) ex).getStatus())
                         .isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"archivo.apk", "archivo.APK", "archivo.Apk"})
+    void guardar_debeRechazarArchivoApkSinImportarMayusculasOMinusculas(String nombreOriginal) throws Exception {
+        assertThatThrownBy(() -> storageServiceImpl.guardar(
+                nombreOriginal,
+                new ByteArrayInputStream("contenido".getBytes(StandardCharsets.UTF_8)),
+                "application/vnd.android.package-archive",
+                9))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("No se permite cargar archivos APK")
+                .satisfies(ex -> assertThat(((BusinessException) ex).getStatus())
+                        .isEqualTo(HttpStatus.BAD_REQUEST));
+
+        try (var archivos = Files.list(directorioTemporal)) {
+            assertThat(archivos).isEmpty();
+        }
+    }
+
+    @Test
+    void guardar_debeAceptarArchivoConExtensionFinalDistintaAunqueElNombreContengaApk() throws Exception {
+        byte[] contenido = "contenido".getBytes(StandardCharsets.UTF_8);
+
+        StoredFile resultado = storageServiceImpl.guardar(
+                "archivo.apk.pdf",
+                new ByteArrayInputStream(contenido),
+                "application/pdf",
+                contenido.length
+        );
+
+        assertThat(resultado.ruta()).endsWith(".pdf");
     }
 
     @Test
