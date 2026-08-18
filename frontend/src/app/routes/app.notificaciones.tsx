@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
+/*import { Link, createFileRoute } from "@tanstack/react-router";
 import { Bell, BellOff, CheckCheck, FilePlus2, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
@@ -109,3 +109,4 @@ function Notificaciones() {
         </AppShell>
     );
 }
+*/

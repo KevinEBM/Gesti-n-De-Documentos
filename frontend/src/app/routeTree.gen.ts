@@ -15,7 +15,7 @@ import { Route as AppUsuariosRouteImport } from './routes/app.usuarios'
 import { Route as AppPublicarRouteImport } from './routes/app.publicar'
 import { Route as AppParametrizacionRouteImport } from './routes/app.parametrizacion'
 import { Route as AppPanelAdminRouteImport } from './routes/app.panel-admin'
-import { Route as AppNotificacionesRouteImport } from './routes/app.notificaciones'
+//import { Route as AppNotificacionesRouteImport } from './routes/app.notificaciones'
 import { Route as AppInicioRouteImport } from './routes/app.inicio'
 import { Route as AppGestionDocumentosRouteImport } from './routes/app.gestion-documentos'
 import { Route as AppDocumentosRouteImport } from './routes/app.documentos'
@@ -52,11 +52,11 @@ const AppPanelAdminRoute = AppPanelAdminRouteImport.update({
     path: '/panel-admin',
     getParentRoute: () => AppRoute,
 } as any)
-const AppNotificacionesRoute = AppNotificacionesRouteImport.update({
+/*const AppNotificacionesRoute = AppNotificacionesRouteImport.update({
     id: '/notificaciones',
     path: '/notificaciones',
     getParentRoute: () => AppRoute,
-} as any)
+} as any)*/
 const AppInicioRoute = AppInicioRouteImport.update({
     id: '/inicio',
     path: '/inicio',
@@ -84,7 +84,7 @@ export interface FileRoutesByFullPath {
     '/app/documentos': typeof AppDocumentosRoute
     '/app/gestion-documentos': typeof AppGestionDocumentosRoute
     '/app/inicio': typeof AppInicioRoute
-    '/app/notificaciones': typeof AppNotificacionesRoute
+    //'/app/notificaciones': typeof AppNotificacionesRoute
     '/app/panel-admin': typeof AppPanelAdminRoute
     '/app/parametrizacion': typeof AppParametrizacionRoute
     '/app/publicar': typeof AppPublicarRoute
@@ -97,7 +97,7 @@ export interface FileRoutesByTo {
     '/app/documentos': typeof AppDocumentosRoute
     '/app/gestion-documentos': typeof AppGestionDocumentosRoute
     '/app/inicio': typeof AppInicioRoute
-    '/app/notificaciones': typeof AppNotificacionesRoute
+    //'/app/notificaciones': typeof AppNotificacionesRoute
     '/app/panel-admin': typeof AppPanelAdminRoute
     '/app/parametrizacion': typeof AppParametrizacionRoute
     '/app/publicar': typeof AppPublicarRoute
@@ -111,7 +111,7 @@ export interface FileRoutesById {
     '/app/documentos': typeof AppDocumentosRoute
     '/app/gestion-documentos': typeof AppGestionDocumentosRoute
     '/app/inicio': typeof AppInicioRoute
-    '/app/notificaciones': typeof AppNotificacionesRoute
+   // '/app/notificaciones': typeof AppNotificacionesRoute
     '/app/panel-admin': typeof AppPanelAdminRoute
     '/app/parametrizacion': typeof AppParametrizacionRoute
     '/app/publicar': typeof AppPublicarRoute
@@ -126,7 +126,7 @@ export interface FileRouteTypes {
         | '/app/documentos'
         | '/app/gestion-documentos'
         | '/app/inicio'
-        | '/app/notificaciones'
+   //     | '/app/notificaciones'
         | '/app/panel-admin'
         | '/app/parametrizacion'
         | '/app/publicar'
@@ -139,7 +139,7 @@ export interface FileRouteTypes {
         | '/app/documentos'
         | '/app/gestion-documentos'
         | '/app/inicio'
-        | '/app/notificaciones'
+     //   | '/app/notificaciones'
         | '/app/panel-admin'
         | '/app/parametrizacion'
         | '/app/publicar'
@@ -152,7 +152,7 @@ export interface FileRouteTypes {
         | '/app/documentos'
         | '/app/gestion-documentos'
         | '/app/inicio'
-        | '/app/notificaciones'
+    //    | '/app/notificaciones'
         | '/app/panel-admin'
         | '/app/parametrizacion'
         | '/app/publicar'
@@ -208,14 +208,14 @@ declare module '@tanstack/react-router' {
             fullPath: '/app/panel-admin'
             preLoaderRoute: typeof AppPanelAdminRouteImport
             parentRoute: typeof AppRoute
-        }
+        }/*
         '/app/notificaciones': {
             id: '/app/notificaciones'
             path: '/notificaciones'
             fullPath: '/app/notificaciones'
             preLoaderRoute: typeof AppNotificacionesRouteImport
             parentRoute: typeof AppRoute
-        }
+        }*/
         '/app/inicio': {
             id: '/app/inicio'
             path: '/inicio'
@@ -251,7 +251,7 @@ interface AppRouteChildren {
     AppDocumentosRoute: typeof AppDocumentosRoute
     AppGestionDocumentosRoute: typeof AppGestionDocumentosRoute
     AppInicioRoute: typeof AppInicioRoute
-    AppNotificacionesRoute: typeof AppNotificacionesRoute
+ //   AppNotificacionesRoute: typeof AppNotificacionesRoute
     AppPanelAdminRoute: typeof AppPanelAdminRoute
     AppParametrizacionRoute: typeof AppParametrizacionRoute
     AppPublicarRoute: typeof AppPublicarRoute
@@ -263,7 +263,7 @@ const AppRouteChildren: AppRouteChildren = {
     AppDocumentosRoute: AppDocumentosRoute,
     AppGestionDocumentosRoute: AppGestionDocumentosRoute,
     AppInicioRoute: AppInicioRoute,
-    AppNotificacionesRoute: AppNotificacionesRoute,
+//    AppNotificacionesRoute: AppNotificacionesRoute,
     AppPanelAdminRoute: AppPanelAdminRoute,
     AppParametrizacionRoute: AppParametrizacionRoute,
     AppPublicarRoute: AppPublicarRoute,

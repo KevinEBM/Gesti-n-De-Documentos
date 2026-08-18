@@ -28,7 +28,7 @@ export const Route = createFileRoute("/app/documento/$id")({
 function DetalleDocumento() {
     const { id } = useParams({ from: "/app/documento/$id" });
     const navigate = useNavigate();
-    const { documentosVisibles, areas, nombreArea, nombreCategoria, nombreTipo, puedeVerHistorial } = useIntranet();
+    const { documentosVisibles, areas, nombreArea, nombreSub_Proceso, nombreTipo, puedeVerHistorial } = useIntranet();
     const doc = documentosVisibles.find((d) => d.id === id);
 
     if (!doc) {
@@ -83,7 +83,7 @@ function DetalleDocumento() {
                         <Separator />
                         <dl className="grid gap-4 sm:grid-cols-2">
                             <Campo k="Área responsable" v={nombreArea(doc.areaId)} />
-                            <Campo k="Categoría" v={nombreCategoria(doc.categoriaId)} />
+                            <Campo k="Categoría" v={nombreSub_Proceso(doc.subProcesoId)} />
                             <Campo k="Tipo de documento" v={nombreTipo(doc.tipoId)} />
                             <Campo k="Versión vigente" v={`v${doc.version}`} />
                             <Campo k="Fecha de actualización" v={doc.fechaPublicacion} />

@@ -1,8 +1,7 @@
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Save, FileUp, Upload } from "lucide-react";
+import { ArrowLeft, Save, FileUp, Upload, FileText } from "lucide-react";
 import React, { useState } from "react";
 import { toast } from "sonner";
-
 import { AppShell } from "@/components/AppShell";
 import { AreasAutorizadas } from "@/components/AreasAutorizadas";
 import { DropzoneArea } from "@/components/ui/drop-zonearea";
@@ -13,9 +12,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-
+import { obtenerIconoArea } from "@/lib/iconos-areas";
+import { obtenerIconoSubProceso } from "@/lib/iconos-subprocesos";
+import { obtenerIconoFormato } from "@/lib/iconos-formatos";
 import type { Estado } from "@/lib/data";
 import { useIntranet } from "@/lib/store";
+import { extraerInformacionDocumento } from "@/lib/extraer-info-doc";
+
 
 export const Route = createFileRoute("/app/publicar")({
     head: () => ({
@@ -34,7 +37,7 @@ export const Route = createFileRoute("/app/publicar")({
 function NuevoDocumentoPage() {
     const navigate = useNavigate();
     const store = useIntranet();
-    const { areas, categorias, tipos, permisos } = store;
+    const { areas, sub_proceso, tipos, permisos } = store;
 
     // Detectar la función de publicación según el nombre expuesto en tu store
     const publicarFn =
@@ -45,6 +48,8 @@ function NuevoDocumentoPage() {
     // Fecha actual predeterminada (YYYY-MM-DD)
     const fechaHoy = new Date().toISOString().split("T")[0];
 
+    //Estados de la sección 0
+    const [codigo, setCodigo] = useState("");
     // Estados de la sección 1: Información
     const [nombre, setNombre] = useState("");
     const [descripcion, setDescripcion] = useState("");
@@ -52,7 +57,7 @@ function NuevoDocumentoPage() {
 
     // Estados de la sección 2: Clasificación y visibilidad
     const [areaId, setAreaId] = useState("");
-    const [categoriaId, setCategoriaId] = useState("");
+    const [subProcesoId, setSub_procesoId] = useState("");
     const [tipoId, setTipoId] = useState("");
     const [visibleTodas, setVisibleTodas] = useState(false);
     const [autorizadas, setAutorizadas] = useState<string[]>([]);
@@ -63,6 +68,10 @@ function NuevoDocumentoPage() {
     const [estado, setEstado] = useState<Estado>("publicado");
 
     const [subiendo, setSubiendo] = useState(false);
+
+    const subProcesosFiltrados = sub_proceso.filter(
+        (sp) => sp.areaId === areaId
+    );
 
     if (!permisos?.actualizarDocumentos) {
         return (
@@ -80,10 +89,11 @@ function NuevoDocumentoPage() {
         e.preventDefault();
 
         // Validaciones
+        if (!codigo.trim()) return toast.error("El código del documento es obligatorio.");
         if (!nombre.trim()) return toast.error("El nombre del documento es obligatorio.");
         if (!descripcion.trim()) return toast.error("La descripción del documento es obligatoria.");
         if (!areaId) return toast.error("Selecciona un área responsable.");
-        if (!categoriaId) return toast.error("Selecciona una categoría.");
+        if (!subProcesoId) return toast.error("Selecciona un subproceso.");
         if (!tipoId) return toast.error("Selecciona un tipo de documento.");
         if (!visibleTodas && autorizadas.length === 0) {
             return toast.error("Selecciona al menos un área autorizada o marca 'Visible para todas las áreas'.");
@@ -94,10 +104,11 @@ function NuevoDocumentoPage() {
 
         try {
             const formData = new FormData();
+            formData.append("codigo", codigo.trim());
             formData.append("nombre", nombre.trim());
             formData.append("descripcion", descripcion.trim());
             formData.append("areaId", areaId);
-            formData.append("categoriaId", categoriaId);
+            formData.append("subProcesoId", subProcesoId);
             formData.append("tipoId", tipoId);
             formData.append("archivo", archivo);
 
@@ -105,10 +116,11 @@ function NuevoDocumentoPage() {
             await new Promise((resolve) => setTimeout(resolve, 1500));
 
             const nuevoDocumento = {
+                codigo,
                 nombre: nombre.trim(),
                 descripcion: descripcion.trim(),
                 areaId,
-                categoriaId,
+                subProcesoId,
                 tipoId,
                 visibleTodas,
                 areasAutorizadas: visibleTodas ? [] : autorizadas,
@@ -162,17 +174,37 @@ function NuevoDocumentoPage() {
                         <CardHeader>
                             <CardTitle className="text-base font-bold">Información del documento</CardTitle>
                             <CardDescription>
-                                Los metadatos permitirán clasificar y buscar el archivo fácilmente.
+
+                                <p>Los metadatos permitirán clasificar y buscar el archivo fácilmente.</p>
+                                <p><b>Se recomienda subir el archivo antes de rellenar los campos</b></p>
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-5">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="codigo">
+                                    Código <span className="text-destructive">*</span>
+                                </Label>
+
+                                <Input
+                                    id="codigo"
+                                    placeholder="PR-LD-PO-01"
+                                    value={codigo}
+                                    onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+                                />
+
+                                <p className="text-xs text-muted-foreground">
+                                    Se detectará automáticamente desde el nombre del archivo cuando siga la nomenclatura
+                                    institucional.
+                                </p>
+                            </div>
+
                             <div className="space-y-1.5">
                                 <Label htmlFor="nombre">
                                     Nombre del documento <span className="text-destructive">*</span>
                                 </Label>
                                 <Input
                                     id="nombre"
-                                    placeholder="Ej: PR-L&D-PG-01 PROGRAMA LIMPIEZA Y DESINFECCIÓN V5"
+                                    placeholder="Ej: PROGRAMA LIMPIEZA Y DESINFECCIÓN"
                                     value={nombre}
                                     onChange={(e) => setNombre(e.target.value)}
                                 />
@@ -191,7 +223,7 @@ function NuevoDocumentoPage() {
                                 />
                             </div>
 
-                            <Separator />
+                            <Separator/>
 
                             {/* Zona de Carga de Archivo */}
                             <div className="space-y-3 pt-2">
@@ -203,17 +235,58 @@ function NuevoDocumentoPage() {
                                         Por seguridad institucional, solo se permiten formatos PDF, Word o Excel.
                                     </span>
                                 </div>
+
                                 <DropzoneArea
                                     selectedFile={archivo}
-                                    onFileSelect={setArchivo}
-                                    accept={{
-                                        'application/pdf': ['.pdf'],
-                                        'application/msword': ['.doc'],
-                                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-                                        'application/vnd.ms-excel': ['.xls'],
-                                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx']
+                                    onFileSelect={(file) => {
+
+                                        if (!file) {
+                                            setArchivo(null);
+                                            return;
+                                        }
+
+                                        console.log("Archivo seleccionado:", file.name);
+
+                                        const resultado = extraerInformacionDocumento(file.name);
+
+                                        if (!resultado.valido) {
+
+                                            toast.error(
+                                                resultado.error ??
+                                                "El archivo no cumple la nomenclatura institucional."
+                                            );
+
+                                            setArchivo(null);
+
+                                            return;
+                                        }
+
+                                        // Guardar archivo
+                                        setArchivo(file);
+
+                                        // Solo completar el código automáticamente si el usuario no escribió uno
+                                        if (!codigo.trim()) {
+                                            setCodigo(resultado.codigo ?? "");
+                                        }
+
+                                        // Siempre actualizar nombre desde el archivo
+                                        if (resultado.nombre !== null) {
+                                            setNombre(resultado.nombre);
+                                        }
+
+                                        // Siempre actualizar versión
+                                        setVersion(resultado.version ?? "1.0");
+
+                                        toast.success("Archivo cargado correctamente.");
                                     }}
-                                    maxSize={10 * 1024 * 1024} // 10 MB límite
+                                    accept={{
+                                        "application/pdf": [".pdf"],
+                                        "application/msword": [".doc"],
+                                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+                                        "application/vnd.ms-excel": [".xls"],
+                                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+                                    }}
+                                    maxSize={15 * 1024 * 1024}
                                 />
                             </div>
                         </CardContent>
@@ -230,38 +303,59 @@ function NuevoDocumentoPage() {
                                     <Label>
                                         Área responsable <span className="text-destructive">*</span>
                                     </Label>
-                                    <Select value={areaId} onValueChange={setAreaId}>
+                                    <Select
+                                        value={areaId}
+                                        onValueChange={(value) => {
+                                            setAreaId(value);
+                                            setSub_procesoId("");
+                                        }}>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Seleccionar…" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {areas.map((a) => (
-                                                <SelectItem key={a.id} value={a.id}>
-                                                    {a.nombre}
-                                                </SelectItem>
-                                            ))}
+                                            {areas.map((a) => {
+                                                const { icono: Icono, color } = obtenerIconoArea(a.nombre);
+
+                                                return (
+                                                    <SelectItem key={a.id} value={a.id}>
+                                                        <div className="flex items-center gap-2">
+                                                            <Icono className={`size-4 ${color}`} />
+                                                            <span>{a.nombre}</span>
+                                                        </div>
+                                                    </SelectItem>
+                                                );
+                                            })}
                                         </SelectContent>
                                     </Select>
+
                                 </div>
 
                                 <div className="space-y-1.5">
                                     <Label>
-                                        Categoría <span className="text-destructive">*</span>
+                                        Subproceso <span className="text-destructive">*</span>
                                     </Label>
-                                    <Select value={categoriaId} onValueChange={setCategoriaId}>
+                                    <Select value={subProcesoId} onValueChange={setSub_procesoId}>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Seleccionar…" />
                                         </SelectTrigger>
+
                                         <SelectContent>
-                                            {categorias.map((c) => (
-                                                <SelectItem key={c.id} value={c.id}>
-                                                    {c.nombre}
-                                                </SelectItem>
-                                            ))}
+                                            {subProcesosFiltrados.map((c) => {
+                                                const { icono: Icono, color } = obtenerIconoSubProceso(c.nombre);
+
+                                                return (
+                                                    <SelectItem key={c.id} value={c.id}>
+                                                        <div className="flex items-center gap-2">
+                                                            <Icono className={`size-4 ${color}`} />
+                                                            <span>{c.nombre}</span>
+                                                        </div>
+                                                    </SelectItem>
+                                                );
+                                            })}
                                         </SelectContent>
                                     </Select>
-                                </div>
 
+                                </div>
                                 <div className="space-y-1.5">
                                     <Label>
                                         Tipo de documento <span className="text-destructive">*</span>
@@ -273,12 +367,16 @@ function NuevoDocumentoPage() {
                                         <SelectContent>
                                             {tipos.map((t) => (
                                                 <SelectItem key={t.id} value={t.id}>
-                                                    {t.nombre}
+                                                    <div className="flex items-center gap-2">
+                                                        <FileText className="size-4 text-slate-500" />
+                                                        <span>{t.nombre}</span>
+                                                    </div>
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
+
                             </div>
 
                             <div className="space-y-2 pt-2">

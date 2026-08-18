@@ -14,13 +14,13 @@ import { useIntranet } from "@/lib/store";
 export const Route = createFileRoute("/")({
     head: () => ({
         meta: [
-            { title: "Iniciar sesión — Intranet documental Grupo Andina" },
+            { title: "Iniciar sesión — Intranet Documental" },
             {
                 name: "description",
                 content:
                     "Acceso privado para trabajadores autorizados de Grupo Andina a la intranet de documentos internos.",
             },
-            { property: "og:title", content: "Iniciar sesión — Intranet documental Grupo Andina" },
+            { property: "og:title", content: "Iniciar sesión — Intranet documental " },
             {
                 property: "og:description",
                 content: "Acceso privado para trabajadores autorizados de Grupo Andina a la intranet de documentos internos.",
@@ -38,6 +38,7 @@ const demos = [
         rol: "Administrativo",
         detalle: "Consulta de documentos vigentes de su área",
     },
+    {correo: "jefearea@empresa.com",password:"admin123",rol: "Administrativo", detalle: "Consulta de documentos vigentes e historicos de su área"}
 ];
 
 function Login() {
@@ -109,8 +110,7 @@ function Login() {
                         Un solo lugar para la documentación interna de la empresa.
                     </h2>
                     <p className="text-sm leading-relaxed opacity-90">
-                        Consulta manuales, políticas, protocolos y procedimientos vigentes de su área, con control de versiones y
-                        notificaciones cuando se publiquen actualizaciones.
+                        Consulta manuales, políticas, protocolos y procedimientos vigentes de su área, con control de versiones.
                     </p>
                     <ul className="space-y-2 text-sm opacity-90">
                         <li>· Documentos organizados por área, categoría y tipo</li>
@@ -147,10 +147,6 @@ function Login() {
                                 alt="Logo Grupo Andina"
                                 className="size-full object-contain"
                             />
-                        </div>
-                        <div>
-                            <p className="font-semibold">Grupo Andina S.A.</p>
-                            <p className="text-xs text-muted-foreground">Intranet documental</p>
                         </div>
                     </div>
 

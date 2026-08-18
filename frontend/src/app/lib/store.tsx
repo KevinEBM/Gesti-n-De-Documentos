@@ -2,14 +2,14 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from "re
 import {
     actividadInicial,
     areasIniciales,
-    categoriasIniciales,
+    subProcesosIniciales,
     documentosIniciales,
-    notificacionesIniciales,
+    //notificacionesIniciales,
     tiposIniciales,
     usuariosIniciales,
     type Actividad,
     type Area,
-    type Categoria,
+    type SubProceso,
     type Documento,
     type Estado,
     type Notificacion,
@@ -18,7 +18,7 @@ import {
     type Version,
 } from "./data";
 
-type Parametro = Area | Categoria | TipoDocumento;
+type Parametro = Area | SubProceso | TipoDocumento;
 
 export interface Permisos {
     gestionarUsuarios: boolean;
@@ -27,31 +27,33 @@ export interface Permisos {
     actualizarDocumentos: boolean;
     administrarEstados: boolean;
     verHistorialGlobal: boolean;
+    verUsarEmojiIcon: boolean;
 }
 
 interface IntranetContextValue {
     sesion: Usuario | null;
     permisos: Permisos;
     areas: Area[];
-    categorias: Categoria[];
+    sub_proceso: SubProceso[];
     tipos: TipoDocumento[];
     usuarios: Usuario[];
     documentos: Documento[];
-    notificaciones: Notificacion[];
+    //notificaciones: Notificacion[];
     actividad: Actividad[];
     iniciarSesion: (correo: string, password: string) => { ok: boolean; error?: string };
     cerrarSesion: () => void;
     nombreArea: (id: string) => string;
-    nombreCategoria: (id: string) => string;
+    nombreSub_Proceso: (id: string) => string;
     nombreTipo: (id: string) => string;
     /** Documentos que el usuario en sesión puede consultar. */
     documentosVisibles: Documento[];
     /** Notificaciones correspondientes a documentos visibles para el usuario. */
-    notificacionesVisibles: Notificacion[];
+//    notificacionesVisibles: Notificacion[];
     /** ¿Puede el usuario consultar el historial de versiones de este documento? */
     puedeVerHistorial: (doc: Documento) => boolean;
-    marcarLeida: (id: string) => void;
-    marcarTodasLeidas: () => void;
+    /*marcarLeida: (id: string) => void;
+    marcarTodasLeidas: () => void;*/
+    verUsarEmojiIcon: boolean;
     crearDocumento: (doc: Omit<Documento, "id" | "consultas" | "versiones">) => void;
     actualizarDocumento: (id: string, cambios: Partial<Documento>) => void;
     nuevaVersion: (
@@ -62,10 +64,10 @@ interface IntranetContextValue {
     guardarUsuario: (usuario: Omit<Usuario, "id"> & { id?: string }) => void;
     alternarUsuario: (id: string) => void;
     guardarParametro: (
-        tipo: "areas" | "categorias" | "tipos",
+        tipo: "areas" | "sub_proceso" | "tipos",
         valor: Omit<Parametro, "id"> & { id?: string },
     ) => void;
-    alternarParametro: (tipo: "areas" | "categorias" | "tipos", id: string) => void;
+    alternarParametro: (tipo: "areas" | "sub_proceso" | "tipos", id: string) => void;
 }
 
 const IntranetContext = createContext<IntranetContextValue | null>(null);
@@ -73,6 +75,7 @@ const IntranetContext = createContext<IntranetContextValue | null>(null);
 const CREDENCIALES: Record<string, string> = {
     "admin@empresa.com": "admin123",
     "administrativo@empresa.com": "admin123",
+    "jefearea@empresa.com":"admin123",
 };
 
 const nuevoId = (prefijo: string) => `${prefijo}${Math.random().toString(36).slice(2, 8)}`;
@@ -84,6 +87,7 @@ const sinPermisos: Permisos = {
     actualizarDocumentos: false,
     administrarEstados: false,
     verHistorialGlobal: false,
+    verUsarEmojiIcon: false,
 };
 
 export function permisosDe(usuario: Usuario | null): Permisos {
@@ -96,6 +100,17 @@ export function permisosDe(usuario: Usuario | null): Permisos {
             actualizarDocumentos: true,
             administrarEstados: true,
             verHistorialGlobal: true,
+            verUsarEmojiIcon: true,
+        };
+    } else if (usuario.rol === "jefe_area") {
+        return {
+            gestionarUsuarios: false,
+            gestionarParametros: false,
+            publicarDocumentos: false,
+            actualizarDocumentos: false,
+            administrarEstados: false,
+            verHistorialGlobal: true,
+            verUsarEmojiIcon: true,
         };
     }
     // Jefe de área y administrativo solo consultan.
@@ -114,11 +129,11 @@ export function sugerirVersion(actual: string) {
 export function IntranetProvider({ children }: { children: ReactNode }) {
     const [sesion, setSesion] = useState<Usuario | null>(null);
     const [areas, setAreas] = useState<Area[]>(areasIniciales);
-    const [categorias, setCategorias] = useState<Categoria[]>(categoriasIniciales);
+    const [sub_proceso, setSub_Procesos] = useState<SubProceso[]>(subProcesosIniciales);
     const [tipos, setTipos] = useState<TipoDocumento[]>(tiposIniciales);
     const [usuarios, setUsuarios] = useState<Usuario[]>(usuariosIniciales);
     const [documentos, setDocumentos] = useState<Documento[]>(documentosIniciales);
-    const [notificaciones, setNotificaciones] = useState<Notificacion[]>(notificacionesIniciales);
+//    const [notificaciones, setNotificaciones] = useState<Notificacion[]>(notificacionesIniciales);
     const [actividad, setActividad] = useState<Actividad[]>(actividadInicial);
 
     const value = useMemo<IntranetContextValue>(() => {
@@ -136,20 +151,20 @@ export function IntranetProvider({ children }: { children: ReactNode }) {
                 ...prev,
             ]);
 
-        const notificar = (tipo: Notificacion["tipo"], titulo: string, mensaje: string, documentoId: string) =>
-            setNotificaciones((prev) => [
-                {
-                    id: nuevoId("n"),
-                    tipo,
-                    titulo,
-                    mensaje,
-                    fecha: new Date().toISOString().slice(0, 16).replace("T", " "),
-                    leida: false,
-                    documentoId,
-                },
-                ...prev,
-            ]);
-
+        /* const notificar = (tipo: Notificacion["tipo"], titulo: string, mensaje: string, documentoId: string) =>
+             setNotificaciones((prev) => [
+                 {
+                     id: nuevoId("n"),
+                     tipo,
+                     titulo,
+                     mensaje,
+                     fecha: new Date().toISOString().slice(0, 16).replace("T", " "),
+                     leida: false,
+                     documentoId,
+                 },
+                 ...prev,
+             ]);
+ */
         const autorizado = (doc: Documento, areaId: string) =>
             doc.visibleTodas || doc.areaId === areaId || doc.areasAutorizadas.includes(areaId);
 
@@ -160,36 +175,47 @@ export function IntranetProvider({ children }: { children: ReactNode }) {
                     ? documentos
                     : documentos.filter((d) => d.estado === "publicado" && autorizado(d, sesion.areaId));
 
-        const notificacionesVisibles = notificaciones.filter((n) => {
+        /*const notificacionesVisibles = notificaciones.filter((n) => {
             if (!sesion) return false;
             if (sesion.rol === "administrador") return true;
             const doc = documentos.find((d) => d.id === n.documentoId);
             return !!doc && doc.estado === "publicado" && autorizado(doc, sesion.areaId);
-        });
+        });*/
 
-        const puedeVerHistorial = (doc: Documento) => {
+        const puedeVerHistorial = (doc: Documento): boolean => {
             if (!sesion) return false;
+
             if (sesion.rol === "administrador") return true;
-            // El jefe de área consulta versiones anteriores de los documentos de su área.
-            if (sesion.rol === "jefe_area") return autorizado(doc, sesion.areaId);
+
+            // El jefe de área puede ver el historial de los documentos de su área
+            if (sesion.rol === "jefe_area") {
+                return autorizado(doc, sesion.areaId);
+            }
+
+            // El administrativo NO puede
+            if (sesion.rol === "administrativo") {
+                return false;
+            }
+
             return false;
         };
 
-        const setter = { areas: setAreas, categorias: setCategorias, tipos: setTipos } as const;
+        const setter = { areas: setAreas, sub_proceso: setSub_Procesos, tipos: setTipos } as const;
 
         return {
             sesion,
             permisos,
             areas,
-            categorias,
+            sub_proceso,
             tipos,
             usuarios,
             documentos,
-            notificaciones,
+            // notificaciones,
             actividad,
             documentosVisibles,
-            notificacionesVisibles,
+            //  notificacionesVisibles,
             puedeVerHistorial,
+            verUsarEmojiIcon: permisos.verUsarEmojiIcon,
             iniciarSesion: (correo, password) => {
                 const usuario = usuarios.find((u) => u.correo.toLowerCase() === correo.trim().toLowerCase());
                 if (!usuario) return { ok: false, error: "No existe una cuenta con ese correo institucional." };
@@ -202,11 +228,11 @@ export function IntranetProvider({ children }: { children: ReactNode }) {
             },
             cerrarSesion: () => setSesion(null),
             nombreArea: (id) => areas.find((a) => a.id === id)?.nombre ?? "—",
-            nombreCategoria: (id) => categorias.find((c) => c.id === id)?.nombre ?? "—",
+            nombreSub_Proceso: (id) => sub_proceso.find((c) => c.id === id)?.nombre ?? "—",
             nombreTipo: (id) => tipos.find((t) => t.id === id)?.nombre ?? "—",
             marcarLeida: (id) =>
-                setNotificaciones((prev) => prev.map((n) => (n.id === id ? { ...n, leida: true } : n))),
-            marcarTodasLeidas: () => setNotificaciones((prev) => prev.map((n) => ({ ...n, leida: true }))),
+            {/*}   setNotificaciones((prev) => prev.map((n) => (n.id === id ? { ...n, leida: true } : n))),
+            marcarTodasLeidas: () => setNotificaciones((prev) => prev.map((n) => ({ ...n, leida: true }))),*/},
             crearDocumento: (doc) => {
                 const id = nuevoId("d");
                 setDocumentos((prev) => [
@@ -225,11 +251,11 @@ export function IntranetProvider({ children }: { children: ReactNode }) {
                         ],
                     },
                     ...prev,
-                ]);
+                ]);/*
                 registrar(doc.estado === "publicado" ? "Publicó documento" : "Guardó borrador", doc.nombre);
                 if (doc.estado === "publicado") {
                     notificar("nuevo", "Nuevo documento publicado", `Se publicó un nuevo documento: ${doc.nombre}.`, id);
-                }
+                }*/
             },
             actualizarDocumento: (id, cambios) => {
                 setDocumentos((prev) => prev.map((d) => (d.id === id ? { ...d, ...cambios } : d)));
@@ -256,12 +282,12 @@ export function IntranetProvider({ children }: { children: ReactNode }) {
                 );
                 const doc = documentos.find((d) => d.id === id);
                 registrar("Publicó nueva versión", `${doc?.nombre ?? id} v${version.numero}`);
-                notificar(
-                    "version",
-                    "Documento actualizado",
-                    `El documento ${doc?.nombre ?? "seleccionado"} fue actualizado a la versión ${version.numero}.`,
-                    id,
-                );
+                /* notificar(
+                     "version",
+                     "Documento actualizado",
+                     `El documento ${doc?.nombre ?? "seleccionado"} fue actualizado a la versión ${version.numero}.`,
+                     id,
+                 );*/
             },
             guardarUsuario: (usuario) => {
                 if (usuario.id) {
@@ -293,7 +319,7 @@ export function IntranetProvider({ children }: { children: ReactNode }) {
                 registrar("Cambió estado de parámetro", id);
             },
         };
-    }, [sesion, areas, categorias, tipos, usuarios, documentos, notificaciones, actividad]);
+    }, [sesion, areas, sub_proceso, tipos, usuarios, documentos/*, notificaciones*/, actividad]);
 
     return <IntranetContext.Provider value={value}>{children}</IntranetContext.Provider>;
 }

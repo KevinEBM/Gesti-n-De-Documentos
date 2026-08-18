@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { ArrowRight, Bell, FileText, Files } from "lucide-react";
+import { ArrowRight/*, Bell*/, FileText, Files } from "lucide-react";
 
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -22,14 +22,14 @@ export const Route = createFileRoute("/app/inicio")({
 });
 
 function Inicio() {
-    const { sesion, documentosVisibles, notificacionesVisibles, nombreArea, nombreTipo, nombreCategoria } =
+    const { sesion, documentosVisibles/*, notificacionesVisibles*/, nombreArea, nombreTipo, nombreSub_Proceso } =
         useIntranet();
     if (!sesion) return null;
 
     const recientes = [...documentosVisibles]
         .sort((a, b) => b.fechaPublicacion.localeCompare(a.fechaPublicacion))
         .slice(0, 6);
-    const pendientes = notificacionesVisibles.filter((n) => !n.leida);
+  //  const pendientes = notificacionesVisibles.filter((n) => !n.leida);
 
     return (
         <AppShell titulo={`Bienvenido, ${sesion.nombre.split(" ")[0]}`} descripcion={`Área de ${nombreArea(sesion.areaId)}`}>
@@ -46,7 +46,7 @@ function Inicio() {
                                 Ir a la biblioteca <Files className="size-4" />
                             </Link>
                         </Button>
-                        <Button asChild variant="outline" className="gap-2">
+                        {/*      <Button asChild variant="outline" className="gap-2">
                             <Link to="/app/notificaciones">
                                 Notificaciones
                                 {pendientes.length > 0 && (
@@ -56,7 +56,7 @@ function Inicio() {
                                 )}
                                 <Bell className="size-4" />
                             </Link>
-                        </Button>
+                        </Button>*/}
                     </div>
                 </CardContent>
             </Card>
@@ -84,7 +84,8 @@ function Inicio() {
                             <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-medium">{d.nombre}</p>
                                 <p className="truncate text-xs text-muted-foreground">
-                                    {nombreTipo(d.tipoId)} · {nombreCategoria(d.categoriaId)} · {nombreArea(d.areaId)}
+                                    {nombreTipo(d.tipoId)} · {nombreSub_Proceso(d.subProcesoId)} · {nombreArea(d.areaId)}
+
                                 </p>
                             </div>
                             <div className="hidden shrink-0 text-right sm:block">

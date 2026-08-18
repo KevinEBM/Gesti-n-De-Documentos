@@ -6,11 +6,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Area } from "@/lib/data";
+import {obtenerIconoArea} from "@/lib/iconos-areas.tsx";
 
 /**
  * Selector múltiple de áreas autorizadas para visualizar un documento.
  * Permite agregar áreas una a una, eliminarlas y marcar "visible para todas las áreas".
  */
+
 export function AreasAutorizadas({
                                      areas,
                                      seleccionadas,
@@ -54,36 +56,63 @@ export function AreasAutorizadas({
                                 <SelectValue placeholder={disponibles.length ? "Seleccionar área…" : "No hay más áreas"} />
                             </SelectTrigger>
                             <SelectContent>
-                                {disponibles.map((a) => (
-                                    <SelectItem key={a.id} value={a.id}>
-                                        {a.nombre}
-                                    </SelectItem>
-                                ))}
+                                {disponibles.map((a) => {
+                                    const {
+                                        icono: Icono,
+                                        color,
+                                    } = obtenerIconoArea(a.nombre);
+
+                                    return (
+                                        <SelectItem
+                                            key={a.id}
+                                            value={a.id}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <Icono className={`size-4 ${color}`} />
+                                                <span>{a.nombre}</span>
+                                            </div>
+                                        </SelectItem>
+                                    );
+                                })}
                             </SelectContent>
                         </Select>
                         <Button type="button" variant="outline" onClick={agregar} disabled={!pendiente} className="gap-1.5">
-                            <Plus className="size-4" /> Agregar otra área
+                            <Plus className="size-4" /> Agregar área
                         </Button>
                     </div>
 
                     {seleccionadas.length > 0 ? (
                         <ul className="flex flex-wrap gap-2">
-                            {seleccionadas.map((id) => (
-                                <li
-                                    key={id}
-                                    className="flex items-center gap-2 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-sm"
-                                >
-                                    {areas.find((a) => a.id === id)?.nombre ?? id}
-                                    <button
-                                        type="button"
-                                        aria-label={`Quitar ${areas.find((a) => a.id === id)?.nombre ?? id}`}
-                                        onClick={() => onChange(seleccionadas.filter((x) => x !== id))}
-                                        className="text-muted-foreground hover:text-destructive"
-                                    >
-                                        <X className="size-3.5" />
-                                    </button>
-                                </li>
-                            ))}
+                            {seleccionadas.map((id) => {
+                                const area = areas.find((a) => a.id === id);
+
+                                if (!area) return null;
+
+                                const { icono: Icono, color } = obtenerIconoArea(area.nombre);
+
+                                return (
+                                    <li
+                                        key={id}
+                                        className=" flex items-center gap-2 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-sm transition-colors hover:bg-green-600 hover:text-white">
+                                        <Icono className={`size-4 ${color}`} />
+
+                                        <span>{area.nombre}</span>
+
+                                        <button
+                                            type="button"
+                                            aria-label={`Quitar ${area.nombre}`}
+                                            onClick={() => onChange(seleccionadas.filter((x) => x !== id))}
+                                            className="
+                    text-muted-foreground
+                    transition-colors
+                    hover:text-white
+                "
+                                        >
+                                            <X className="size-3.5" />
+                                        </button>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     ) : (
                         <p className="text-sm text-muted-foreground">Aún no has agregado áreas autorizadas.</p>
