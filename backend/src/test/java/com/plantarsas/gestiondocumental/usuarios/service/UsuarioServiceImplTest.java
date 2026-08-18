@@ -420,4 +420,67 @@ class UsuarioServiceImplTest {
         assertThat(resultado).isEmpty();
         verifyNoInteractions(usuarioAreaRepository, usuarioMapper);
     }
+
+    // ------------------------------------------------------------------
+    // cambiarContrasena(...) (Etapa 4B)
+    // ------------------------------------------------------------------
+
+    @Test
+    void cambiarContrasena_conContrasenaActualCorrectaYNuevaDiferente_debeActualizarLaContrasena() {
+        Long id = 1L;
+        Usuario usuario = mock(Usuario.class);
+
+        when(usuarioRepository.findById(id)).thenReturn(Optional.of(usuario));
+        when(usuario.coincideConPassword("actual123", passwordEncoder)).thenReturn(true);
+        when(usuario.coincideConPassword("nueva12345", passwordEncoder)).thenReturn(false);
+        when(passwordEncoder.encode("nueva12345")).thenReturn("hash-nuevo");
+
+        usuarioServiceImpl.cambiarContrasena(id, "actual123", "nueva12345");
+
+        verify(usuario).actualizarPassword("hash-nuevo");
+    }
+
+    @Test
+    void cambiarContrasena_conContrasenaActualIncorrecta_debeLanzarBusinessException() {
+        Long id = 1L;
+        Usuario usuario = mock(Usuario.class);
+
+        when(usuarioRepository.findById(id)).thenReturn(Optional.of(usuario));
+        when(usuario.coincideConPassword("actualEquivocada", passwordEncoder)).thenReturn(false);
+
+        assertThatThrownBy(() -> usuarioServiceImpl.cambiarContrasena(id, "actualEquivocada", "nueva12345"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("La contraseña actual no es correcta");
+
+        verify(usuario, never()).actualizarPassword(anyString());
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    void cambiarContrasena_conNuevaContrasenaIgualALaVigente_debeLanzarBusinessException() {
+        Long id = 1L;
+        Usuario usuario = mock(Usuario.class);
+
+        when(usuarioRepository.findById(id)).thenReturn(Optional.of(usuario));
+        when(usuario.coincideConPassword("actual123", passwordEncoder)).thenReturn(true);
+
+        assertThatThrownBy(() -> usuarioServiceImpl.cambiarContrasena(id, "actual123", "actual123"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("La nueva contraseña debe ser diferente a la actual");
+
+        verify(usuario, never()).actualizarPassword(anyString());
+        verify(passwordEncoder, never()).encode(anyString());
+    }
+
+    @Test
+    void cambiarContrasena_conUsuarioInexistente_debeLanzarResourceNotFoundException() {
+        Long id = 404L;
+
+        when(usuarioRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> usuarioServiceImpl.cambiarContrasena(id, "actual123", "nueva12345"))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(passwordEncoder);
+    }
 }

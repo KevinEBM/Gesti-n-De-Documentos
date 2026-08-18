@@ -18,4 +18,6 @@ public interface UsuarioService {
     UsuarioResponse actualizar(Long id, UsuarioUpdateRequest request);
 
     UsuarioResponse cambiarEstado(Long id, UsuarioEstadoRequest request);
+
+    void cambiarContrasena(Long usuarioId, String contrasenaActual, String nuevaContrasena);
 }
