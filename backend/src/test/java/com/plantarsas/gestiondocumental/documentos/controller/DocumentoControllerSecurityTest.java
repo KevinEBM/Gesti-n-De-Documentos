@@ -29,6 +29,14 @@ package com.plantarsas.gestiondocumental.documentos.controller;
  * indistinguible para documento inexistente/no visible, 500 para inconsistencia interna e
  * IOException real). Lo nuevo a verificar es exclusivo de la respuesta HTTP binaria: Content-Type,
  * Content-Disposition attachment y Content-Length calculados a partir de DocumentoArchivoDescarga.
+ *
+ * Etapa 3D agrega la cobertura MockMvc de GET /api/documentos/{id}/versiones (histórico) y
+ * GET /api/documentos/{id}/versiones/{versionId}/descarga (descarga histórica). Ambos usan
+ * @PreAuthorize("hasAnyRole('ADMINISTRADOR','JEFE_AREA')") — a diferencia de listar/obtenerPorId/
+ * descarga vigente, ADMINISTRATIVO NO está incluido, por lo que el propio mecanismo de
+ * @PreAuthorize produce 403 sin código nuevo. La descarga histórica reutiliza el mismo helper
+ * privado del controller (construirRespuestaDescarga) que ya arma la respuesta de la vigente, así
+ * que sus headers se prueban con el mismo criterio, no una implementación distinta.
  */
 
 import com.plantarsas.gestiondocumental.config.SecurityConfig;
@@ -37,6 +45,7 @@ import com.plantarsas.gestiondocumental.documentos.dto.DocumentoFiltroRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResumenResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.NuevaVersionDocumentoRequest;
+import com.plantarsas.gestiondocumental.documentos.dto.VersionHistoricaResponse;
 import com.plantarsas.gestiondocumental.documentos.service.DocumentoConsultaService;
 import com.plantarsas.gestiondocumental.documentos.service.DocumentoService;
 import com.plantarsas.gestiondocumental.exception.BusinessException;
@@ -147,6 +156,10 @@ class DocumentoControllerSecurityTest {
     private static final String URL_NUEVA_VERSION = "/api/documentos/" + DOCUMENTO_ID + "/versiones";
 
     private static final String URL_DESCARGA = "/api/documentos/" + DOCUMENTO_ID + "/descarga";
+
+    private static final Long VERSION_ID = 55L;
+
+    private static final String URL_DESCARGA_HISTORICA = URL_NUEVA_VERSION + "/" + VERSION_ID + "/descarga";
 
     private static final String METADATA_NUEVA_VERSION_VALIDA_JSON =
             "{\"descripcionCambio\":\"Corrección de erratas\"}";
@@ -261,6 +274,13 @@ class DocumentoControllerSecurityTest {
     private DocumentoArchivoDescarga archivoDescargaDePrueba() {
         return new DocumentoArchivoDescarga(
                 "informe.pdf", "application/pdf", 9L, new ByteArrayInputStream("contenido".getBytes())
+        );
+    }
+
+    private VersionHistoricaResponse versionHistoricaDePrueba() {
+        return new VersionHistoricaResponse(
+                2L, 2, "informe-v2.pdf", "application/pdf", 9L,
+                "Corrección de erratas", LocalDateTime.now(), 1L, true
         );
     }
 
@@ -979,6 +999,120 @@ class DocumentoControllerSecurityTest {
                 .thenThrow(new ResourceNotFoundException("No existe un documento con id " + DOCUMENTO_ID));
 
         mockMvc.perform(get(URL_DESCARGA).with(administradorAutenticado()))
+                .andExpect(status().isNotFound());
+    }
+
+    // ------------------------------------------------------------------
+    // GET /api/documentos/{id}/versiones (Etapa 3D — histórico)
+    // ------------------------------------------------------------------
+
+    @Test
+    void listarHistorico_sinAutenticacion_debeResponder401() throws Exception {
+        mockMvc.perform(get(URL_NUEVA_VERSION))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(documentoConsultaService);
+    }
+
+    @Test
+    void listarHistorico_conAdministrador_debeResponder200() throws Exception {
+        when(documentoConsultaService.listarHistorico(eq(DOCUMENTO_ID), any()))
+                .thenReturn(List.of(versionHistoricaDePrueba()));
+
+        mockMvc.perform(get(URL_NUEVA_VERSION).with(administradorAutenticado()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "JEFE_AREA")
+    void listarHistorico_conJefeArea_debeResponder200() throws Exception {
+        when(documentoConsultaService.listarHistorico(eq(DOCUMENTO_ID), any()))
+                .thenReturn(List.of(versionHistoricaDePrueba()));
+
+        mockMvc.perform(get(URL_NUEVA_VERSION))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMINISTRATIVO")
+    void listarHistorico_conAdministrativo_debeResponder403() throws Exception {
+        mockMvc.perform(get(URL_NUEVA_VERSION))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(documentoConsultaService);
+    }
+
+    @Test
+    void listarHistorico_conDocumentoInexistenteONoVisible_debeResponder404() throws Exception {
+        when(documentoConsultaService.listarHistorico(eq(DOCUMENTO_ID), any()))
+                .thenThrow(new ResourceNotFoundException("No existe un documento con id " + DOCUMENTO_ID));
+
+        mockMvc.perform(get(URL_NUEVA_VERSION).with(administradorAutenticado()))
+                .andExpect(status().isNotFound());
+    }
+
+    // ------------------------------------------------------------------
+    // GET /api/documentos/{id}/versiones/{versionId}/descarga (Etapa 3D)
+    // ------------------------------------------------------------------
+
+    @Test
+    void descargarVersionHistorica_sinAutenticacion_debeResponder401() throws Exception {
+        mockMvc.perform(get(URL_DESCARGA_HISTORICA))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(documentoConsultaService);
+    }
+
+    @Test
+    void descargarVersionHistorica_conAdministrador_debeResponder200() throws Exception {
+        when(documentoConsultaService.descargarVersionHistorica(eq(DOCUMENTO_ID), eq(VERSION_ID), any()))
+                .thenReturn(archivoDescargaDePrueba());
+
+        mockMvc.perform(get(URL_DESCARGA_HISTORICA).with(administradorAutenticado()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "JEFE_AREA")
+    void descargarVersionHistorica_conJefeArea_debeResponder200() throws Exception {
+        when(documentoConsultaService.descargarVersionHistorica(eq(DOCUMENTO_ID), eq(VERSION_ID), any()))
+                .thenReturn(archivoDescargaDePrueba());
+
+        mockMvc.perform(get(URL_DESCARGA_HISTORICA))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMINISTRATIVO")
+    void descargarVersionHistorica_conAdministrativo_debeResponder403() throws Exception {
+        mockMvc.perform(get(URL_DESCARGA_HISTORICA))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(documentoConsultaService);
+    }
+
+    @Test
+    void descargarVersionHistorica_conExito_debeIncluirLosMismosHeadersQueLaDescargaVigente() throws Exception {
+        when(documentoConsultaService.descargarVersionHistorica(eq(DOCUMENTO_ID), eq(VERSION_ID), any()))
+                .thenReturn(archivoDescargaDePrueba());
+
+        mockMvc.perform(get(URL_DESCARGA_HISTORICA).with(administradorAutenticado()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "application/pdf"))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("attachment")))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("informe.pdf")))
+                .andExpect(header().longValue(HttpHeaders.CONTENT_LENGTH, 9L))
+                .andExpect(content().bytes("contenido".getBytes()));
+    }
+
+    @Test
+    void descargarVersionHistorica_conVersionInexistenteODeOtroDocumento_debeResponder404() throws Exception {
+        when(documentoConsultaService.descargarVersionHistorica(eq(DOCUMENTO_ID), eq(VERSION_ID), any()))
+                .thenThrow(new ResourceNotFoundException(
+                        "No existe la versión con id " + VERSION_ID + " para el documento con id " + DOCUMENTO_ID
+                ));
+
+        mockMvc.perform(get(URL_DESCARGA_HISTORICA).with(administradorAutenticado()))
                 .andExpect(status().isNotFound());
     }
 

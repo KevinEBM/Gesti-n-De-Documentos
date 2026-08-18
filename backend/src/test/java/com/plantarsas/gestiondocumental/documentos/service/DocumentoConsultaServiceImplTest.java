@@ -45,6 +45,16 @@ package com.plantarsas.gestiondocumental.documentos.service;
  * (findOne(idIgual.and(visiblePara))), que se usa la versión vigente real, que se llama a
  * StorageService con la ruta correcta, y que una IOException real se traduce en
  * UncheckedIOException siguiendo el mismo patrón que DocumentoServiceImpl.
+ *
+ * Etapa 3D (histórico de versiones y descarga histórica) añade la misma clase de
+ * verificación: que listarHistorico/descargarVersionHistorica autorizan por el mismo
+ * buscarDocumentoVisible (mismo 404 indistinguible para inexistente/no visible), que el
+ * histórico usa findByDocumento_IdOrderByNumeroVersionDesc sin filtrar la vigente, que la
+ * descarga histórica valida la pertenencia documento-versión en la propia consulta
+ * (findByIdAndDocumento_Id) sin confiar en datos del cliente, y que el helper compartido
+ * aArchivoDescarga(...) se reutiliza igual para vigente e histórica (los tests ya
+ * existentes de descargarVersionVigente siguen probando, sin cambios, que ese
+ * comportamiento no se alteró al extraer el helper).
  */
 
 import com.plantarsas.gestiondocumental.areas.entity.Area;
@@ -52,6 +62,7 @@ import com.plantarsas.gestiondocumental.documentos.dto.DocumentoArchivoDescarga;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoFiltroRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResumenResponse;
+import com.plantarsas.gestiondocumental.documentos.dto.VersionHistoricaResponse;
 import com.plantarsas.gestiondocumental.documentos.entity.Documento;
 import com.plantarsas.gestiondocumental.documentos.entity.DocumentoArea;
 import com.plantarsas.gestiondocumental.documentos.entity.VersionDocumento;
@@ -598,6 +609,180 @@ class DocumentoConsultaServiceImplTest {
         when(storageService.cargar("b3f1c2.pdf")).thenThrow(new IOException("fallo de lectura"));
 
         assertThatThrownBy(() -> documentoConsultaServiceImpl.descargarVersionVigente(DOCUMENTO_ID, jefeArea()))
+                .isInstanceOf(UncheckedIOException.class);
+    }
+
+    // ------------------------------------------------------------------
+    // listarHistorico(...) (Etapa 3D)
+    // ------------------------------------------------------------------
+
+    @Test
+    void listarHistorico_conAdministrador_debeRetornarElHistoricoCompleto() {
+        Documento documento = mock(Documento.class);
+        VersionDocumento v2 = mock(VersionDocumento.class);
+        VersionDocumento v1 = mock(VersionDocumento.class);
+        VersionHistoricaResponse r2 = mock(VersionHistoricaResponse.class);
+        VersionHistoricaResponse r1 = mock(VersionHistoricaResponse.class);
+
+        when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
+        when(versionDocumentoRepository.findByDocumento_IdOrderByNumeroVersionDesc(DOCUMENTO_ID))
+                .thenReturn(List.of(v2, v1));
+        when(documentoMapper.toHistorico(v2)).thenReturn(r2);
+        when(documentoMapper.toHistorico(v1)).thenReturn(r1);
+
+        List<VersionHistoricaResponse> resultado =
+                documentoConsultaServiceImpl.listarHistorico(DOCUMENTO_ID, administrador());
+
+        assertThat(resultado).containsExactly(r2, r1);
+        verify(usuarioAreaRepository, never()).findByUsuario_Id(any());
+    }
+
+    @Test
+    void listarHistorico_conJefeAreaYDocumentoVisible_debeRetornarHistorico() {
+        Documento documento = mock(Documento.class);
+        VersionDocumento version = mock(VersionDocumento.class);
+        VersionHistoricaResponse respuesta = mock(VersionHistoricaResponse.class);
+
+        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
+        when(versionDocumentoRepository.findByDocumento_IdOrderByNumeroVersionDesc(DOCUMENTO_ID))
+                .thenReturn(List.of(version));
+        when(documentoMapper.toHistorico(version)).thenReturn(respuesta);
+
+        List<VersionHistoricaResponse> resultado =
+                documentoConsultaServiceImpl.listarHistorico(DOCUMENTO_ID, jefeArea());
+
+        assertThat(resultado).containsExactly(respuesta);
+    }
+
+    @Test
+    void listarHistorico_conDocumentoInexistenteONoVisible_debeLanzarResourceNotFoundExceptionSinConsultarVersiones() {
+        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> documentoConsultaServiceImpl.listarHistorico(DOCUMENTO_ID, jefeArea()))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(versionDocumentoRepository, never()).findByDocumento_IdOrderByNumeroVersionDesc(any());
+    }
+
+    @Test
+    void listarHistorico_debeConservarElOrdenEntregadoPorElRepository() {
+        Documento documento = mock(Documento.class);
+        VersionDocumento vigente = mock(VersionDocumento.class);
+        VersionDocumento anterior = mock(VersionDocumento.class);
+        VersionHistoricaResponse respuestaVigente = mock(VersionHistoricaResponse.class);
+        VersionHistoricaResponse respuestaAnterior = mock(VersionHistoricaResponse.class);
+
+        // El repository ya entrega orden numeroVersion DESC (vigente primero); el
+        // servicio no debe reordenar ni filtrar la vigente del histórico.
+        when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
+        when(versionDocumentoRepository.findByDocumento_IdOrderByNumeroVersionDesc(DOCUMENTO_ID))
+                .thenReturn(List.of(vigente, anterior));
+        when(documentoMapper.toHistorico(vigente)).thenReturn(respuestaVigente);
+        when(documentoMapper.toHistorico(anterior)).thenReturn(respuestaAnterior);
+
+        List<VersionHistoricaResponse> resultado =
+                documentoConsultaServiceImpl.listarHistorico(DOCUMENTO_ID, administrador());
+
+        assertThat(resultado).containsExactly(respuestaVigente, respuestaAnterior);
+    }
+
+    // ------------------------------------------------------------------
+    // descargarVersionHistorica(...) (Etapa 3D)
+    // ------------------------------------------------------------------
+
+    private static final Long VERSION_ID = 55L;
+
+    @Test
+    void descargarVersionHistorica_conVersionValida_debeRetornarArchivoDeEsaVersion() throws Exception {
+        Documento documento = mock(Documento.class);
+        VersionDocumento version = mock(VersionDocumento.class);
+        InputStream contenido = InputStream.nullInputStream();
+
+        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
+        when(versionDocumentoRepository.findByIdAndDocumento_Id(VERSION_ID, DOCUMENTO_ID))
+                .thenReturn(Optional.of(version));
+        when(version.getRutaArchivo()).thenReturn("archivo-anterior.pdf");
+        when(version.getNombreArchivoOriginal()).thenReturn("informe-v1.pdf");
+        when(version.getTipoMime()).thenReturn("application/pdf");
+        when(version.getTamanoBytes()).thenReturn(512L);
+        when(storageService.cargar("archivo-anterior.pdf")).thenReturn(contenido);
+
+        DocumentoArchivoDescarga resultado = documentoConsultaServiceImpl
+                .descargarVersionHistorica(DOCUMENTO_ID, VERSION_ID, jefeArea());
+
+        assertThat(resultado.nombreArchivoOriginal()).isEqualTo("informe-v1.pdf");
+        assertThat(resultado.tipoMime()).isEqualTo("application/pdf");
+        assertThat(resultado.tamanoBytes()).isEqualTo(512L);
+        assertThat(resultado.contenido()).isSameAs(contenido);
+        verify(storageService).cargar("archivo-anterior.pdf");
+    }
+
+    @Test
+    void descargarVersionHistorica_conDocumentoInexistenteONoVisible_debeLanzarResourceNotFoundExceptionSinConsultarVersion() {
+        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> documentoConsultaServiceImpl
+                .descargarVersionHistorica(DOCUMENTO_ID, VERSION_ID, jefeArea()))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(versionDocumentoRepository, never()).findByIdAndDocumento_Id(any(), any());
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void descargarVersionHistorica_conVersionIdInexistente_debeLanzarResourceNotFoundException() {
+        Documento documento = mock(Documento.class);
+
+        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
+        when(versionDocumentoRepository.findByIdAndDocumento_Id(VERSION_ID, DOCUMENTO_ID))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> documentoConsultaServiceImpl
+                .descargarVersionHistorica(DOCUMENTO_ID, VERSION_ID, jefeArea()))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void descargarVersionHistorica_conVersionIdDeOtroDocumento_debeLanzarElMismoResourceNotFoundException() {
+        // findByIdAndDocumento_Id ya valida la pertenencia en la propia consulta: si el
+        // versionId existe pero pertenece a otro documento, el repository (mockeado aquí
+        // exactamente como lo haría la query derivada real) devuelve vacío igual que si
+        // no existiera. Mismo 404, sin distinguir el caso.
+        Documento documento = mock(Documento.class);
+
+        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
+        when(versionDocumentoRepository.findByIdAndDocumento_Id(VERSION_ID, DOCUMENTO_ID))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> documentoConsultaServiceImpl
+                .descargarVersionHistorica(DOCUMENTO_ID, VERSION_ID, jefeArea()))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(versionDocumentoRepository).findByIdAndDocumento_Id(VERSION_ID, DOCUMENTO_ID);
+    }
+
+    @Test
+    void descargarVersionHistorica_conIOExceptionAlLeerElArchivo_debeLanzarUncheckedIOException() throws Exception {
+        Documento documento = mock(Documento.class);
+        VersionDocumento version = mock(VersionDocumento.class);
+
+        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
+        when(versionDocumentoRepository.findByIdAndDocumento_Id(VERSION_ID, DOCUMENTO_ID))
+                .thenReturn(Optional.of(version));
+        when(version.getRutaArchivo()).thenReturn("archivo-anterior.pdf");
+        when(storageService.cargar("archivo-anterior.pdf")).thenThrow(new IOException("fallo de lectura"));
+
+        assertThatThrownBy(() -> documentoConsultaServiceImpl
+                .descargarVersionHistorica(DOCUMENTO_ID, VERSION_ID, jefeArea()))
                 .isInstanceOf(UncheckedIOException.class);
     }
 }
