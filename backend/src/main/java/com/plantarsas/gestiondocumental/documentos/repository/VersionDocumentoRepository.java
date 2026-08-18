@@ -16,6 +16,8 @@ public interface VersionDocumentoRepository extends JpaRepository<VersionDocumen
 
     Optional<VersionDocumento> findByIdAndDocumento_Id(Long id, Long documentoId);
 
+    List<VersionDocumento> findTop10ByOrderByFechaPublicacionDescIdDesc();
+
     @Query("SELECT COALESCE(MAX(v.numeroVersion), 0) FROM VersionDocumento v WHERE v.documento.id = :documentoId")
     int obtenerUltimoNumeroVersion(@Param("documentoId") Long documentoId);
 }
