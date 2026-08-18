@@ -6,6 +6,7 @@ import com.plantarsas.gestiondocumental.documentos.dto.DocumentoPublicacionInici
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResumenResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.NuevaVersionDocumentoRequest;
+import com.plantarsas.gestiondocumental.documentos.dto.VersionHistoricaResponse;
 import com.plantarsas.gestiondocumental.documentos.service.DocumentoConsultaService;
 import com.plantarsas.gestiondocumental.documentos.service.DocumentoService;
 import com.plantarsas.gestiondocumental.exception.BusinessException;
@@ -42,6 +43,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/documentos")
@@ -160,7 +162,31 @@ public class DocumentoController {
             @AuthenticationPrincipal AuthenticatedUser usuarioAutenticado
     ) {
         DocumentoArchivoDescarga archivo = documentoConsultaService.descargarVersionVigente(id, usuarioAutenticado);
+        return construirRespuestaDescarga(archivo);
+    }
 
+    @GetMapping("/{id}/versiones")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'JEFE_AREA')")
+    public ApiResponse<List<VersionHistoricaResponse>> listarHistorico(
+            @PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser usuarioAutenticado
+    ) {
+        return ApiResponse.exitosa(documentoConsultaService.listarHistorico(id, usuarioAutenticado));
+    }
+
+    @GetMapping("/{id}/versiones/{versionId}/descarga")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'JEFE_AREA')")
+    public ResponseEntity<Resource> descargarVersionHistorica(
+            @PathVariable Long id,
+            @PathVariable Long versionId,
+            @AuthenticationPrincipal AuthenticatedUser usuarioAutenticado
+    ) {
+        DocumentoArchivoDescarga archivo =
+                documentoConsultaService.descargarVersionHistorica(id, versionId, usuarioAutenticado);
+        return construirRespuestaDescarga(archivo);
+    }
+
+    private ResponseEntity<Resource> construirRespuestaDescarga(DocumentoArchivoDescarga archivo) {
         ContentDisposition contentDisposition = ContentDisposition.attachment()
                 .filename(archivo.nombreArchivoOriginal(), StandardCharsets.UTF_8)
                 .build();

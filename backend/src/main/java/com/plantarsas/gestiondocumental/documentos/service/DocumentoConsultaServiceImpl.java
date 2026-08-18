@@ -4,6 +4,7 @@ import com.plantarsas.gestiondocumental.documentos.dto.DocumentoArchivoDescarga;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoFiltroRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResumenResponse;
+import com.plantarsas.gestiondocumental.documentos.dto.VersionHistoricaResponse;
 import com.plantarsas.gestiondocumental.documentos.entity.Documento;
 import com.plantarsas.gestiondocumental.documentos.entity.DocumentoArea;
 import com.plantarsas.gestiondocumental.documentos.entity.VersionDocumento;
@@ -126,17 +127,46 @@ public class DocumentoConsultaServiceImpl implements DocumentoConsultaService {
                                 + " está en estado PUBLICADO pero no tiene una versión vigente registrada"
                 ));
 
+        return aArchivoDescarga(versionVigente, "No se pudo leer el archivo de la versión vigente");
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VersionHistoricaResponse> listarHistorico(Long documentoId, AuthenticatedUser usuarioAutenticado) {
+        buscarDocumentoVisible(documentoId, usuarioAutenticado);
+
+        return versionDocumentoRepository.findByDocumento_IdOrderByNumeroVersionDesc(documentoId).stream()
+                .map(documentoMapper::toHistorico)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DocumentoArchivoDescarga descargarVersionHistorica(
+            Long documentoId, Long versionId, AuthenticatedUser usuarioAutenticado
+    ) {
+        buscarDocumentoVisible(documentoId, usuarioAutenticado);
+
+        VersionDocumento version = versionDocumentoRepository.findByIdAndDocumento_Id(versionId, documentoId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No existe la versión con id " + versionId + " para el documento con id " + documentoId
+                ));
+
+        return aArchivoDescarga(version, "No se pudo leer el archivo de la versión histórica");
+    }
+
+    private DocumentoArchivoDescarga aArchivoDescarga(VersionDocumento version, String mensajeErrorLectura) {
         InputStream contenido;
         try {
-            contenido = storageService.cargar(versionVigente.getRutaArchivo());
+            contenido = storageService.cargar(version.getRutaArchivo());
         } catch (IOException e) {
-            throw new UncheckedIOException("No se pudo leer el archivo de la versión vigente", e);
+            throw new UncheckedIOException(mensajeErrorLectura, e);
         }
 
         return new DocumentoArchivoDescarga(
-                versionVigente.getNombreArchivoOriginal(),
-                versionVigente.getTipoMime(),
-                versionVigente.getTamanoBytes(),
+                version.getNombreArchivoOriginal(),
+                version.getTipoMime(),
+                version.getTamanoBytes(),
                 contenido
         );
     }

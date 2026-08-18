@@ -3,6 +3,7 @@ package com.plantarsas.gestiondocumental.documentos.mapper;
 import com.plantarsas.gestiondocumental.documentos.dto.AreaResumenResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResumenResponse;
+import com.plantarsas.gestiondocumental.documentos.dto.VersionHistoricaResponse;
 import com.plantarsas.gestiondocumental.documentos.entity.Documento;
 import com.plantarsas.gestiondocumental.documentos.entity.DocumentoArea;
 import com.plantarsas.gestiondocumental.documentos.entity.VersionDocumento;
@@ -61,6 +62,20 @@ public class DocumentoMapper {
                 documento.getSubprograma().getNombre(),
                 documento.getTipoDocumento().getNombre(),
                 documento.getFechaActualizacion()
+        );
+    }
+
+    public VersionHistoricaResponse toHistorico(VersionDocumento version) {
+        return new VersionHistoricaResponse(
+                version.getId(),
+                version.getNumeroVersion(),
+                version.getNombreArchivoOriginal(),
+                version.getTipoMime(),
+                version.getTamanoBytes(),
+                version.getDescripcionCambio(),
+                version.getFechaPublicacion(),
+                version.getPublicadoPor().getId(),
+                version.isVigente()
         );
     }
 }
