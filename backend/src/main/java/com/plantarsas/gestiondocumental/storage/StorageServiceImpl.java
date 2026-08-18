@@ -5,6 +5,8 @@ import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.InvalidMediaTypeException;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -23,13 +25,14 @@ public class StorageServiceImpl implements StorageService {
 
     private static final int LONGITUD_MAXIMA_EXTENSION = 10;
     private static final String MIME_TYPE_POR_DEFECTO = "application/octet-stream";
+    private static final String EXTENSION_APK = ".apk";
 
     private final Path rootLocation;
     private final long maxFileSizeBytes;
 
     public StorageServiceImpl(
             @Value("${storage.location}") String location,
-            @Value("${storage.max-file-size-bytes:10485760}") long maxFileSizeBytes) {
+            @Value("${storage.max-file-size-bytes:15728640}") long maxFileSizeBytes) {
 
         if (location == null || location.isBlank()) {
             throw new IllegalArgumentException("La ubicación de almacenamiento es obligatoria");
@@ -80,7 +83,12 @@ public class StorageServiceImpl implements StorageService {
             );
         }
 
-        String nombreAlmacenado = UUID.randomUUID() + extensionDe(nombreOriginal);
+        String extension = extensionDe(nombreOriginal);
+        if (extension.equalsIgnoreCase(EXTENSION_APK)) {
+            throw new BusinessException("No se permite cargar archivos APK");
+        }
+
+        String nombreAlmacenado = UUID.randomUUID() + extension;
         Path destino = rootLocation.resolve(nombreAlmacenado).normalize();
 
         MessageDigest digest;
@@ -121,10 +129,7 @@ public class StorageServiceImpl implements StorageService {
             }
 
             String hash = HexFormat.of().formatHex(digest.digest());
-            String mimeTypeFinal =
-                    mimeType == null || mimeType.isBlank()
-                            ? MIME_TYPE_POR_DEFECTO
-                            : mimeType;
+            String mimeTypeFinal = resolverMimeType(mimeType);
 
             return new StoredFile(
                     nombreOriginal,
@@ -182,6 +187,18 @@ public class StorageServiceImpl implements StorageService {
         }
 
         return resuelta;
+    }
+
+    private String resolverMimeType(String mimeType) {
+        if (mimeType == null || mimeType.isBlank()) {
+            return MIME_TYPE_POR_DEFECTO;
+        }
+        try {
+            MediaType.parseMediaType(mimeType);
+        } catch (InvalidMediaTypeException e) {
+            return MIME_TYPE_POR_DEFECTO;
+        }
+        return mimeType;
     }
 
     private String extensionDe(String nombreOriginal) {

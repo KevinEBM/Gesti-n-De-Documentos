@@ -37,6 +37,13 @@ package com.plantarsas.gestiondocumental.documentos.controller;
  * @PreAuthorize produce 403 sin código nuevo. La descarga histórica reutiliza el mismo helper
  * privado del controller (construirRespuestaDescarga) que ya arma la respuesta de la vigente, así
  * que sus headers se prueban con el mismo criterio, no una implementación distinta.
+ *
+ * Etapa 4C agrega un único caso de hardening: si el tipoMime persistido en BD llega inválido,
+ * nulo o vacío hasta el controller (dato antiguo, corrupción o manipulación manual de BD), el
+ * helper privado DocumentoController#resolverMediaType(...) debe evitar que
+ * MediaType.parseMediaType(...) lance InvalidMediaTypeException y produzca un 500 — en su lugar
+ * la descarga debe completarse igualmente con Content-Type application/octet-stream. El resto de
+ * los tests de esta clase no cambia.
  */
 
 import com.plantarsas.gestiondocumental.config.SecurityConfig;
@@ -274,6 +281,12 @@ class DocumentoControllerSecurityTest {
     private DocumentoArchivoDescarga archivoDescargaDePrueba() {
         return new DocumentoArchivoDescarga(
                 "informe.pdf", "application/pdf", 9L, new ByteArrayInputStream("contenido".getBytes())
+        );
+    }
+
+    private DocumentoArchivoDescarga archivoDescargaConMimeInvalidoDePrueba() {
+        return new DocumentoArchivoDescarga(
+                "informe.pdf", "mime invalido", 9L, new ByteArrayInputStream("contenido".getBytes())
         );
     }
 
@@ -1000,6 +1013,17 @@ class DocumentoControllerSecurityTest {
 
         mockMvc.perform(get(URL_DESCARGA).with(administradorAutenticado()))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void descargarVersionVigente_conMimeInvalidoAlmacenado_debeResponderOctetStreamSinFallar() throws Exception {
+        when(documentoConsultaService.descargarVersionVigente(eq(DOCUMENTO_ID), any()))
+                .thenReturn(archivoDescargaConMimeInvalidoDePrueba());
+
+        mockMvc.perform(get(URL_DESCARGA).with(administradorAutenticado()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "application/octet-stream"))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("attachment")));
     }
 
     // ------------------------------------------------------------------

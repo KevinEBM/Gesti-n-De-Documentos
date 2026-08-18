@@ -25,6 +25,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -192,10 +193,21 @@ public class DocumentoController {
                 .build();
 
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(archivo.tipoMime()))
+                .contentType(resolverMediaType(archivo.tipoMime()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString())
                 .contentLength(archivo.tamanoBytes())
                 .body(new InputStreamResource(archivo.contenido()));
+    }
+
+    private MediaType resolverMediaType(String tipoMime) {
+        if (tipoMime == null || tipoMime.isBlank()) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+        try {
+            return MediaType.parseMediaType(tipoMime);
+        } catch (InvalidMediaTypeException e) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
     }
 
     private void validarPaginacion(int page, int size) {
