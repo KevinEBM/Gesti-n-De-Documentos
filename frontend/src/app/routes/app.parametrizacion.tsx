@@ -54,6 +54,13 @@ import {
     type AreaCatalogo,
 } from "@/lib/areas-api";
 import { ApiError } from "@/lib/api";
+import {
+    listarSubprogramas,
+    crearSubprograma,
+    actualizarSubprograma,
+    cambiarEstadoSubprograma,
+    type SubprogramaCatalogo,
+} from "@/lib/subprogramas-api";
 import { useIntranet } from "@/lib/store";
 
 import { obtenerIconoArea } from "@/lib/iconos-areas";
@@ -94,8 +101,9 @@ interface RegistroParametro {
 }
 
 function Parametrizacion() {
-    const { sub_proceso, tipos, permisos } = useIntranet();
+    const { tipos, permisos } = useIntranet();
     const [totalAreas, setTotalAreas] = useState(0);
+    const [totalSubprogramas, setTotalSubprogramas] = useState(0);
 
     if (!permisos.gestionarParametros) {
         return (
@@ -124,25 +132,10 @@ function Parametrizacion() {
                     </TabsTrigger>
 
                     <TabsTrigger
-                        value="Subproceso"
+                        value="subprogramas"
                         className="flex items-center gap-2 border border-input bg-background text-black shadow-sm hover:bg-[#289248] hover:text-white hover:border-[#289248] hover:shadow data-[state=active]:bg-[#289248] data-[state=active]:text-white"
                     >
-                        {sub_proceso.length > 0 &&
-                            (() => {
-                                const {
-                                    icono: Icono,
-                                    color,
-                                } = obtenerIconoSubProceso(
-                                    sub_proceso[0].nombre
-                                );
-
-                                return (
-                                    <Icono
-                                        className={`size-4 ${color}`}
-                                    />
-                                );
-                            })()}
-                        Subproceso ({sub_proceso.length})
+                        Subprocesos ({totalSubprogramas})
                     </TabsTrigger>
 
                     <TabsTrigger
@@ -170,13 +163,8 @@ function Parametrizacion() {
                     <SeccionAreas onTotalChange={setTotalAreas} />
                 </TabsContent>
 
-                <TabsContent value="Subproceso">
-                    <Seccion
-                        clave="sub_proceso"
-                        titulo="Subprocesos"
-                        descripcion="Agrupaciones temáticas para clasificar la documentación asociadas a un área."
-                        registros={sub_proceso}
-                    />
+                <TabsContent value="subprogramas">
+                    <SeccionSubprogramas onTotalChange={setTotalSubprogramas} />
                 </TabsContent>
 
                 <TabsContent value="tipos">
@@ -523,6 +511,484 @@ function SeccionAreas({ onTotalChange }: { onTotalChange?: (total: number) => vo
                         </Button>
 
                         <Button onClick={() => void guardar()} disabled={guardando}>
+                            Guardar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </Card>
+    );
+}
+
+function SeccionSubprogramas({
+    onTotalChange,
+}: {
+    onTotalChange?: (total: number) => void;
+}) {
+    const [subprogramas, setSubprogramas] = useState<SubprogramaCatalogo[]>([]);
+    const [cargando, setCargando] = useState(true);
+    const [errorCarga, setErrorCarga] = useState<string | null>(null);
+    const [areasReales, setAreasReales] = useState<AreaCatalogo[]>([]);
+    const [cargandoAreas, setCargandoAreas] = useState(true);
+    const [errorAreas, setErrorAreas] = useState<string | null>(null);
+    const [abierto, setAbierto] = useState(false);
+    const [guardando, setGuardando] = useState(false);
+    const [alternandoId, setAlternandoId] = useState<string | null>(null);
+    const [form, setForm] = useState<{
+        id?: string;
+        nombre: string;
+        descripcion: string;
+        areaId: string;
+    }>({
+        nombre: "",
+        descripcion: "",
+        areaId: "",
+    });
+    const [errorForm, setErrorForm] = useState("");
+    const [erroresCampo, setErroresCampo] = useState<
+        Partial<Record<"nombre" | "descripcion" | "areaId", string>>
+    >({});
+
+    const areasActivas = areasReales.filter((area) => area.activo);
+
+    const notificarTotal = (lista: SubprogramaCatalogo[]) => {
+        onTotalChange?.(lista.length);
+    };
+
+    const cargar = async () => {
+        setCargando(true);
+        setErrorCarga(null);
+        try {
+            const resultado = await listarSubprogramas();
+            setSubprogramas(resultado);
+            notificarTotal(resultado);
+        } catch (err) {
+            const mensaje =
+                err instanceof ApiError
+                    ? err.message
+                    : "No fue posible cargar los subprocesos.";
+            setErrorCarga(mensaje);
+        } finally {
+            setCargando(false);
+        }
+    };
+
+    const cargarAreas = async () => {
+        setCargandoAreas(true);
+        setErrorAreas(null);
+        try {
+            const resultado = await listarAreas();
+            setAreasReales(resultado);
+        } catch (err) {
+            const mensaje =
+                err instanceof ApiError
+                    ? err.message
+                    : "No fue posible cargar las áreas.";
+            setErrorAreas(mensaje);
+        } finally {
+            setCargandoAreas(false);
+        }
+    };
+
+    useEffect(() => {
+        void cargar();
+        void cargarAreas();
+    }, []);
+
+    const abrirNuevo = () => {
+        setForm({ nombre: "", descripcion: "", areaId: "" });
+        setErrorForm("");
+        setErroresCampo({});
+        setAbierto(true);
+    };
+
+    const abrirEditar = (sp: SubprogramaCatalogo) => {
+        setForm({
+            id: sp.id,
+            nombre: sp.nombre,
+            descripcion: sp.descripcion,
+            areaId: sp.areaId,
+        });
+        setErrorForm("");
+        setErroresCampo({});
+        setAbierto(true);
+    };
+
+    const guardar = async () => {
+        setErrorForm("");
+        setErroresCampo({});
+
+        const nombre = form.nombre.trim();
+        const descripcion = form.descripcion.trim();
+
+        if (!nombre) {
+            setErrorForm("El nombre es obligatorio.");
+            return;
+        }
+        if (nombre.length > 100) {
+            setErrorForm("El nombre no puede superar los 100 caracteres.");
+            return;
+        }
+        if (descripcion.length > 255) {
+            setErrorForm("La descripción no puede superar los 255 caracteres.");
+            return;
+        }
+
+        setGuardando(true);
+        try {
+            if (form.id) {
+                const actualizado = await actualizarSubprograma(form.id, {
+                    nombre,
+                    descripcion,
+                });
+                setSubprogramas((prev) =>
+                    prev.map((sp) =>
+                        sp.id === actualizado.id ? actualizado : sp,
+                    ),
+                );
+                toast.success("Registro actualizado");
+            } else {
+                if (!form.areaId) {
+                    setErrorForm("Debe seleccionar un área responsable.");
+                    setGuardando(false);
+                    return;
+                }
+
+                const areaSeleccionada = areasActivas.find(
+                    (a) => a.id === form.areaId,
+                );
+                if (!areaSeleccionada) {
+                    setErrorForm("Debe seleccionar un área activa válida.");
+                    setErroresCampo({
+                        areaId: "Seleccione un área activa válida.",
+                    });
+                    setGuardando(false);
+                    return;
+                }
+
+                const creado = await crearSubprograma({
+                    nombre,
+                    descripcion,
+                    areaId: Number(form.areaId),
+                });
+                setSubprogramas((prev) => {
+                    const next = [...prev, creado];
+                    notificarTotal(next);
+                    return next;
+                });
+                toast.success("Registro creado");
+            }
+            setAbierto(false);
+        } catch (err) {
+            if (err instanceof ApiError) {
+                if (err.errores) {
+                    setErroresCampo({
+                        nombre: err.errores.nombre,
+                        descripcion: err.errores.descripcion,
+                        areaId: form.id ? undefined : err.errores.areaId,
+                    });
+                }
+                setErrorForm(err.message);
+            } else {
+                setErrorForm(
+                    form.id
+                        ? "No fue posible actualizar el subproceso."
+                        : "No fue posible crear el subproceso.",
+                );
+            }
+        } finally {
+            setGuardando(false);
+        }
+    };
+
+    const alternarEstado = async (sp: SubprogramaCatalogo) => {
+        setAlternandoId(sp.id);
+        try {
+            const actualizado = await cambiarEstadoSubprograma(sp.id, !sp.activo);
+            setSubprogramas((prev) =>
+                prev.map((actual) =>
+                    actual.id === actualizado.id ? actualizado : actual,
+                ),
+            );
+            toast.success(
+                actualizado.activo
+                    ? "Registro activado"
+                    : "Registro desactivado",
+            );
+        } catch (err) {
+            const mensaje =
+                err instanceof ApiError
+                    ? err.message
+                    : "No fue posible cambiar el estado del subproceso.";
+            toast.error(mensaje);
+        } finally {
+            setAlternandoId(null);
+        }
+    };
+
+    const etiquetaArea = (sp: SubprogramaCatalogo) => {
+        const base = `${sp.areaCodigo} - ${sp.areaNombre}`;
+        return sp.areaActiva ? base : `${base} (inactiva)`;
+    };
+
+    const nuevoDeshabilitado =
+        cargando ||
+        cargandoAreas ||
+        !!errorCarga ||
+        !!errorAreas ||
+        areasActivas.length === 0;
+
+    const subprogramaEditando = form.id
+        ? subprogramas.find((sp) => sp.id === form.id)
+        : undefined;
+
+    return (
+        <Card>
+            <CardHeader className="flex-row items-start justify-between space-y-0">
+                <div>
+                    <CardTitle className="text-base">Subprocesos</CardTitle>
+                    <CardDescription>
+                        Agrupaciones temáticas para clasificar la documentación
+                        asociadas a un área.
+                    </CardDescription>
+
+                    {errorAreas && (
+                        <div className="mt-2 space-y-2">
+                            <p className="text-xs text-destructive">{errorAreas}</p>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void cargarAreas()}
+                            >
+                                Reintentar Áreas
+                            </Button>
+                        </div>
+                    )}
+
+                    {!cargandoAreas &&
+                        !errorAreas &&
+                        areasActivas.length === 0 && (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                                Debe existir al menos un área activa para crear un
+                                subproceso.
+                            </p>
+                        )}
+                </div>
+
+                <Button
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={abrirNuevo}
+                    disabled={nuevoDeshabilitado}
+                >
+                    <Plus className="size-4" />
+                    Nuevo
+                </Button>
+            </CardHeader>
+
+            {cargando ? (
+                <CardContent className="py-14 text-center text-sm text-muted-foreground">
+                    Cargando subprocesos...
+                </CardContent>
+            ) : errorCarga ? (
+                <CardContent className="space-y-4 py-14 text-center">
+                    <p className="text-sm text-muted-foreground">{errorCarga}</p>
+                    <Button variant="outline" onClick={() => void cargar()}>
+                        Reintentar
+                    </Button>
+                </CardContent>
+            ) : subprogramas.length === 0 ? (
+                <CardContent className="py-14 text-center text-sm text-muted-foreground">
+                    No hay subprocesos registrados.
+                </CardContent>
+            ) : (
+                <CardContent className="px-0 pb-0">
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="bg-secondary/60">
+                                <TableHead>Nombre</TableHead>
+                                <TableHead>Área responsable</TableHead>
+                                <TableHead>Descripción</TableHead>
+                                <TableHead>Estado</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
+                            </TableRow>
+                        </TableHeader>
+
+                        <TableBody>
+                            {subprogramas.map((sp) => {
+                                const { icono: Icono, color } =
+                                    obtenerIconoSubProceso(sp.nombre);
+
+                                return (
+                                    <TableRow key={sp.id}>
+                                        <TableCell className="font-medium">
+                                            <div className="flex items-center gap-2">
+                                                <Icono
+                                                    className={`size-4 ${color}`}
+                                                />
+                                                <span>{sp.nombre}</span>
+                                            </div>
+                                        </TableCell>
+
+                                        <TableCell className="text-sm text-muted-foreground">
+                                            {etiquetaArea(sp)}
+                                        </TableCell>
+
+                                        <TableCell className="text-sm text-muted-foreground">
+                                            {sp.descripcion}
+                                        </TableCell>
+
+                                        <TableCell>
+                                            <ActivoBadge activo={sp.activo} />
+                                        </TableCell>
+
+                                        <TableCell>
+                                            <div className="flex justify-end gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => abrirEditar(sp)}
+                                                    disabled={alternandoId === sp.id}
+                                                >
+                                                    Editar
+                                                </Button>
+
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    disabled={alternandoId === sp.id}
+                                                    onClick={() =>
+                                                        void alternarEstado(sp)
+                                                    }
+                                                >
+                                                    {sp.activo
+                                                        ? "Desactivar"
+                                                        : "Activar"}
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            )}
+
+            <Dialog open={abierto} onOpenChange={setAbierto}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>
+                            {form.id ? "Editar subproceso" : "Nuevo subproceso"}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {form.id
+                                ? "Actualice el nombre y la descripción del subproceso."
+                                : "Seleccione el área responsable y complete la información."}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div className="space-y-1.5">
+                            <Label>Área responsable *</Label>
+
+                            {form.id ? (
+                                <p className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                                    {subprogramaEditando
+                                        ? `${subprogramaEditando.areaCodigo} - ${subprogramaEditando.areaNombre}${
+                                              subprogramaEditando.areaActiva
+                                                  ? ""
+                                                  : " (inactiva)"
+                                          }`
+                                        : "—"}
+                                </p>
+                            ) : (
+                                <>
+                                    <Select
+                                        value={form.areaId || ""}
+                                        onValueChange={(value) =>
+                                            setForm({ ...form, areaId: value })
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Seleccione un área" />
+                                        </SelectTrigger>
+
+                                        <SelectContent className="bg-white text-slate-900 dark:bg-zinc-900 dark:text-zinc-50 shadow-2xl border border-slate-200 dark:border-zinc-800 z-[99999]">
+                                            {areasActivas.map((area) => (
+                                                <SelectItem
+                                                    key={area.id}
+                                                    value={area.id}
+                                                >
+                                                    {`${area.codigo} - ${area.nombre}`}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+
+                                    {erroresCampo.areaId && (
+                                        <p className="text-xs text-destructive">
+                                            {erroresCampo.areaId}
+                                        </p>
+                                    )}
+                                </>
+                            )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label>Nombre</Label>
+                            <Input
+                                value={form.nombre}
+                                maxLength={100}
+                                onChange={(e) =>
+                                    setForm({ ...form, nombre: e.target.value })
+                                }
+                            />
+                            {erroresCampo.nombre && (
+                                <p className="text-xs text-destructive">
+                                    {erroresCampo.nombre}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label>Descripción</Label>
+                            <Textarea
+                                rows={3}
+                                maxLength={255}
+                                value={form.descripcion}
+                                onChange={(e) =>
+                                    setForm({
+                                        ...form,
+                                        descripcion: e.target.value,
+                                    })
+                                }
+                            />
+                            {erroresCampo.descripcion && (
+                                <p className="text-xs text-destructive">
+                                    {erroresCampo.descripcion}
+                                </p>
+                            )}
+                        </div>
+
+                        {errorForm && (
+                            <p className="text-xs text-destructive">{errorForm}</p>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setAbierto(false)}
+                            disabled={guardando}
+                        >
+                            Cancelar
+                        </Button>
+
+                        <Button
+                            onClick={() => void guardar()}
+                            disabled={guardando}
+                        >
                             Guardar
                         </Button>
                     </DialogFooter>
