@@ -28,6 +28,7 @@ import {IconBuildingWarehouse,
         IconBusinessplan,
         IconPasswordFingerprint,
         IconHeartHandshake,
+        School
 } from "@tabler/icons-react"
 
 export interface IconoSubProceso {
@@ -53,7 +54,7 @@ const color = {
 const ICONOS_SUBPROCESO = {
 
     inocuidad: {
-        icono: ShieldCheck,
+        icono: School,
         color: color.verde,
     },
 

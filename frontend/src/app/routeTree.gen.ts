@@ -52,11 +52,6 @@ const AppPanelAdminRoute = AppPanelAdminRouteImport.update({
     path: '/panel-admin',
     getParentRoute: () => AppRoute,
 } as any)
-/*const AppNotificacionesRoute = AppNotificacionesRouteImport.update({
-    id: '/notificaciones',
-    path: '/notificaciones',
-    getParentRoute: () => AppRoute,
-} as any)*/
 const AppInicioRoute = AppInicioRouteImport.update({
     id: '/inicio',
     path: '/inicio',
