@@ -1,4 +1,12 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { apiFetch, ApiError, type LoginResponseDto } from "./api";
+import {
+    clearSession,
+    getSession,
+    loginResponseToUsuario,
+    saveSession,
+    type AuthSession,
+} from "./auth-storage";
 import {
     actividadInicial,
     areasIniciales,
@@ -40,7 +48,7 @@ interface IntranetContextValue {
     documentos: Documento[];
     //notificaciones: Notificacion[];
     actividad: Actividad[];
-    iniciarSesion: (correo: string, password: string) => { ok: boolean; error?: string };
+    iniciarSesion: (correo: string, password: string) => Promise<{ ok: boolean; error?: string }>;
     cerrarSesion: () => void;
     nombreArea: (id: string) => string;
     nombreSub_Proceso: (id: string) => string;
@@ -71,12 +79,6 @@ interface IntranetContextValue {
 }
 
 const IntranetContext = createContext<IntranetContextValue | null>(null);
-
-const CREDENCIALES: Record<string, string> = {
-    "admin@empresa.com": "admin123",
-    "administrativo@empresa.com": "admin123",
-    "jefearea@empresa.com":"admin123",
-};
 
 const nuevoId = (prefijo: string) => `${prefijo}${Math.random().toString(36).slice(2, 8)}`;
 
@@ -127,7 +129,9 @@ export function sugerirVersion(actual: string) {
 }
 
 export function IntranetProvider({ children }: { children: ReactNode }) {
-    const [sesion, setSesion] = useState<Usuario | null>(null);
+    const [sesion, setSesion] = useState<Usuario | null>(
+        () => getSession()?.usuario ?? null,
+    );
     const [areas, setAreas] = useState<Area[]>(areasIniciales);
     const [sub_proceso, setSub_Procesos] = useState<SubProceso[]>(subProcesosIniciales);
     const [tipos, setTipos] = useState<TipoDocumento[]>(tiposIniciales);
@@ -216,17 +220,32 @@ export function IntranetProvider({ children }: { children: ReactNode }) {
             //  notificacionesVisibles,
             puedeVerHistorial,
             verUsarEmojiIcon: permisos.verUsarEmojiIcon,
-            iniciarSesion: (correo, password) => {
-                const usuario = usuarios.find((u) => u.correo.toLowerCase() === correo.trim().toLowerCase());
-                if (!usuario) return { ok: false, error: "No existe una cuenta con ese correo institucional." };
-                if (!usuario.activo) return { ok: false, error: "La cuenta está inactiva. Contacta al administrador." };
-                if (CREDENCIALES[usuario.correo] && CREDENCIALES[usuario.correo] !== password) {
-                    return { ok: false, error: "La contraseña no es correcta." };
+            iniciarSesion: async (correo, password) => {
+                try {
+                    const datos = await apiFetch<LoginResponseDto>("/api/auth/login", {
+                        method: "POST",
+                        body: JSON.stringify({ correo, contrasena: password }),
+                    });
+                    const usuario = loginResponseToUsuario(datos);
+                    const session: AuthSession = {
+                        token: datos.token,
+                        tipo: datos.tipo,
+                        usuario,
+                    };
+                    saveSession(session);
+                    setSesion(usuario);
+                    return { ok: true };
+                } catch (err) {
+                    if (err instanceof ApiError) {
+                        return { ok: false, error: err.message };
+                    }
+                    return { ok: false, error: "No fue posible iniciar sesión" };
                 }
-                setSesion(usuario);
-                return { ok: true };
             },
-            cerrarSesion: () => setSesion(null),
+            cerrarSesion: () => {
+                clearSession();
+                setSesion(null);
+            },
             nombreArea: (id) => areas.find((a) => a.id === id)?.nombre ?? "—",
             nombreSub_Proceso: (id) => sub_proceso.find((c) => c.id === id)?.nombre ?? "—",
             nombreTipo: (id) => tipos.find((t) => t.id === id)?.nombre ?? "—",

@@ -19,6 +19,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.context.web.WebAppConfiguration;
@@ -40,6 +41,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -48,6 +50,7 @@ import java.time.ZoneOffset;
 
 @ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = SecurityConfigTest.ConfiguracionSeguridadTest.class)
+@TestPropertySource(properties = "app.cors.allowed-origins=http://localhost:5173")
 @WebAppConfiguration
 class SecurityConfigTest {
 
@@ -137,6 +140,45 @@ class SecurityConfigTest {
 
         verify(jwtService, never()).esTokenValido(anyString());
         verifyNoInteractions(usuarioRepository);
+    }
+
+    @Test
+    void optionsLogin_conOriginPermitido_debeIncluirAccessControlAllowOrigin() throws Exception {
+        MvcResult result = mockMvc.perform(
+                        options("/api/auth/login")
+                                .header("Origin", "http://localhost:5173")
+                                .header("Access-Control-Request-Method", "POST")
+                )
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader("Access-Control-Allow-Origin"))
+                .isEqualTo("http://localhost:5173");
+    }
+
+    @Test
+    void optionsLogin_conOriginPermitido_debeExponerContentDisposition() throws Exception {
+        MvcResult result = mockMvc.perform(
+                        options("/api/auth/login")
+                                .header("Origin", "http://localhost:5173")
+                                .header("Access-Control-Request-Method", "POST")
+                )
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader("Access-Control-Expose-Headers"))
+                .contains("Content-Disposition");
+    }
+
+    @Test
+    void optionsLogin_conOriginNoPermitido_noDebeReflejarOriginComoPermitido() throws Exception {
+        MvcResult result = mockMvc.perform(
+                        options("/api/auth/login")
+                                .header("Origin", "http://evil.com")
+                                .header("Access-Control-Request-Method", "POST")
+                )
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader("Access-Control-Allow-Origin"))
+                .isNotEqualTo("http://evil.com");
     }
 
     private void assertRespuestaDeError(MvcResult result, String mensajeEsperado) throws Exception {

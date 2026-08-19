@@ -56,7 +56,7 @@ export interface Usuario {
     id: string;
     nombre: string;
     correo: string;
-    areaId: string;
+    areaId?: string;
     rol: Rol;
     activo: boolean;
 }

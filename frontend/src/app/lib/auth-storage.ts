@@ -1,0 +1,69 @@
+﻿import type { LoginResponseDto } from "./api";
+import type { Rol, Usuario } from "./data";
+
+const AUTH_SESSION_KEY = "intranet.auth.session";
+
+function getStorage(): Storage | null {
+    return typeof window !== "undefined" ? window.sessionStorage : null;
+}
+
+export interface AuthSession {
+    token: string;
+    tipo: string;
+    usuario: Usuario;
+}
+
+const ROL_BACKEND_TO_FRONTEND: Record<string, Rol> = {
+    ADMINISTRADOR: "administrador",
+    JEFE_AREA: "jefe_area",
+    ADMINISTRATIVO: "administrativo",
+};
+
+export function mapRolBackend(rol: string): Rol {
+    const mapeado = ROL_BACKEND_TO_FRONTEND[rol];
+    if (!mapeado) {
+        throw new Error(`Rol backend no reconocido: ${rol}`);
+    }
+    return mapeado;
+}
+
+export function loginResponseToUsuario(datos: LoginResponseDto): Usuario {
+    return {
+        id: String(datos.id),
+        nombre: `${datos.nombres} ${datos.apellidos}`.trim(),
+        correo: datos.correo,
+        rol: mapRolBackend(datos.rol),
+        activo: true,
+    };
+}
+
+export function saveSession(session: AuthSession): void {
+    const storage = getStorage();
+    if (!storage) return;
+    storage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+}
+
+export function getSession(): AuthSession | null {
+    const storage = getStorage();
+    if (!storage) return null;
+
+    const raw = storage.getItem(AUTH_SESSION_KEY);
+    if (!raw) return null;
+
+    try {
+        return JSON.parse(raw) as AuthSession;
+    } catch {
+        storage.removeItem(AUTH_SESSION_KEY);
+        return null;
+    }
+}
+
+export function getToken(): string | null {
+    return getSession()?.token ?? null;
+}
+
+export function clearSession(): void {
+    const storage = getStorage();
+    if (!storage) return;
+    storage.removeItem(AUTH_SESSION_KEY);
+}

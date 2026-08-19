@@ -2,7 +2,7 @@ import logoImg from "../resources/portada-logo.png";
 import fondoImg from "../resources/fondo-inicio-sesion.png";
 
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Lock, Mail, ShieldCheck } from "lucide-react";
+import { Lock, Mail } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -30,17 +30,6 @@ export const Route = createFileRoute("/")({
     component: Login,
 });
 
-const demos = [
-    { correo: "admin@empresa.com", password: "admin123", rol: "Administrador", detalle: "Gestión total de la intranet" },
-    {
-        correo: "administrativo@empresa.com",
-        password: "admin123",
-        rol: "Administrativo",
-        detalle: "Consulta de documentos vigentes de su área",
-    },
-    {correo: "jefearea@empresa.com",password:"admin123",rol: "Administrativo", detalle: "Consulta de documentos vigentes e historicos de su área"}
-];
-
 function Login() {
     const { iniciarSesion, sesion } = useIntranet();
     const navigate = useNavigate();
@@ -48,7 +37,7 @@ function Login() {
     const [password, setPassword] = useState("");
     const [errores, setErrores] = useState<{ correo?: string; password?: string }>({});
     const [error, setError] = useState<string | null>(null);
-    const [aviso, setAviso] = useState<string | null>(null);
+    const [cargando, setCargando] = useState(false);
 
     useEffect(() => {
         if (sesion) {
@@ -56,10 +45,10 @@ function Login() {
         }
     }, [sesion, navigate]);
 
-    const enviar = (e: React.FormEvent) => {
+    const enviar = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (cargando) return;
         setError(null);
-        setAviso(null);
         const nuevos: { correo?: string; password?: string } = {};
         if (!correo.trim()) nuevos.correo = "El correo institucional es obligatorio.";
         else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo.trim()))
@@ -69,15 +58,13 @@ function Login() {
         setErrores(nuevos);
         if (Object.keys(nuevos).length > 0) return;
 
-        const res = iniciarSesion(correo, password);
-        if (!res.ok) setError(res.error ?? "No fue posible iniciar sesión.");
-    };
-
-    const usarDemo = (d: (typeof demos)[number]) => {
-        setCorreo(d.correo);
-        setPassword(d.password);
-        setErrores({});
-        setError(null);
+        setCargando(true);
+        try {
+            const resultado = await iniciarSesion(correo, password);
+            if (!resultado.ok) setError(resultado.error ?? "No fue posible iniciar sesión.");
+        } finally {
+            setCargando(false);
+        }
     };
 
     return (
@@ -197,45 +184,17 @@ function Login() {
                                 <AlertDescription>{error}</AlertDescription>
                             </Alert>
                         )}
-                        {aviso && (
-                            <Alert>
-                                <AlertDescription>{aviso}</AlertDescription>
-                            </Alert>
-                        )}
 
                         {/* Botón de Iniciar Sesión */}
                         <Button
                             type="submit"
+                            disabled={cargando}
                             className="w-full text-white font-medium transition-opacity hover:opacity-90"
                             style={{ backgroundColor: "#289248" }}
                         >
-                            Iniciar sesión
+                            {cargando ? "Iniciando sesión..." : "Iniciar sesión"}
                         </Button>
                     </form>
-
-                    <div className="mt-8 rounded-lg border border-border bg-white p-4 shadow-sm">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            Usuarios de demostración
-                        </p>
-                        <div className="mt-3 space-y-2">
-                            {demos.map((d) => (
-                                <button
-                                    key={d.correo}
-                                    type="button"
-                                    onClick={() => usarDemo(d)}
-                                    className="flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted/50"
-                                >
-                                    <span className="min-w-0">
-                                        <span className="block truncate text-sm font-medium">{d.correo}</span>
-                                        <span className="block truncate text-xs text-muted-foreground">
-                                          {d.rol} · {d.detalle}
-                                        </span>
-                                    </span>
-                                    <span className="ml-3 shrink-0 text-xs font-medium" style={{ color: "#289248" }}>Usar</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
