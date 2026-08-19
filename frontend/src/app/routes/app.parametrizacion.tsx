@@ -61,6 +61,13 @@ import {
     cambiarEstadoSubprograma,
     type SubprogramaCatalogo,
 } from "@/lib/subprogramas-api";
+import {
+    listarTiposDocumento,
+    crearTipoDocumento,
+    actualizarTipoDocumento,
+    cambiarEstadoTipoDocumento,
+    type TipoDocumentoCatalogo,
+} from "@/lib/tipos-documento-api";
 import { useIntranet } from "@/lib/store";
 
 import { obtenerIconoArea } from "@/lib/iconos-areas";
@@ -101,9 +108,10 @@ interface RegistroParametro {
 }
 
 function Parametrizacion() {
-    const { tipos, permisos } = useIntranet();
+    const { permisos } = useIntranet();
     const [totalAreas, setTotalAreas] = useState(0);
     const [totalSubprogramas, setTotalSubprogramas] = useState(0);
+    const [totalTiposDocumento, setTotalTiposDocumento] = useState(0);
 
     if (!permisos.gestionarParametros) {
         return (
@@ -142,20 +150,7 @@ function Parametrizacion() {
                         value="tipos"
                         className="flex items-center gap-2 border border-input bg-background text-black shadow-sm hover:bg-[#289248] hover:text-white hover:border-[#289248] hover:shadow data-[state=active]:bg-[#289248] data-[state=active]:text-white"
                     >
-                        {tipos.length > 0 &&
-                            (() => {
-                                const {
-                                    icono: Icono,
-                                    color,
-                                } = obtenerIconoFormato(tipos[0].nombre);
-
-                                return (
-                                    <Icono
-                                        className={`size-4 ${color}`}
-                                    />
-                                );
-                            })()}
-                        Tipos de documento ({tipos.length})
+                        Tipos de documento ({totalTiposDocumento})
                     </TabsTrigger>
                 </TabsList>
 
@@ -168,11 +163,8 @@ function Parametrizacion() {
                 </TabsContent>
 
                 <TabsContent value="tipos">
-                    <Seccion
-                        clave="tipos"
-                        titulo="Tipos de documento"
-                        descripcion="Plantilla, protocolo, programa, manual, política, procedimiento y otros."
-                        registros={tipos}
+                    <SeccionTiposDocumento
+                        onTotalChange={setTotalTiposDocumento}
                     />
                 </TabsContent>
             </Tabs>
@@ -937,6 +929,359 @@ function SeccionSubprogramas({
 
                         <div className="space-y-1.5">
                             <Label>Nombre</Label>
+                            <Input
+                                value={form.nombre}
+                                maxLength={100}
+                                onChange={(e) =>
+                                    setForm({ ...form, nombre: e.target.value })
+                                }
+                            />
+                            {erroresCampo.nombre && (
+                                <p className="text-xs text-destructive">
+                                    {erroresCampo.nombre}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label>Descripción</Label>
+                            <Textarea
+                                rows={3}
+                                maxLength={255}
+                                value={form.descripcion}
+                                onChange={(e) =>
+                                    setForm({
+                                        ...form,
+                                        descripcion: e.target.value,
+                                    })
+                                }
+                            />
+                            {erroresCampo.descripcion && (
+                                <p className="text-xs text-destructive">
+                                    {erroresCampo.descripcion}
+                                </p>
+                            )}
+                        </div>
+
+                        {errorForm && (
+                            <p className="text-xs text-destructive">{errorForm}</p>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setAbierto(false)}
+                            disabled={guardando}
+                        >
+                            Cancelar
+                        </Button>
+
+                        <Button
+                            onClick={() => void guardar()}
+                            disabled={guardando}
+                        >
+                            Guardar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </Card>
+    );
+}
+
+function SeccionTiposDocumento({
+    onTotalChange,
+}: {
+    onTotalChange?: (total: number) => void;
+}) {
+    const [tiposDocumento, setTiposDocumento] = useState<TipoDocumentoCatalogo[]>(
+        [],
+    );
+    const [cargando, setCargando] = useState(true);
+    const [errorCarga, setErrorCarga] = useState<string | null>(null);
+    const [abierto, setAbierto] = useState(false);
+    const [guardando, setGuardando] = useState(false);
+    const [alternandoId, setAlternandoId] = useState<string | null>(null);
+    const [form, setForm] = useState<{
+        id?: string;
+        nombre: string;
+        descripcion: string;
+    }>({
+        nombre: "",
+        descripcion: "",
+    });
+    const [errorForm, setErrorForm] = useState("");
+    const [erroresCampo, setErroresCampo] = useState<
+        Partial<Record<"nombre" | "descripcion", string>>
+    >({});
+
+    const notificarTotal = (lista: TipoDocumentoCatalogo[]) => {
+        onTotalChange?.(lista.length);
+    };
+
+    const cargar = async () => {
+        setCargando(true);
+        setErrorCarga(null);
+        try {
+            const resultado = await listarTiposDocumento();
+            setTiposDocumento(resultado);
+            notificarTotal(resultado);
+        } catch (err) {
+            const mensaje =
+                err instanceof ApiError
+                    ? err.message
+                    : "No fue posible cargar los tipos de documento.";
+            setErrorCarga(mensaje);
+        } finally {
+            setCargando(false);
+        }
+    };
+
+    useEffect(() => {
+        void cargar();
+    }, []);
+
+    const abrirNuevo = () => {
+        setForm({
+            nombre: "",
+            descripcion: "",
+        });
+        setErrorForm("");
+        setErroresCampo({});
+        setAbierto(true);
+    };
+
+    const abrirEditar = (tipo: TipoDocumentoCatalogo) => {
+        setForm({
+            id: tipo.id,
+            nombre: tipo.nombre,
+            descripcion: tipo.descripcion,
+        });
+        setErrorForm("");
+        setErroresCampo({});
+        setAbierto(true);
+    };
+
+    const guardar = async () => {
+        setErrorForm("");
+        setErroresCampo({});
+
+        const nombre = form.nombre.trim();
+        const descripcion = form.descripcion.trim();
+
+        if (!nombre) {
+            setErrorForm("El nombre es obligatorio.");
+            return;
+        }
+        if (nombre.length > 100) {
+            setErrorForm("El nombre no puede superar los 100 caracteres.");
+            return;
+        }
+        if (descripcion.length > 255) {
+            setErrorForm("La descripción no puede superar los 255 caracteres.");
+            return;
+        }
+
+        setGuardando(true);
+        try {
+            if (form.id) {
+                const actualizado = await actualizarTipoDocumento(form.id, {
+                    nombre,
+                    descripcion,
+                });
+                setTiposDocumento((prev) =>
+                    prev.map((tipo) =>
+                        tipo.id === actualizado.id ? actualizado : tipo,
+                    ),
+                );
+                toast.success("Registro actualizado");
+            } else {
+                const creado = await crearTipoDocumento({
+                    nombre,
+                    descripcion,
+                });
+                setTiposDocumento((prev) => {
+                    const next = [...prev, creado];
+                    notificarTotal(next);
+                    return next;
+                });
+                toast.success("Registro creado");
+            }
+            setAbierto(false);
+        } catch (err) {
+            if (err instanceof ApiError) {
+                if (err.errores) {
+                    setErroresCampo({
+                        nombre: err.errores.nombre,
+                        descripcion: err.errores.descripcion,
+                    });
+                }
+                setErrorForm(err.message);
+            } else {
+                setErrorForm(
+                    form.id
+                        ? "No fue posible actualizar el tipo de documento."
+                        : "No fue posible crear el tipo de documento.",
+                );
+            }
+        } finally {
+            setGuardando(false);
+        }
+    };
+
+    const alternarEstado = async (tipo: TipoDocumentoCatalogo) => {
+        setAlternandoId(tipo.id);
+        try {
+            const actualizado = await cambiarEstadoTipoDocumento(
+                tipo.id,
+                !tipo.activo,
+            );
+            setTiposDocumento((prev) =>
+                prev.map((actual) =>
+                    actual.id === actualizado.id ? actualizado : actual,
+                ),
+            );
+            toast.success(
+                actualizado.activo
+                    ? "Registro activado"
+                    : "Registro desactivado",
+            );
+        } catch (err) {
+            const mensaje =
+                err instanceof ApiError
+                    ? err.message
+                    : "No fue posible cambiar el estado del tipo de documento.";
+            toast.error(mensaje);
+        } finally {
+            setAlternandoId(null);
+        }
+    };
+
+    return (
+        <Card>
+            <CardHeader className="flex-row items-start justify-between space-y-0">
+                <div>
+                    <CardTitle className="text-base">Tipos de documento</CardTitle>
+                    <CardDescription>
+                        Plantilla, protocolo, programa, manual, política,
+                        procedimiento y otros.
+                    </CardDescription>
+                </div>
+
+                <Button
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={abrirNuevo}
+                    disabled={cargando || !!errorCarga}
+                >
+                    <Plus className="size-4" />
+                    Nuevo
+                </Button>
+            </CardHeader>
+
+            {cargando ? (
+                <CardContent className="py-14 text-center text-sm text-muted-foreground">
+                    Cargando tipos de documento...
+                </CardContent>
+            ) : errorCarga ? (
+                <CardContent className="space-y-4 py-14 text-center">
+                    <p className="text-sm text-muted-foreground">{errorCarga}</p>
+                    <Button variant="outline" onClick={() => void cargar()}>
+                        Reintentar
+                    </Button>
+                </CardContent>
+            ) : tiposDocumento.length === 0 ? (
+                <CardContent className="py-14 text-center text-sm text-muted-foreground">
+                    No hay tipos de documento registrados.
+                </CardContent>
+            ) : (
+                <CardContent className="px-0 pb-0">
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="bg-secondary/60">
+                                <TableHead>Nombre</TableHead>
+                                <TableHead>Descripción</TableHead>
+                                <TableHead>Estado</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
+                            </TableRow>
+                        </TableHeader>
+
+                        <TableBody>
+                            {tiposDocumento.map((tipo) => {
+                                const { icono: Icono, color } =
+                                    obtenerIconoFormato(tipo.nombre);
+
+                                return (
+                                    <TableRow key={tipo.id}>
+                                        <TableCell className="font-medium">
+                                            <div className="flex items-center gap-2">
+                                                <Icono
+                                                    className={`size-4 ${color}`}
+                                                />
+                                                <span>{tipo.nombre}</span>
+                                            </div>
+                                        </TableCell>
+
+                                        <TableCell className="text-sm text-muted-foreground">
+                                            {tipo.descripcion}
+                                        </TableCell>
+
+                                        <TableCell>
+                                            <ActivoBadge activo={tipo.activo} />
+                                        </TableCell>
+
+                                        <TableCell>
+                                            <div className="flex justify-end gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => abrirEditar(tipo)}
+                                                    disabled={alternandoId === tipo.id}
+                                                >
+                                                    Editar
+                                                </Button>
+
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    disabled={alternandoId === tipo.id}
+                                                    onClick={() =>
+                                                        void alternarEstado(tipo)
+                                                    }
+                                                >
+                                                    {tipo.activo
+                                                        ? "Desactivar"
+                                                        : "Activar"}
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            )}
+
+            <Dialog open={abierto} onOpenChange={setAbierto}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>
+                            {form.id
+                                ? "Editar tipo de documento"
+                                : "Nuevo tipo de documento"}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {form.id
+                                ? "Actualice la información del tipo de documento."
+                                : "Complete la información del tipo de documento."}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div className="space-y-1.5">
+                            <Label>Nombre *</Label>
                             <Input
                                 value={form.nombre}
                                 maxLength={100}
