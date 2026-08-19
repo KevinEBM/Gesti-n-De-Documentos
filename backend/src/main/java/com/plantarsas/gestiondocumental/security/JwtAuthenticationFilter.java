@@ -63,7 +63,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        Optional<Usuario> usuarioOpt = usuarioRepository.findById(id);
+        Optional<Usuario> usuarioOpt = usuarioRepository.findWithRolById(id);
         if (usuarioOpt.isEmpty()) {
             return;
         }

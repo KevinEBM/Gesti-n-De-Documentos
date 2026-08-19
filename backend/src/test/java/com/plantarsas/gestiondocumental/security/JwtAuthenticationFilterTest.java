@@ -191,12 +191,12 @@ class JwtAuthenticationFilterTest {
 
         when(jwtService.esTokenValido("token-valido")).thenReturn(true);
         when(jwtService.obtenerIdUsuario("token-valido")).thenReturn(1L);
-        when(usuarioRepository.findById(1L)).thenReturn(Optional.empty());
+        when(usuarioRepository.findWithRolById(1L)).thenReturn(Optional.empty());
 
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
         verify(filterChain, times(1)).doFilter(request, response);
-        verify(usuarioRepository, times(1)).findById(1L);
+        verify(usuarioRepository, times(1)).findWithRolById(1L);
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     }
 
@@ -213,7 +213,7 @@ class JwtAuthenticationFilterTest {
 
         when(jwtService.esTokenValido("token-valido")).thenReturn(true);
         when(jwtService.obtenerIdUsuario("token-valido")).thenReturn(1L);
-        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
+        when(usuarioRepository.findWithRolById(1L)).thenReturn(Optional.of(usuario));
 
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
@@ -233,7 +233,7 @@ class JwtAuthenticationFilterTest {
 
         when(jwtService.esTokenValido("token-valido")).thenReturn(true);
         when(jwtService.obtenerIdUsuario("token-valido")).thenReturn(1L);
-        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
+        when(usuarioRepository.findWithRolById(1L)).thenReturn(Optional.of(usuario));
 
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
@@ -255,7 +255,7 @@ class JwtAuthenticationFilterTest {
 
         when(jwtService.esTokenValido("token-valido")).thenReturn(true);
         when(jwtService.obtenerIdUsuario("token-valido")).thenReturn(1L);
-        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
+        when(usuarioRepository.findWithRolById(1L)).thenReturn(Optional.of(usuario));
 
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
@@ -278,7 +278,7 @@ class JwtAuthenticationFilterTest {
 
         when(jwtService.esTokenValido("token-valido")).thenReturn(true);
         when(jwtService.obtenerIdUsuario("token-valido")).thenReturn(1L);
-        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
+        when(usuarioRepository.findWithRolById(1L)).thenReturn(Optional.of(usuario));
 
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
@@ -303,7 +303,7 @@ class JwtAuthenticationFilterTest {
 
         when(jwtService.esTokenValido("token-valido")).thenReturn(true);
         when(jwtService.obtenerIdUsuario("token-valido")).thenReturn(1L);
-        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
+        when(usuarioRepository.findWithRolById(1L)).thenReturn(Optional.of(usuario));
 
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
@@ -322,12 +322,12 @@ class JwtAuthenticationFilterTest {
 
         when(jwtService.esTokenValido("token-valido")).thenReturn(true);
         when(jwtService.obtenerIdUsuario("token-valido")).thenReturn(1L);
-        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
+        when(usuarioRepository.findWithRolById(1L)).thenReturn(Optional.of(usuario));
 
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
         verify(filterChain, times(1)).doFilter(request, response);
-        verify(usuarioRepository, times(1)).findById(1L);
+        verify(usuarioRepository, times(1)).findWithRolById(1L);
         verify(jwtService, never()).obtenerCorreo(anyString());
         verify(jwtService, never()).obtenerRol(anyString());
 
@@ -357,7 +357,7 @@ class JwtAuthenticationFilterTest {
 
         when(jwtService.esTokenValido("token-valido")).thenReturn(true);
         when(jwtService.obtenerIdUsuario("token-valido")).thenReturn(1L);
-        when(usuarioRepository.findById(1L))
+        when(usuarioRepository.findWithRolById(1L))
                 .thenThrow(new RuntimeException("fallo de base de datos"));
 
         assertThatThrownBy(() ->
