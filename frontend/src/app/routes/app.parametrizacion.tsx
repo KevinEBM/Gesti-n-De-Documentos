@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { ComponentType } from "react";
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/AppShell";
@@ -46,6 +46,14 @@ import {
     TabsTrigger,
 } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import {
+    actualizarArea,
+    cambiarEstadoArea,
+    crearArea,
+    listarAreas,
+    type AreaCatalogo,
+} from "@/lib/areas-api";
+import { ApiError } from "@/lib/api";
 import { useIntranet } from "@/lib/store";
 
 import { obtenerIconoArea } from "@/lib/iconos-areas";
@@ -86,7 +94,20 @@ interface RegistroParametro {
 }
 
 function Parametrizacion() {
-    const { areas, sub_proceso, tipos } = useIntranet();
+    const { sub_proceso, tipos, permisos } = useIntranet();
+    const [totalAreas, setTotalAreas] = useState(0);
+
+    if (!permisos.gestionarParametros) {
+        return (
+            <AppShell titulo="Parametrización">
+                <Card>
+                    <CardContent className="py-14 text-center text-sm text-muted-foreground">
+                        No cuentas con permisos para acceder a la parametrización.
+                    </CardContent>
+                </Card>
+            </AppShell>
+        );
+    }
 
     return (
         <AppShell
@@ -99,20 +120,7 @@ function Parametrizacion() {
                         value="areas"
                         className="flex items-center gap-2 border border-input bg-background text-black shadow-sm hover:bg-[#289248] hover:text-white hover:border-[#289248] hover:shadow data-[state=active]:bg-[#289248] data-[state=active]:text-white"
                     >
-                        {areas.length > 0 &&
-                            (() => {
-                                const {
-                                    icono: Icono,
-                                    color,
-                                } = obtenerIconoArea(areas[0].nombre);
-
-                                return (
-                                    <Icono
-                                        className={`size-4 ${color}`}
-                                    />
-                                );
-                            })()}
-                        Áreas ({areas.length})
+                        Áreas ({totalAreas})
                     </TabsTrigger>
 
                     <TabsTrigger
@@ -159,12 +167,7 @@ function Parametrizacion() {
                 </TabsList>
 
                 <TabsContent value="areas">
-                    <Seccion
-                        clave="areas"
-                        titulo="Áreas"
-                        descripcion="Unidades organizacionales responsables de los documentos."
-                        registros={areas}
-                    />
+                    <SeccionAreas onTotalChange={setTotalAreas} />
                 </TabsContent>
 
                 <TabsContent value="Subproceso">
@@ -186,6 +189,346 @@ function Parametrizacion() {
                 </TabsContent>
             </Tabs>
         </AppShell>
+    );
+}
+
+function SeccionAreas({ onTotalChange }: { onTotalChange?: (total: number) => void }) {
+    const [areasCatalogo, setAreasCatalogo] = useState<AreaCatalogo[]>([]);
+    const [cargando, setCargando] = useState(true);
+    const [errorCarga, setErrorCarga] = useState<string | null>(null);
+    const [guardando, setGuardando] = useState(false);
+    const [alternandoId, setAlternandoId] = useState<string | null>(null);
+    const [abierto, setAbierto] = useState(false);
+    const [form, setForm] = useState<{
+        id?: string;
+        codigo: string;
+        nombre: string;
+        descripcion: string;
+    }>({
+        codigo: "",
+        nombre: "",
+        descripcion: "",
+    });
+    const [errorForm, setErrorForm] = useState("");
+    const [erroresCampo, setErroresCampo] = useState<
+        Partial<Record<"codigo" | "nombre" | "descripcion", string>>
+    >({});
+
+    const notificarTotal = (lista: AreaCatalogo[]) => {
+        onTotalChange?.(lista.length);
+    };
+
+    const cargar = async () => {
+        setCargando(true);
+        setErrorCarga(null);
+        try {
+            const resultado = await listarAreas();
+            setAreasCatalogo(resultado);
+            notificarTotal(resultado);
+        } catch (err) {
+            const mensaje =
+                err instanceof ApiError
+                    ? err.message
+                    : "No fue posible cargar las áreas.";
+            setErrorCarga(mensaje);
+        } finally {
+            setCargando(false);
+        }
+    };
+
+    useEffect(() => {
+        void cargar();
+    }, []);
+
+    const abrirNuevo = () => {
+        setForm({ codigo: "", nombre: "", descripcion: "" });
+        setErrorForm("");
+        setErroresCampo({});
+        setAbierto(true);
+    };
+
+    const abrirEditar = (area: AreaCatalogo) => {
+        setForm({
+            id: area.id,
+            codigo: area.codigo,
+            nombre: area.nombre,
+            descripcion: area.descripcion,
+        });
+        setErrorForm("");
+        setErroresCampo({});
+        setAbierto(true);
+    };
+
+    const guardar = async () => {
+        setErrorForm("");
+        setErroresCampo({});
+
+        const codigo = form.codigo.trim();
+        const nombre = form.nombre.trim();
+        const descripcion = form.descripcion.trim();
+
+        if (!codigo) {
+            setErrorForm("El código es obligatorio.");
+            return;
+        }
+        if (codigo.length > 20) {
+            setErrorForm("El código no puede superar los 20 caracteres.");
+            return;
+        }
+        if (!nombre) {
+            setErrorForm("El nombre es obligatorio.");
+            return;
+        }
+        if (nombre.length > 100) {
+            setErrorForm("El nombre no puede superar los 100 caracteres.");
+            return;
+        }
+        if (descripcion.length > 255) {
+            setErrorForm("La descripción no puede superar los 255 caracteres.");
+            return;
+        }
+
+        const body = { codigo, nombre, descripcion };
+        setGuardando(true);
+        try {
+            if (form.id) {
+                const actualizada = await actualizarArea(form.id, body);
+                setAreasCatalogo((prev) => {
+                    const next = prev.map((a) =>
+                        a.id === actualizada.id ? actualizada : a,
+                    );
+                    notificarTotal(next);
+                    return next;
+                });
+                toast.success("Registro actualizado");
+            } else {
+                const creada = await crearArea(body);
+                setAreasCatalogo((prev) => {
+                    const next = [...prev, creada];
+                    notificarTotal(next);
+                    return next;
+                });
+                toast.success("Registro creado");
+            }
+            setAbierto(false);
+        } catch (err) {
+            if (err instanceof ApiError) {
+                if (err.errores) {
+                    setErroresCampo({
+                        codigo: err.errores.codigo,
+                        nombre: err.errores.nombre,
+                        descripcion: err.errores.descripcion,
+                    });
+                }
+                setErrorForm(err.message);
+            } else {
+                setErrorForm("No fue posible guardar el área.");
+            }
+        } finally {
+            setGuardando(false);
+        }
+    };
+
+    const alternarEstado = async (area: AreaCatalogo) => {
+        setAlternandoId(area.id);
+        try {
+            const actualizada = await cambiarEstadoArea(area.id, !area.activo);
+            setAreasCatalogo((prev) =>
+                prev.map((a) => (a.id === actualizada.id ? actualizada : a)),
+            );
+            toast.success(
+                actualizada.activo ? "Registro activado" : "Registro desactivado",
+            );
+        } catch (err) {
+            const mensaje =
+                err instanceof ApiError
+                    ? err.message
+                    : "No fue posible cambiar el estado del área.";
+            toast.error(mensaje);
+        } finally {
+            setAlternandoId(null);
+        }
+    };
+
+    return (
+        <Card>
+            <CardHeader className="flex-row items-start justify-between space-y-0">
+                <div>
+                    <CardTitle className="text-base">Áreas</CardTitle>
+                    <CardDescription>
+                        Unidades organizacionales responsables de los documentos.
+                    </CardDescription>
+                </div>
+
+                <Button
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={abrirNuevo}
+                    disabled={cargando || !!errorCarga}
+                >
+                    <Plus className="size-4" />
+                    Nuevo
+                </Button>
+            </CardHeader>
+
+            {cargando ? (
+                <CardContent className="py-14 text-center text-sm text-muted-foreground">
+                    Cargando áreas...
+                </CardContent>
+            ) : errorCarga ? (
+                <CardContent className="space-y-4 py-14 text-center">
+                    <p className="text-sm text-muted-foreground">{errorCarga}</p>
+                    <Button variant="outline" onClick={() => void cargar()}>
+                        Reintentar
+                    </Button>
+                </CardContent>
+            ) : (
+                <CardContent className="px-0 pb-0">
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="bg-secondary/60">
+                                <TableHead>Nombre</TableHead>
+                                <TableHead>Código</TableHead>
+                                <TableHead>Descripción</TableHead>
+                                <TableHead>Estado</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
+                            </TableRow>
+                        </TableHeader>
+
+                        <TableBody>
+                            {areasCatalogo.map((r) => {
+                                const { icono: Icono, color } = obtenerIconoArea(r.nombre);
+
+                                return (
+                                    <TableRow key={r.id}>
+                                        <TableCell className="font-medium">
+                                            <div className="flex items-center gap-2">
+                                                <Icono className={`size-4 ${color}`} />
+                                                <span>{r.nombre}</span>
+                                            </div>
+                                        </TableCell>
+
+                                        <TableCell className="text-sm text-muted-foreground">
+                                            {r.codigo}
+                                        </TableCell>
+
+                                        <TableCell className="text-sm text-muted-foreground">
+                                            {r.descripcion}
+                                        </TableCell>
+
+                                        <TableCell>
+                                            <ActivoBadge activo={r.activo} />
+                                        </TableCell>
+
+                                        <TableCell>
+                                            <div className="flex justify-end gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => abrirEditar(r)}
+                                                    disabled={alternandoId === r.id}
+                                                >
+                                                    Editar
+                                                </Button>
+
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    disabled={alternandoId === r.id}
+                                                    onClick={() => void alternarEstado(r)}
+                                                >
+                                                    {r.activo ? "Desactivar" : "Activar"}
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            )}
+
+            <Dialog open={abierto} onOpenChange={setAbierto}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>
+                            {form.id ? "Editar registro" : "Nuevo registro"}
+                        </DialogTitle>
+                        <DialogDescription>Áreas</DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div className="space-y-1.5">
+                            <Label>Código</Label>
+                            <Input
+                                value={form.codigo}
+                                maxLength={20}
+                                onChange={(e) =>
+                                    setForm({ ...form, codigo: e.target.value })
+                                }
+                            />
+                            {erroresCampo.codigo && (
+                                <p className="text-xs text-destructive">
+                                    {erroresCampo.codigo}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label>Nombre</Label>
+                            <Input
+                                value={form.nombre}
+                                maxLength={100}
+                                onChange={(e) =>
+                                    setForm({ ...form, nombre: e.target.value })
+                                }
+                            />
+                            {erroresCampo.nombre && (
+                                <p className="text-xs text-destructive">
+                                    {erroresCampo.nombre}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label>Descripción</Label>
+                            <Textarea
+                                rows={3}
+                                maxLength={255}
+                                value={form.descripcion}
+                                onChange={(e) =>
+                                    setForm({ ...form, descripcion: e.target.value })
+                                }
+                            />
+                            {erroresCampo.descripcion && (
+                                <p className="text-xs text-destructive">
+                                    {erroresCampo.descripcion}
+                                </p>
+                            )}
+                        </div>
+
+                        {errorForm && (
+                            <p className="text-xs text-destructive">{errorForm}</p>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setAbierto(false)}
+                            disabled={guardando}
+                        >
+                            Cancelar
+                        </Button>
+
+                        <Button onClick={() => void guardar()} disabled={guardando}>
+                            Guardar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </Card>
     );
 }
 
