@@ -1,18 +1,11 @@
 import {
-    BadgeCheck, BrushCleaning,
-    Calculator,
-    GraduationCap,
+
     HardHat, Leaf,
     LucideIcon,
-    ShoppingCart,
-    Wallet,
-    Wrench,
-    Warehouse,
-    PencilRuler,
     ClipboardList,
-    FolderArchive,
-    ShieldCheck,
-    Cog
+
+    Cog,
+    Search,
 } from "lucide-react";
 
 import {IconBuildingWarehouse,
@@ -28,9 +21,30 @@ import {IconBuildingWarehouse,
         IconBusinessplan,
         IconPasswordFingerprint,
         IconHeartHandshake,
-        School
+        IconSchool,
+        IconUsersGroup,
+        IconFirstAidKit,
+        IconBiohazard,
+        IconDroplet,
+        IconBugOff,
+        IconFilter,
+        IconTrash,
+        IconSpray,
+        IconShieldCog,
+        IconWashHand,
+        IconShieldX,
+        IconArchive,
+        IconMapSearch,
+        IconTestPipe2,
+        IconRotateClockwise2,
+        IconSettings,
+        IconSTurnRight,
+        IconShieldCheck,
+        IconBan,
+        IconBulb,
+        IconArrowUpRightCircle,
 } from "@tabler/icons-react"
-
+    
 export interface IconoSubProceso {
     icono: LucideIcon;
     color: string;
@@ -53,132 +67,143 @@ const color = {
 
 const ICONOS_SUBPROCESO = {
 
-    inocuidad: {
-        icono: School,
+/* Gestión Humana */
+
+    "capacitacion y desarrollo": {
+        icono: IconSchool,
         color: color.verde,
     },
 
-    documental: {
-        icono: FolderArchive,
+    "gestion humana": {
+        icono: IconUsersGroup,
         color: color.azul,
     },
 
-    calidad: {
-        icono: BadgeCheck,
+    "salud y seguridad en el trabajo": {
+        icono: IconFirstAidKit,
         color: color.rojo,
     },
 
-    nomina: {
-        icono: Wallet,
+    "sustancias quimicas": {
+        icono: IconBiohazard,
         color: color.verdeOscuro,
     },
 
-    sst: {
-        icono: HardHat,
+    "programa de respeto, convivencia e inclusion": {
+        icono: IconHeartHandshake,
         color: color.naranja,
     },
 
-    capacitacion: {
-        icono: GraduationCap,
-        color: color.morado,
-    },
+/* Gestión Ambiental */
 
-    "mantenimiento locativo": {
-        icono: Wrench,
-        color: color.rojo,
-    },
-
-    "maquinaria y equipo":{
-        icono:Cog,
-        color: color.cafe
-    },
-
-    calibracion: {
-        icono:PencilRuler,
-        color: color.amarillo
-    },
-
-    compras: {
-        icono: ShoppingCart,
-        color: color.rojo,
-    },
-
-    contabilidad: {
-        icono: Calculator,
-        color: color.verdeOscuro,
-    },
-
-    ambiental: {
-        icono: Leaf,
-        color: color.verde,
-    },
-
-    "limpieza y desinfeccion (lyd)": {
-        icono: BrushCleaning,
+    "calidad del agua potable": {
+        icono: IconDroplet,
         color: color.azul,
     },
 
-    abastecimiento: {
-        icono: IconBuildingWarehouse,
-        color: color.verde,
-    },
-
-    proveedores: {
-        icono:IconHeartHandshake,
-        color: color.dorado
-    },
-    transporte: {
-        icono: IconTruckDelivery,
-        color: color.cian,
-    },
-
-    "centro de distribucion (cedi)": {
-        icono: Warehouse,
-        color: color.rojo
-    },
-
-    logistica: {
-        icono: IconHomeSearch,
-        color: color.naranja
-    },
-
-    comercial: {
-        icono: IconShoppingCart,
+    "control de plagas": {
+        icono: IconBugOff,
         color: color.rojo,
     },
 
-    "peladero y recepcion": {
-        icono: IconBanana,
-        color: color.amarillo
+    "control de residuos liquidos": {
+        icono:IconFilter,
+        color: color.amarillo,
     },
 
-    produccion: {
-        icono: IconAutomation,
-        color: color.rojo
+    "control de residuos solidos": {
+        icono: IconTrash,
+        color: color.negro,
     },
 
-    costos: {
-        icono: IconBusinessplan,
-        color: color.verde
+    "limpieza y desinfeccion": {
+        icono: IconSpray,
+        color: color.azul,
     },
 
-    nexo: {
-        icono: IconTopologyStarRing3,
-        color: color.azul
+    "gestion ambiental": {
+            icono: Leaf,
+            color: color.verde,
     },
 
-    tecnologia: {
-        icono: IconDeviceImacCode,
-        color: color.rojo
+    "maquinaria y equipo":{
+                icono:Cog,
+                color: color.cafe
     },
+
+/* Gestión de Calidad */
+
+    "auditoria interna": {
+        icono: IconShieldCog,
+        color: color.verdeOscuro,
+    },
+
+    "buenas practicas higienicas": {
+        icono: IconWashHand,
+        color: color.verde,
+    },
+
+    "control de alergenos": {
+        icono:IconShieldX,
+        color: color.dorado
+    },
+    "gestion documental": {
+        icono: IconArchive,
+        color: color.cian,
+    },
+
+    "gestion de la calidad": {
+        icono: IconShieldCheck,
+        color: color.rojo,
+    },
+/*
+    "material extraño": {
+        icono: IconMapSearch,
+        color: color.naranja,
+    },*/
+
+    "plan de muestreo": {
+        icono: IconTestPipe2,
+        color: color.rojo,
+    },
+
+    recall: {
+        icono: IconRotateClockwise2,
+        color: color.amarillo,
+    },
+
+    "sistemas integrados de gestion": {
+        icono: IconSettings,
+        color: color.rojo,
+    },
+
+    trazabilidad: {
+        icono: IconSTurnRight,
+        color: color.verde,
+    },
+
+    "programa de producto no conforme": {
+        icono: IconBan,
+        color: color.azul,
+    },
+
+    "desarrollo e innovacion": {
+        icono: IconBulb,
+        color: color.rojo,
+    },
+    "proceso de mejora continua": {
+        icono: IconArrowUpRightCircle,
+        color: color.azul,
+    },
+
 
     cyberseguridad: {
       icono: IconPasswordFingerprint,
-        color:color.verde
+        color:color.verde,
     },
     tesoreria: {
         icono: IconBuildingBank,
-        color: color.azul
+        color: color.azul,
     },
 
     "seguridad fisica": {
