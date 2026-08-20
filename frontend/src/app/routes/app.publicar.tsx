@@ -1,24 +1,47 @@
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Save, FileUp, Upload, FileText } from "lucide-react";
-import React, { useState } from "react";
+import { ArrowLeft, ChevronDown, Plus, Save, X } from "lucide-react";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ChangeEvent,
+    type FormEvent,
+    type ReactNode,
+} from "react";
 import { toast } from "sonner";
+
 import { AppShell } from "@/components/AppShell";
-import { AreasAutorizadas } from "@/components/AreasAutorizadas";
-import { DropzoneArea } from "@/components/ui/drop-zonearea";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
+import { ApiError } from "@/lib/api";
+import { listarAreas, type AreaCatalogo } from "@/lib/areas-api";
+import {
+    publicarDocumentoInicial,
+    type DocumentoAlcance,
+    type DocumentoPublicacionInicialRequestDto,
+} from "@/lib/documentos-api";
 import { obtenerIconoArea } from "@/lib/iconos-areas";
-import { obtenerIconoSubProceso } from "@/lib/iconos-subprocesos";
 import { obtenerIconoFormato } from "@/lib/iconos-formatos";
-import type { Estado } from "@/lib/data";
+import { obtenerIconoSubProceso } from "@/lib/iconos-subprocesos";
+import { listarSubprogramas, type SubprogramaCatalogo } from "@/lib/subprogramas-api";
 import { useIntranet } from "@/lib/store";
-import { extraerInformacionDocumento } from "@/lib/extraer-info-doc";
-
+import { listarTiposDocumento, type TipoDocumentoCatalogo } from "@/lib/tipos-documento-api";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/publicar")({
     head: () => ({
@@ -34,44 +57,386 @@ export const Route = createFileRoute("/app/publicar")({
     component: NuevoDocumentoPage,
 });
 
+const LIMITE_ARCHIVO = 15 * 1024 * 1024;
+
+const SELECT_CONTENT_CLASS =
+    "!bg-white !text-slate-900 border border-slate-200 shadow-2xl z-[99999]";
+
+const SELECT_TRIGGER_CLASS = "w-full !bg-white !text-slate-900";
+
+const SELECT_ITEM_CLASS =
+    "!text-slate-900 focus:!bg-slate-100 focus:!text-slate-900 data-[highlighted]:!bg-slate-100 data-[highlighted]:!text-slate-900";
+
+const POPOVER_CONTENT_CLASS =
+    "w-[var(--radix-popover-trigger-width)] p-0 !bg-white !text-slate-900 border border-slate-200 shadow-2xl z-[99999]";
+
+const COMMAND_CLASS = "!bg-white !text-slate-900";
+
+const COMMAND_ITEM_CLASS =
+    "!text-slate-900 data-[selected=true]:!bg-slate-100 data-[selected=true]:!text-slate-900";
+
+const etiquetasAlcance: Record<DocumentoAlcance, string> = {
+    AREA_RESPONSABLE: "Área responsable",
+    AREAS_ESPECIFICAS: "Áreas específicas",
+    GLOBAL: "Global",
+};
+
+const ayudaAlcance: Record<DocumentoAlcance, string> = {
+    AREA_RESPONSABLE: "Visible para usuarios asociados al área responsable.",
+    AREAS_ESPECIFICAS:
+        "Visible para el área responsable y las áreas adicionales seleccionadas.",
+    GLOBAL: "Visible para todos los usuarios autorizados del sistema.",
+};
+
+interface FormularioPublicacion {
+    codigo: string;
+    titulo: string;
+    descripcion: string;
+    areaId: string;
+    subprogramaId: string;
+    tipoDocumentoId: string;
+    alcance: DocumentoAlcance | "";
+    areasAdicionalesIds: string[];
+    descripcionVersionInicial: string;
+}
+
+const formularioVacio: FormularioPublicacion = {
+    codigo: "",
+    titulo: "",
+    descripcion: "",
+    areaId: "",
+    subprogramaId: "",
+    tipoDocumentoId: "",
+    alcance: "",
+    areasAdicionalesIds: [],
+    descripcionVersionInicial: "",
+};
+
+function validarFormulario(
+    form: FormularioPublicacion,
+    archivo: File | null,
+    areasActivas: AreaCatalogo[],
+    subprogramas: SubprogramaCatalogo[],
+    tiposActivos: TipoDocumentoCatalogo[],
+): Record<string, string> {
+    const errores: Record<string, string> = {};
+
+    const codigo = form.codigo.trim();
+    if (!codigo) errores.codigo = "El código documental es obligatorio.";
+    else if (codigo.length > 50) errores.codigo = "El código no puede superar los 50 caracteres.";
+
+    const titulo = form.titulo.trim();
+    if (!titulo) errores.titulo = "El título es obligatorio.";
+    else if (titulo.length > 200) errores.titulo = "El título no puede superar los 200 caracteres.";
+
+    const descripcion = form.descripcion.trim();
+    if (descripcion.length > 500) {
+        errores.descripcion = "La descripción no puede superar los 500 caracteres.";
+    }
+
+    if (!form.areaId) {
+        errores.areaId = "Selecciona el área responsable.";
+    } else if (!areasActivas.some((area) => area.id === form.areaId)) {
+        errores.areaId = "Selecciona un área activa válida.";
+    }
+
+    if (!form.areaId) {
+        errores.subprogramaId = "Selecciona primero un área responsable.";
+    } else if (!form.subprogramaId) {
+        errores.subprogramaId = "Selecciona un subprograma.";
+    } else {
+        const subprograma = subprogramas.find((item) => item.id === form.subprogramaId);
+        if (!subprograma?.activo || subprograma.areaId !== form.areaId) {
+            errores.subprogramaId = "Selecciona un subprograma activo del área elegida.";
+        }
+    }
+
+    if (!form.tipoDocumentoId) {
+        errores.tipoDocumentoId = "Selecciona un tipo de documento.";
+    } else if (!tiposActivos.some((tipo) => tipo.id === form.tipoDocumentoId)) {
+        errores.tipoDocumentoId = "Selecciona un tipo de documento activo válido.";
+    }
+
+    if (!form.alcance) {
+        errores.alcance = "Selecciona el alcance del documento.";
+    } else if (form.alcance === "AREAS_ESPECIFICAS") {
+        if (form.areasAdicionalesIds.length === 0) {
+            errores.areasAdicionalesIds = "Selecciona al menos un área adicional.";
+        } else if (form.areasAdicionalesIds.includes(form.areaId)) {
+            errores.areasAdicionalesIds =
+                "El área responsable no puede incluirse como área adicional.";
+        }
+    }
+
+    if (!archivo) {
+        errores.archivo = "Debes adjuntar un archivo.";
+    } else {
+        if (archivo.size > LIMITE_ARCHIVO) {
+            errores.archivo = "El archivo no puede superar los 15 MB.";
+        }
+        if (archivo.name.toLowerCase().endsWith(".apk")) {
+            errores.archivo = "No se permiten archivos APK.";
+        }
+    }
+
+    const descripcionVersion = form.descripcionVersionInicial.trim();
+    if (!descripcionVersion) {
+        errores.descripcionVersionInicial = "La descripción de la versión inicial es obligatoria.";
+    } else if (descripcionVersion.length > 500) {
+        errores.descripcionVersionInicial =
+            "La descripción de la versión no puede superar los 500 caracteres.";
+    }
+
+    return errores;
+}
+
+function construirMetadata(form: FormularioPublicacion): DocumentoPublicacionInicialRequestDto {
+    const alcance = form.alcance as DocumentoAlcance;
+    const descripcion = form.descripcion.trim();
+
+    let areasAdicionalesIds: number[] = [];
+    if (alcance === "AREAS_ESPECIFICAS") {
+        areasAdicionalesIds = form.areasAdicionalesIds.map(Number);
+    }
+
+    return {
+        codigo: form.codigo.trim(),
+        titulo: form.titulo.trim(),
+        descripcion: descripcion || null,
+        areaId: Number(form.areaId),
+        subprogramaId: Number(form.subprogramaId),
+        tipoDocumentoId: Number(form.tipoDocumentoId),
+        descripcionVersionInicial: form.descripcionVersionInicial.trim(),
+        alcance,
+        areasAdicionalesIds,
+    };
+}
+
 function NuevoDocumentoPage() {
     const navigate = useNavigate();
-    const store = useIntranet();
-    const { areas, sub_proceso, tipos, permisos } = store;
+    const { permisos } = useIntranet();
 
-    // Detectar la función de publicación según el nombre expuesto en tu store
-    const publicarFn =
-        (store as any).publicarDocumento ||
-        (store as any).crearDocumento ||
-        (store as any).agregarDocumento;
+    const [areasCatalogo, setAreasCatalogo] = useState<AreaCatalogo[]>([]);
+    const [subprogramasCatalogo, setSubprogramasCatalogo] = useState<SubprogramaCatalogo[]>([]);
+    const [tiposCatalogo, setTiposCatalogo] = useState<TipoDocumentoCatalogo[]>([]);
+    const [cargandoCatalogos, setCargandoCatalogos] = useState(true);
+    const [errorCatalogos, setErrorCatalogos] = useState<string | null>(null);
+    const catalogosCargados = useRef(false);
 
-    // Fecha actual predeterminada (YYYY-MM-DD)
-    const fechaHoy = new Date().toISOString().split("T")[0];
-
-    //Estados de la sección 0
-    const [codigo, setCodigo] = useState("");
-    // Estados de la sección 1: Información
-    const [nombre, setNombre] = useState("");
-    const [descripcion, setDescripcion] = useState("");
+    const [form, setForm] = useState<FormularioPublicacion>(formularioVacio);
     const [archivo, setArchivo] = useState<File | null>(null);
+    const [archivoInputKey, setArchivoInputKey] = useState(0);
+    const [errores, setErrores] = useState<Record<string, string>>({});
+    const [publicando, setPublicando] = useState(false);
+    const [buscadorAreaAdicionalVisible, setBuscadorAreaAdicionalVisible] = useState(false);
 
-    // Estados de la sección 2: Clasificación y visibilidad
-    const [areaId, setAreaId] = useState("");
-    const [subProcesoId, setSub_procesoId] = useState("");
-    const [tipoId, setTipoId] = useState("");
-    const [visibleTodas, setVisibleTodas] = useState(false);
-    const [autorizadas, setAutorizadas] = useState<string[]>([]);
-
-    // Estados de la sección 3: Versión y estado
-    const [version, setVersion] = useState("1.0");
-    const [fechaPublicacion, setFechaPublicacion] = useState(fechaHoy);
-    const [estado, setEstado] = useState<Estado>("publicado");
-
-    const [subiendo, setSubiendo] = useState(false);
-
-    const subProcesosFiltrados = sub_proceso.filter(
-        (sp) => sp.areaId === areaId
+    const areasActivas = useMemo(
+        () => areasCatalogo.filter((area) => area.activo),
+        [areasCatalogo],
     );
+
+    const subprogramasActivos = useMemo(() => {
+        if (!form.areaId) return [];
+        return subprogramasCatalogo.filter(
+            (item) => item.activo && item.areaId === form.areaId,
+        );
+    }, [subprogramasCatalogo, form.areaId]);
+
+    const tiposActivos = useMemo(
+        () => tiposCatalogo.filter((tipo) => tipo.activo),
+        [tiposCatalogo],
+    );
+
+    const areasSeleccionablesAdicionales = useMemo(
+        () =>
+            areasActivas.filter(
+                (area) =>
+                    area.id !== form.areaId &&
+                    !form.areasAdicionalesIds.includes(area.id),
+            ),
+        [areasActivas, form.areaId, form.areasAdicionalesIds],
+    );
+
+    const areasAdicionalesSeleccionadas = useMemo(
+        () =>
+            form.areasAdicionalesIds
+                .map((id) => areasActivas.find((area) => area.id === id))
+                .filter((area): area is AreaCatalogo => area != null),
+        [form.areasAdicionalesIds, areasActivas],
+    );
+
+    const hayMasAreasAdicionales = areasSeleccionablesAdicionales.length > 0;
+
+    const cargarCatalogos = useCallback(async (forzar = false) => {
+        if (catalogosCargados.current && !forzar && !errorCatalogos) return;
+
+        setCargandoCatalogos(true);
+        setErrorCatalogos(null);
+        try {
+            const [areas, subprogramas, tipos] = await Promise.all([
+                listarAreas(),
+                listarSubprogramas(),
+                listarTiposDocumento(),
+            ]);
+            setAreasCatalogo(areas);
+            setSubprogramasCatalogo(subprogramas);
+            setTiposCatalogo(tipos);
+            catalogosCargados.current = true;
+        } catch (err) {
+            catalogosCargados.current = false;
+            const mensaje =
+                err instanceof ApiError
+                    ? err.message
+                    : "No fue posible cargar los catálogos del formulario.";
+            setErrorCatalogos(mensaje);
+        } finally {
+            setCargandoCatalogos(false);
+        }
+    }, [errorCatalogos]);
+
+    useEffect(() => {
+        cargarCatalogos();
+    }, [cargarCatalogos]);
+
+    const cambiarArea = (areaId: string) => {
+        setForm((prev) => ({
+            ...prev,
+            areaId,
+            subprogramaId: "",
+            areasAdicionalesIds: prev.areasAdicionalesIds.filter((id) => id !== areaId),
+        }));
+    };
+
+    const cambiarAlcance = (alcance: DocumentoAlcance) => {
+        setForm((prev) => ({
+            ...prev,
+            alcance,
+            areasAdicionalesIds: alcance === "AREAS_ESPECIFICAS" ? prev.areasAdicionalesIds : [],
+        }));
+        if (alcance === "AREAS_ESPECIFICAS") {
+            setBuscadorAreaAdicionalVisible(form.areasAdicionalesIds.length === 0);
+        } else {
+            setBuscadorAreaAdicionalVisible(false);
+        }
+    };
+
+    const agregarAreaAdicional = (areaId: string) => {
+        setForm((prev) => {
+            if (
+                prev.areasAdicionalesIds.includes(areaId) ||
+                areaId === prev.areaId
+            ) {
+                return prev;
+            }
+            return {
+                ...prev,
+                areasAdicionalesIds: [...prev.areasAdicionalesIds, areaId],
+            };
+        });
+        setBuscadorAreaAdicionalVisible(false);
+        setErrores((prev) => {
+            const { areasAdicionalesIds: _, ...resto } = prev;
+            return resto;
+        });
+    };
+
+    const quitarAreaAdicional = (areaId: string) => {
+        setForm((prev) => {
+            const areasAdicionalesIds = prev.areasAdicionalesIds.filter((id) => id !== areaId);
+            if (areasAdicionalesIds.length === 0) {
+                setBuscadorAreaAdicionalVisible(true);
+            }
+            return { ...prev, areasAdicionalesIds };
+        });
+    };
+
+    const manejarArchivo = (evento: ChangeEvent<HTMLInputElement>) => {
+        const file = evento.target.files?.[0] ?? null;
+        evento.target.value = "";
+
+        if (!file) {
+            setArchivo(null);
+            return;
+        }
+
+        if (file.size > LIMITE_ARCHIVO) {
+            setArchivo(null);
+            setErrores((prev) => ({
+                ...prev,
+                archivo: "El archivo no puede superar los 15 MB.",
+            }));
+            toast.error("El archivo no puede superar los 15 MB.");
+            return;
+        }
+
+        if (file.name.toLowerCase().endsWith(".apk")) {
+            setArchivo(null);
+            setErrores((prev) => ({
+                ...prev,
+                archivo: "No se permiten archivos APK.",
+            }));
+            toast.error("No se permiten archivos APK.");
+            return;
+        }
+
+        setArchivo(file);
+        setErrores((prev) => {
+            const { archivo: _, ...resto } = prev;
+            return resto;
+        });
+    };
+
+    const handleSubmit = async (evento: FormEvent<HTMLFormElement>) => {
+        evento.preventDefault();
+
+        if (cargandoCatalogos || errorCatalogos || publicando) return;
+
+        const erroresValidacion = validarFormulario(
+            form,
+            archivo,
+            areasActivas,
+            subprogramasCatalogo,
+            tiposActivos,
+        );
+        setErrores(erroresValidacion);
+
+        if (Object.keys(erroresValidacion).length > 0) {
+            toast.error("Revise los campos marcados en el formulario.");
+            return;
+        }
+
+        if (!archivo) return;
+
+        const metadata = construirMetadata(form);
+
+        setPublicando(true);
+        try {
+            const creado = await publicarDocumentoInicial(metadata, archivo);
+            toast.success(`Documento ${creado.codigo} publicado correctamente.`);
+            setForm(formularioVacio);
+            setArchivo(null);
+            setErrores({});
+            setArchivoInputKey((prev) => prev + 1);
+            navigate({ to: "/app/documentos" });
+        } catch (err) {
+            if (err instanceof ApiError) {
+                if (err.status === 409) {
+                    setErrores((prev) => ({ ...prev, codigo: err.message }));
+                } else if (err.errores) {
+                    const mapeados: Record<string, string> = {};
+                    for (const [campo, mensaje] of Object.entries(err.errores)) {
+                        mapeados[campo] = mensaje;
+                    }
+                    setErrores((prev) => ({ ...prev, ...mapeados }));
+                }
+                toast.error(err.message);
+            } else {
+                toast.error("No fue posible publicar el documento.");
+            }
+        } finally {
+            setPublicando(false);
+        }
+    };
 
     if (!permisos?.actualizarDocumentos) {
         return (
@@ -85,372 +450,480 @@ function NuevoDocumentoPage() {
         );
     }
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-
-        // Validaciones
-        if (!codigo.trim()) return toast.error("El código del documento es obligatorio.");
-        if (!nombre.trim()) return toast.error("El nombre del documento es obligatorio.");
-        if (!descripcion.trim()) return toast.error("La descripción del documento es obligatoria.");
-        if (!areaId) return toast.error("Selecciona un área responsable.");
-        if (!subProcesoId) return toast.error("Selecciona un subproceso.");
-        if (!tipoId) return toast.error("Selecciona un tipo de documento.");
-        if (!visibleTodas && autorizadas.length === 0) {
-            return toast.error("Selecciona al menos un área autorizada o marca 'Visible para todas las áreas'.");
-        }
-        if (!archivo) return toast.error("Debes adjuntar un archivo para el documento.");
-
-        setSubiendo(true);
-
-        try {
-            const formData = new FormData();
-            formData.append("codigo", codigo.trim());
-            formData.append("nombre", nombre.trim());
-            formData.append("descripcion", descripcion.trim());
-            formData.append("areaId", areaId);
-            formData.append("subProcesoId", subProcesoId);
-            formData.append("tipoId", tipoId);
-            formData.append("archivo", archivo);
-
-            // Simulación de carga
-            await new Promise((resolve) => setTimeout(resolve, 1500));
-
-            const nuevoDocumento = {
-                codigo,
-                nombre: nombre.trim(),
-                descripcion: descripcion.trim(),
-                areaId,
-                subProcesoId,
-                tipoId,
-                visibleTodas,
-                areasAutorizadas: visibleTodas ? [] : autorizadas,
-                archivo: archivo.name,
-                version,
-                fechaPublicacion,
-                estado,
-            };
-
-            if (typeof publicarFn === "function") {
-                publicarFn(nuevoDocumento);
-            } else {
-                console.warn("No se encontró una función de publicación directa en useIntranet().");
-            }
-
-            toast.success("Documento publicado exitosamente");
-            navigate({ to: "/app/gestion-documentos" });
-        } catch (error) {
-            console.error("Error al publicar:", error);
-            toast.error("Ocurrió un error al intentar publicar el documento.");
-        } finally {
-            setSubiendo(false);
-        }
-    };
+    const formularioDeshabilitado = cargandoCatalogos || !!errorCatalogos || publicando;
+    const archivoSeleccionadoValido = archivo !== null && !errores.archivo;
 
     return (
         <AppShell
             titulo="Publicar nuevo documento"
             descripcion="Diligencia los metadatos del documento y adjunta el archivo oficial."
         >
-            <div className="space-y-6 max-w-4xl mx-auto pb-10 p-4 md:p-6">
-
-                {/* Encabezado y Navegación */}
-                <div className="flex items-center space-x-4 mb-4">
+            <div className="mx-auto max-w-4xl space-y-6 p-4 pb-10 md:p-6">
+                <div className="mb-4 flex items-center space-x-4">
                     <Button variant="outline" size="icon" asChild>
                         <Link to="/app/gestion-documentos">
-                            <ArrowLeft className="w-5 h-5" />
+                            <ArrowLeft className="h-5 w-5" />
                         </Link>
                     </Button>
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Cargar Nuevo Documento</h1>
-                        <p className="text-muted-foreground text-sm">
+                        <h1 className="text-2xl font-bold tracking-tight">Publicar documento</h1>
+                        <p className="text-sm text-muted-foreground">
                             Completa los metadatos y adjunta el archivo correspondiente.
                         </p>
                     </div>
                 </div>
 
+                {errorCatalogos ? (
+                    <Card>
+                        <CardContent className="space-y-3 py-8 text-center">
+                            <p className="text-sm font-medium">{errorCatalogos}</p>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => cargarCatalogos(true)}
+                                disabled={cargandoCatalogos}
+                            >
+                                Reintentar
+                            </Button>
+                        </CardContent>
+                    </Card>
+                ) : cargandoCatalogos ? (
+                    <Card>
+                        <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                            Cargando catálogos del formulario...
+                        </CardContent>
+                    </Card>
+                ) : null}
+
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* TARJETA 1: Información del documento */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base font-bold">Información del documento</CardTitle>
+                            <CardTitle className="text-base font-bold">
+                                Información del documento
+                            </CardTitle>
                             <CardDescription>
-
-                                <p>Los metadatos permitirán clasificar y buscar el archivo fácilmente.</p>
-                                <p><b>Se recomienda subir el archivo antes de rellenar los campos</b></p>
+                                Los metadatos permitirán clasificar y buscar el archivo en la
+                                biblioteca.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-5">
-                            <div className="space-y-1.5">
-                                <Label htmlFor="codigo">
-                                    Código <span className="text-destructive">*</span>
-                                </Label>
-
+                            <Campo
+                                id="codigo"
+                                label="Código documental"
+                                obligatorio
+                                error={errores.codigo}
+                            >
                                 <Input
                                     id="codigo"
                                     placeholder="PR-LD-PO-01"
-                                    value={codigo}
-                                    onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+                                    value={form.codigo}
+                                    onChange={(e) =>
+                                        setForm((prev) => ({ ...prev, codigo: e.target.value }))
+                                    }
+                                    disabled={formularioDeshabilitado}
                                 />
+                            </Campo>
 
-                                <p className="text-xs text-muted-foreground">
-                                    Se detectará automáticamente desde el nombre del archivo cuando siga la nomenclatura
-                                    institucional.
-                                </p>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <Label htmlFor="nombre">
-                                    Nombre del documento <span className="text-destructive">*</span>
-                                </Label>
+                            <Campo
+                                id="titulo"
+                                label="Título"
+                                obligatorio
+                                error={errores.titulo}
+                            >
                                 <Input
-                                    id="nombre"
-                                    placeholder="Ej: PROGRAMA LIMPIEZA Y DESINFECCIÓN"
-                                    value={nombre}
-                                    onChange={(e) => setNombre(e.target.value)}
+                                    id="titulo"
+                                    placeholder="Ej: Programa de limpieza y desinfección"
+                                    value={form.titulo}
+                                    onChange={(e) =>
+                                        setForm((prev) => ({ ...prev, titulo: e.target.value }))
+                                    }
+                                    disabled={formularioDeshabilitado}
                                 />
-                            </div>
+                            </Campo>
 
-                            <div className="space-y-1.5">
-                                <Label htmlFor="descripcion">
-                                    Descripción / Alcance <span className="text-destructive">*</span>
-                                </Label>
+                            <Campo id="descripcion" label="Descripción" error={errores.descripcion}>
                                 <Textarea
                                     id="descripcion"
                                     rows={3}
-                                    placeholder="Describe brevemente el alcance y propósito del documento…"
-                                    value={descripcion}
-                                    onChange={(e) => setDescripcion(e.target.value)}
+                                    placeholder="Descripción opcional del documento…"
+                                    value={form.descripcion}
+                                    onChange={(e) =>
+                                        setForm((prev) => ({
+                                            ...prev,
+                                            descripcion: e.target.value,
+                                        }))
+                                    }
+                                    disabled={formularioDeshabilitado}
                                 />
-                            </div>
-
-                            <Separator/>
-
-                            {/* Zona de Carga de Archivo */}
-                            <div className="space-y-3 pt-2">
-                                <div className="flex flex-col">
-                                    <Label className="text-sm font-medium">
-                                        Archivo Adjunto <span className="text-destructive">*</span>
-                                    </Label>
-                                    <span className="text-xs text-muted-foreground mb-2">
-                                        Por seguridad institucional, solo se permiten formatos PDF, Word o Excel.
-                                    </span>
-                                </div>
-
-                                <DropzoneArea
-                                    selectedFile={archivo}
-                                    onFileSelect={(file) => {
-
-                                        if (!file) {
-                                            setArchivo(null);
-                                            return;
-                                        }
-
-                                        console.log("Archivo seleccionado:", file.name);
-
-                                        const resultado = extraerInformacionDocumento(file.name);
-
-                                        if (!resultado.valido) {
-
-                                            toast.error(
-                                                resultado.error ??
-                                                "El archivo no cumple la nomenclatura institucional."
-                                            );
-
-                                            setArchivo(null);
-
-                                            return;
-                                        }
-
-                                        // Guardar archivo
-                                        setArchivo(file);
-
-                                        // Solo completar el código automáticamente si el usuario no escribió uno
-                                        if (!codigo.trim()) {
-                                            setCodigo(resultado.codigo ?? "");
-                                        }
-
-                                        // Siempre actualizar nombre desde el archivo
-                                        if (resultado.nombre !== null) {
-                                            setNombre(resultado.nombre);
-                                        }
-
-                                        // Siempre actualizar versión
-                                        setVersion(resultado.version ?? "1.0");
-
-                                        toast.success("Archivo cargado correctamente.");
-                                    }}
-                                    accept={{
-                                        "application/pdf": [".pdf"],
-                                        "application/msword": [".doc"],
-                                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
-                                        "application/vnd.ms-excel": [".xls"],
-                                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
-                                    }}
-                                    maxSize={15 * 1024 * 1024}
-                                />
-                            </div>
+                            </Campo>
                         </CardContent>
                     </Card>
 
-                    {/* TARJETA 2: Clasificación y visibilidad */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base font-bold">Clasificación y visibilidad</CardTitle>
+                            <CardTitle className="text-base font-bold">
+                                Clasificación y alcance
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-5">
                             <div className="grid gap-4 sm:grid-cols-3">
-                                <div className="space-y-1.5">
-                                    <Label>
-                                        Área responsable <span className="text-destructive">*</span>
-                                    </Label>
+                                <Campo
+                                    label="Área responsable"
+                                    obligatorio
+                                    error={errores.areaId}
+                                >
                                     <Select
-                                        value={areaId}
-                                        onValueChange={(value) => {
-                                            setAreaId(value);
-                                            setSub_procesoId("");
-                                        }}>
-                                        <SelectTrigger>
+                                        value={form.areaId}
+                                        onValueChange={cambiarArea}
+                                        disabled={formularioDeshabilitado}
+                                    >
+                                        <SelectTrigger className={SELECT_TRIGGER_CLASS}>
                                             <SelectValue placeholder="Seleccionar…" />
                                         </SelectTrigger>
-                                        <SelectContent>
-                                            {areas.map((a) => {
-                                                const { icono: Icono, color } = obtenerIconoArea(a.nombre);
-
+                                        <SelectContent className={SELECT_CONTENT_CLASS}>
+                                            {areasActivas.map((area) => {
+                                                const { icono: Icono, color } = obtenerIconoArea(
+                                                    area.nombre,
+                                                );
                                                 return (
-                                                    <SelectItem key={a.id} value={a.id}>
+                                                    <SelectItem
+                                                        className={SELECT_ITEM_CLASS}
+                                                        key={area.id}
+                                                        value={area.id}
+                                                    >
                                                         <div className="flex items-center gap-2">
                                                             <Icono className={`size-4 ${color}`} />
-                                                            <span>{a.nombre}</span>
+                                                            <span>{area.nombre}</span>
                                                         </div>
                                                     </SelectItem>
                                                 );
                                             })}
                                         </SelectContent>
                                     </Select>
+                                </Campo>
 
-                                </div>
-
-                                <div className="space-y-1.5">
-                                    <Label>
-                                        Subproceso <span className="text-destructive">*</span>
-                                    </Label>
-                                    <Select value={subProcesoId} onValueChange={setSub_procesoId}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Seleccionar…" />
+                                <Campo
+                                    label="Subprograma"
+                                    obligatorio
+                                    error={errores.subprogramaId}
+                                >
+                                    <Select
+                                        value={form.subprogramaId}
+                                        onValueChange={(subprogramaId) =>
+                                            setForm((prev) => ({ ...prev, subprogramaId }))
+                                        }
+                                        disabled={formularioDeshabilitado || !form.areaId}
+                                    >
+                                        <SelectTrigger className={SELECT_TRIGGER_CLASS}>
+                                            <SelectValue
+                                                placeholder={
+                                                    form.areaId
+                                                        ? "Seleccionar…"
+                                                        : "Seleccione primero un área"
+                                                }
+                                            />
                                         </SelectTrigger>
-
-                                        <SelectContent>
-                                            {subProcesosFiltrados.map((c) => {
-                                                const { icono: Icono, color } = obtenerIconoSubProceso(c.nombre);
-
+                                        <SelectContent className={SELECT_CONTENT_CLASS}>
+                                            {subprogramasActivos.map((subprograma) => {
+                                                const { icono: Icono, color } =
+                                                    obtenerIconoSubProceso(subprograma.nombre);
                                                 return (
-                                                    <SelectItem key={c.id} value={c.id}>
+                                                    <SelectItem
+                                                        className={SELECT_ITEM_CLASS}
+                                                        key={subprograma.id}
+                                                        value={subprograma.id}
+                                                    >
                                                         <div className="flex items-center gap-2">
                                                             <Icono className={`size-4 ${color}`} />
-                                                            <span>{c.nombre}</span>
+                                                            <span>{subprograma.nombre}</span>
                                                         </div>
                                                     </SelectItem>
                                                 );
                                             })}
                                         </SelectContent>
                                     </Select>
+                                </Campo>
 
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label>
-                                        Tipo de documento <span className="text-destructive">*</span>
-                                    </Label>
-                                    <Select value={tipoId} onValueChange={setTipoId}>
-                                        <SelectTrigger>
+                                <Campo
+                                    label="Tipo de documento"
+                                    obligatorio
+                                    error={errores.tipoDocumentoId}
+                                >
+                                    <Select
+                                        value={form.tipoDocumentoId}
+                                        onValueChange={(tipoDocumentoId) =>
+                                            setForm((prev) => ({ ...prev, tipoDocumentoId }))
+                                        }
+                                        disabled={formularioDeshabilitado}
+                                    >
+                                        <SelectTrigger className={SELECT_TRIGGER_CLASS}>
                                             <SelectValue placeholder="Seleccionar…" />
                                         </SelectTrigger>
-                                        <SelectContent>
-                                            {tipos.map((t) => (
-                                                <SelectItem key={t.id} value={t.id}>
-                                                    <div className="flex items-center gap-2">
-                                                        <FileText className="size-4 text-slate-500" />
-                                                        <span>{t.nombre}</span>
-                                                    </div>
+                                        <SelectContent className={SELECT_CONTENT_CLASS}>
+                                            {tiposActivos.map((tipo) => {
+                                                const { icono: Icono, color } = obtenerIconoFormato(
+                                                    tipo.nombre,
+                                                );
+                                                return (
+                                                    <SelectItem
+                                                        className={SELECT_ITEM_CLASS}
+                                                        key={tipo.id}
+                                                        value={tipo.id}
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <Icono className={`size-4 ${color}`} />
+                                                            <span>{tipo.nombre}</span>
+                                                        </div>
+                                                    </SelectItem>
+                                                );
+                                            })}
+                                        </SelectContent>
+                                    </Select>
+                                </Campo>
+                            </div>
+
+                            <Campo label="Alcance" obligatorio error={errores.alcance}>
+                                <Select
+                                    value={form.alcance}
+                                    onValueChange={(valor) =>
+                                        cambiarAlcance(valor as DocumentoAlcance)
+                                    }
+                                    disabled={formularioDeshabilitado}
+                                >
+                                    <SelectTrigger className={SELECT_TRIGGER_CLASS}>
+                                        <SelectValue placeholder="Seleccionar alcance…" />
+                                    </SelectTrigger>
+                                    <SelectContent className={SELECT_CONTENT_CLASS}>
+                                        {(Object.keys(etiquetasAlcance) as DocumentoAlcance[]).map(
+                                            (alcance) => (
+                                                <SelectItem
+                                                    className={SELECT_ITEM_CLASS}
+                                                    key={alcance}
+                                                    value={alcance}
+                                                >
+                                                    {etiquetasAlcance[alcance]}
                                                 </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                            ),
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                                {form.alcance ? (
+                                    <p className="text-xs text-muted-foreground">
+                                        {ayudaAlcance[form.alcance]}
+                                    </p>
+                                ) : null}
+                            </Campo>
+
+                            {form.alcance === "AREAS_ESPECIFICAS" ? (
+                                <div className="space-y-3 rounded-md border p-4">
+                                    <div>
+                                        <Label>
+                                            Áreas adicionales
+                                            <span className="text-destructive"> *</span>
+                                        </Label>
+                                        <p className="text-xs text-muted-foreground">
+                                            Seleccione al menos un área distinta del área
+                                            responsable.
+                                        </p>
+                                    </div>
+
+                                    {buscadorAreaAdicionalVisible && hayMasAreasAdicionales ? (
+                                        <BuscadorAreaAdicional
+                                            areas={areasSeleccionablesAdicionales}
+                                            onSeleccionar={agregarAreaAdicional}
+                                            disabled={formularioDeshabilitado}
+                                        />
+                                    ) : null}
+
+                                    {areasAdicionalesSeleccionadas.length > 0 ? (
+                                        <div className="space-y-2">
+                                            <p className="text-xs font-medium text-muted-foreground">
+                                                Áreas seleccionadas:
+                                            </p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {areasAdicionalesSeleccionadas.map((area) => {
+                                                    const { icono: Icono, color } =
+                                                        obtenerIconoArea(area.nombre);
+                                                    return (
+                                                        <div
+                                                            key={area.id}
+                                                            className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-1.5"
+                                                        >
+                                                            <Icono
+                                                                className={`size-4 ${color}`}
+                                                            />
+                                                            <span className="text-sm font-medium text-slate-900">
+                                                                {area.nombre}
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    quitarAreaAdicional(area.id)
+                                                                }
+                                                                disabled={formularioDeshabilitado}
+                                                                className="rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                                                aria-label={`Quitar ${area.nombre}`}
+                                                            >
+                                                                <X className="size-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ) : null}
+
+                                    {hayMasAreasAdicionales ? (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="gap-1.5 !bg-white !text-slate-900"
+                                            onClick={() => setBuscadorAreaAdicionalVisible(true)}
+                                            disabled={
+                                                formularioDeshabilitado ||
+                                                buscadorAreaAdicionalVisible
+                                            }
+                                        >
+                                            <Plus className="size-4" />
+                                            Agregar otra área
+                                        </Button>
+                                    ) : areasAdicionalesSeleccionadas.length > 0 ? (
+                                        <p className="text-xs text-muted-foreground">
+                                            No hay más áreas disponibles.
+                                        </p>
+                                    ) : null}
+
+                                    {errores.areasAdicionalesIds ? (
+                                        <p className="text-sm text-destructive">
+                                            {errores.areasAdicionalesIds}
+                                        </p>
+                                    ) : null}
                                 </div>
-
-                            </div>
-
-                            <div className="space-y-2 pt-2">
-                                <Label>Áreas autorizadas para visualizar</Label>
-                                <AreasAutorizadas
-                                    idCheckbox="publicar-visible-todas"
-                                    areas={areas}
-                                    seleccionadas={autorizadas}
-                                    onChange={setAutorizadas}
-                                    visibleTodas={visibleTodas}
-                                    onVisibleTodas={setVisibleTodas}
-                                />
-                            </div>
+                            ) : null}
                         </CardContent>
                     </Card>
 
-                    {/* TARJETA 3: Versión y estado */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base font-bold">Versión y estado</CardTitle>
+                            <CardTitle className="text-base font-bold">Archivo y versión</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="grid gap-4 sm:grid-cols-3">
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="version">Versión</Label>
-                                    <Input
-                                        id="version"
-                                        value={version}
-                                        onChange={(e) => setVersion(e.target.value)}
-                                        placeholder="1.0"
+                        <CardContent className="space-y-5">
+                            <Campo label="Archivo" obligatorio error={errores.archivo}>
+                                <div
+                                    className={cn(
+                                        "rounded-md border transition-colors",
+                                        archivoSeleccionadoValido
+                                            ? "border-emerald-500 bg-emerald-500/5"
+                                            : errores.archivo
+                                              ? "border-destructive/50 bg-destructive/5"
+                                              : "border-border bg-white",
+                                    )}
+                                >
+                                    <input
+                                        key={archivoInputKey}
+                                        id="archivo-documento"
+                                        type="file"
+                                        className="sr-only"
+                                        onChange={manejarArchivo}
+                                        disabled={formularioDeshabilitado}
                                     />
-                                    <p className="text-xs text-muted-foreground">
-                                        Se sugiere 1.0 para la primera publicación.
-                                    </p>
+                                    <label
+                                        htmlFor={
+                                            formularioDeshabilitado
+                                                ? undefined
+                                                : "archivo-documento"
+                                        }
+                                        className={cn(
+                                            "flex cursor-pointer flex-col gap-1.5 rounded-md p-4",
+                                            formularioDeshabilitado &&
+                                                "cursor-not-allowed opacity-50",
+                                        )}
+                                    >
+                                        {archivoSeleccionadoValido && archivo ? (
+                                            <>
+                                                <span className="text-sm font-medium text-emerald-700">
+                                                    Archivo seleccionado
+                                                </span>
+                                                <span className="truncate text-sm font-medium text-slate-900">
+                                                    {archivo.name}
+                                                </span>
+                                                <span className="text-xs text-emerald-800">
+                                                    {(archivo.size / (1024 * 1024)).toFixed(2)} MB
+                                                </span>
+                                                <span className="text-xs font-medium text-emerald-700 underline">
+                                                    Cambiar archivo
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="text-sm font-medium text-slate-900">
+                                                    Seleccionar archivo
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    Ningún archivo seleccionado
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    Tamaño máximo: 15 MB. No se permiten archivos
+                                                    APK.
+                                                </span>
+                                            </>
+                                        )}
+                                    </label>
                                 </div>
+                            </Campo>
 
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="fecha">Fecha de publicación</Label>
-                                    <Input
-                                        id="fecha"
-                                        type="date"
-                                        value={fechaPublicacion}
-                                        onChange={(e) => setFechaPublicacion(e.target.value)}
-                                    />
-                                </div>
+                            <Campo label="Versión inicial">
+                                <Input
+                                    id="versionInicial"
+                                    value="1"
+                                    readOnly
+                                    disabled
+                                    className="bg-muted/40 text-slate-900"
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    La primera publicación se registra automáticamente como versión
+                                    1.
+                                </p>
+                            </Campo>
 
-                                <div className="space-y-1.5">
-                                    <Label>Estado</Label>
-                                    <Select value={estado} onValueChange={(v) => setEstado(v as Estado)}>
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="publicado">Publicado</SelectItem>
-                                            <SelectItem value="borrador">Borrador</SelectItem>
-                                            <SelectItem value="inactivo">Inactivo</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
+                            <Campo
+                                id="descripcionVersionInicial"
+                                label="Descripción de la versión inicial"
+                                obligatorio
+                                error={errores.descripcionVersionInicial}
+                            >
+                                <Textarea
+                                    id="descripcionVersionInicial"
+                                    rows={3}
+                                    placeholder="Indique brevemente qué contiene esta primera versión."
+                                    value={form.descripcionVersionInicial}
+                                    onChange={(e) =>
+                                        setForm((prev) => ({
+                                            ...prev,
+                                            descripcionVersionInicial: e.target.value,
+                                        }))
+                                    }
+                                    disabled={formularioDeshabilitado}
+                                />
+                            </Campo>
 
-                            <div className="flex justify-end gap-3 pt-4 border-t">
-                                <Button asChild variant="outline" type="button" disabled={subiendo}>
+                            <div className="flex justify-end gap-3 border-t pt-4">
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    type="button"
+                                    disabled={publicando}
+                                >
                                     <Link to="/app/gestion-documentos">Cancelar</Link>
                                 </Button>
-                                <Button type="submit" disabled={subiendo} className="gap-2">
-                                    {subiendo ? (
-                                        "Guardando..."
-                                    ) : (
-                                        <>
-                                            <Save className="size-4 mr-2" />
-                                            Guardar Documento
-                                        </>
-                                    )}
+                                <Button
+                                    type="submit"
+                                    disabled={publicando || formularioDeshabilitado}
+                                    className="gap-2"
+                                >
+                                    <Save className="size-4" />
+                                    {publicando ? "Publicando..." : "Publicar documento"}
                                 </Button>
                             </div>
                         </CardContent>
@@ -458,5 +931,90 @@ function NuevoDocumentoPage() {
                 </form>
             </div>
         </AppShell>
+    );
+}
+
+function Campo({
+    id,
+    label,
+    obligatorio = false,
+    error,
+    children,
+}: {
+    id?: string;
+    label: string;
+    obligatorio?: boolean;
+    error?: string;
+    children: ReactNode;
+}) {
+    return (
+        <div className="space-y-1.5">
+            <Label htmlFor={id}>
+                {label}
+                {obligatorio ? <span className="text-destructive"> *</span> : null}
+            </Label>
+            {children}
+            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        </div>
+    );
+}
+
+function BuscadorAreaAdicional({
+    areas,
+    onSeleccionar,
+    disabled = false,
+}: {
+    areas: AreaCatalogo[];
+    onSeleccionar: (areaId: string) => void;
+    disabled?: boolean;
+}) {
+    const [abierto, setAbierto] = useState(false);
+
+    return (
+        <Popover open={abierto} onOpenChange={setAbierto}>
+            <PopoverTrigger asChild>
+                <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={abierto}
+                    disabled={disabled || areas.length === 0}
+                    className={cn(
+                        "w-full justify-between font-normal !bg-white !text-slate-900",
+                        !areas.length && "text-muted-foreground",
+                    )}
+                >
+                    Buscar y seleccionar área…
+                    <ChevronDown className="ml-2 size-4 shrink-0 opacity-50" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className={POPOVER_CONTENT_CLASS}>
+                <Command className={COMMAND_CLASS}>
+                    <CommandInput placeholder="Buscar área…" className="!text-slate-900" />
+                    <CommandList>
+                        <CommandEmpty>No se encontraron áreas.</CommandEmpty>
+                        <CommandGroup>
+                            {areas.map((area) => {
+                                const { icono: Icono, color } = obtenerIconoArea(area.nombre);
+                                return (
+                                    <CommandItem
+                                        key={area.id}
+                                        value={area.nombre}
+                                        className={COMMAND_ITEM_CLASS}
+                                        onSelect={() => {
+                                            onSeleccionar(area.id);
+                                            setAbierto(false);
+                                        }}
+                                    >
+                                        <Icono className={`size-4 ${color}`} />
+                                        <span>{area.nombre}</span>
+                                    </CommandItem>
+                                );
+                            })}
+                        </CommandGroup>
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
     );
 }

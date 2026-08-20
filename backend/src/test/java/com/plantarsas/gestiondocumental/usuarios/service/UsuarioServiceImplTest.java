@@ -260,17 +260,15 @@ class UsuarioServiceImplTest {
                 1L, Set.of(10L), null
         );
         Rol rol = rolMock(RolEnum.JEFE_AREA);
-        Area area = mock(Area.class);
         when(usuarioRepository.existsByCorreoIgnoreCase("ana@empresa.com")).thenReturn(false);
         when(rolLookupService.obtenerActivoPorId(1L)).thenReturn(rol);
-        when(areaLookupService.obtenerActivaPorId(10L)).thenReturn(area);
 
         assertThatThrownBy(() -> usuarioServiceImpl.crear(request))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("área principal");
+                .hasMessage("El rol 'JEFE_AREA' requiere exactamente un área principal");
 
         verify(usuarioRepository, never()).save(any());
-        verifyNoInteractions(passwordEncoder);
+        verifyNoInteractions(passwordEncoder, areaLookupService);
     }
 
     @Test
@@ -280,17 +278,87 @@ class UsuarioServiceImplTest {
                 1L, Set.of(10L), null
         );
         Rol rol = rolMock(RolEnum.ADMINISTRATIVO);
-        Area area = mock(Area.class);
         when(usuarioRepository.existsByCorreoIgnoreCase("ana@empresa.com")).thenReturn(false);
         when(rolLookupService.obtenerActivoPorId(1L)).thenReturn(rol);
-        when(areaLookupService.obtenerActivaPorId(10L)).thenReturn(area);
 
         assertThatThrownBy(() -> usuarioServiceImpl.crear(request))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("área principal");
+                .hasMessage("El rol 'ADMINISTRATIVO' requiere exactamente un área principal");
 
         verify(usuarioRepository, never()).save(any());
-        verifyNoInteractions(passwordEncoder);
+        verifyNoInteractions(passwordEncoder, areaLookupService);
+    }
+
+    @Test
+    void crear_debeRechazarAdministrativoConMasDeUnArea() {
+        UsuarioRequest request = new UsuarioRequest(
+                "Ana", "Perez", "ana@empresa.com", "claveInicial123",
+                1L, Set.of(10L, 20L), 10L
+        );
+        Rol rol = rolMock(RolEnum.ADMINISTRATIVO);
+        when(usuarioRepository.existsByCorreoIgnoreCase("ana@empresa.com")).thenReturn(false);
+        when(rolLookupService.obtenerActivoPorId(1L)).thenReturn(rol);
+
+        assertThatThrownBy(() -> usuarioServiceImpl.crear(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("El rol 'ADMINISTRATIVO' requiere exactamente un área asignada");
+
+        verify(usuarioRepository, never()).save(any());
+        verifyNoInteractions(passwordEncoder, areaLookupService);
+    }
+
+    @Test
+    void crear_debeRechazarJefeAreaConMasDeUnArea() {
+        UsuarioRequest request = new UsuarioRequest(
+                "Ana", "Perez", "ana@empresa.com", "claveInicial123",
+                1L, Set.of(10L, 20L), 10L
+        );
+        Rol rol = rolMock(RolEnum.JEFE_AREA);
+        when(usuarioRepository.existsByCorreoIgnoreCase("ana@empresa.com")).thenReturn(false);
+        when(rolLookupService.obtenerActivoPorId(1L)).thenReturn(rol);
+
+        assertThatThrownBy(() -> usuarioServiceImpl.crear(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("El rol 'JEFE_AREA' requiere exactamente un área asignada");
+
+        verify(usuarioRepository, never()).save(any());
+        verifyNoInteractions(passwordEncoder, areaLookupService);
+    }
+
+    @Test
+    void crear_debeRechazarAdministrativoConAreaPrincipalDistintaALUnicaArea() {
+        UsuarioRequest request = new UsuarioRequest(
+                "Ana", "Perez", "ana@empresa.com", "claveInicial123",
+                1L, Set.of(10L), 20L
+        );
+        Rol rol = rolMock(RolEnum.ADMINISTRATIVO);
+        when(usuarioRepository.existsByCorreoIgnoreCase("ana@empresa.com")).thenReturn(false);
+        when(rolLookupService.obtenerActivoPorId(1L)).thenReturn(rol);
+
+        assertThatThrownBy(() -> usuarioServiceImpl.crear(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("El área principal debe estar incluida en las áreas asignadas");
+
+        verify(usuarioRepository, never()).save(any());
+        verifyNoInteractions(passwordEncoder, areaLookupService);
+    }
+
+    @Test
+    void crear_debeRechazarJefeAreaConAreaPrincipalDistintaALUnicaArea() {
+        UsuarioRequest request = new UsuarioRequest(
+                "Ana", "Perez", "ana@empresa.com", "claveInicial123",
+                1L, Set.of(10L), 20L
+        );
+        Rol rol = rolMock(RolEnum.JEFE_AREA);
+        when(usuarioRepository.existsByCorreoIgnoreCase("ana@empresa.com")).thenReturn(false);
+        when(rolLookupService.obtenerActivoPorId(1L)).thenReturn(rol);
+
+        assertThatThrownBy(() -> usuarioServiceImpl.crear(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("El área principal debe estar incluida en las áreas asignadas");
+
+        verify(usuarioRepository, never()).save(any());
+        verifyNoInteractions(passwordEncoder, areaLookupService);
     }
 
     @Test

@@ -8,6 +8,9 @@ import com.plantarsas.gestiondocumental.areas.mapper.AreaMapper;
 import com.plantarsas.gestiondocumental.areas.repository.AreaRepository;
 import com.plantarsas.gestiondocumental.exception.BusinessException;
 import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
+import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
+import com.plantarsas.gestiondocumental.security.UsuarioAreaAutorizacionService;
+import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +21,7 @@ import org.springframework.http.HttpStatus;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,13 +38,21 @@ class AreaServiceImplTest {
     @Mock
     private AreaRepository areaRepository;
 
+    @Mock
+    private UsuarioAreaAutorizacionService usuarioAreaAutorizacionService;
+
     private AreaServiceImpl areaServiceImpl;
+
+    private AuthenticatedUser administrativo() {
+        return new AuthenticatedUser(4L, "administrativo@plantarsas.com", RolEnum.ADMINISTRATIVO);
+    }
 
     @BeforeEach
     void inicializar() {
         areaServiceImpl = new AreaServiceImpl(
                 areaRepository,
-                new AreaMapper()
+                new AreaMapper(),
+                usuarioAreaAutorizacionService
         );
     }
 
@@ -137,6 +149,46 @@ class AreaServiceImplTest {
 
         verify(areaRepository).findAll();
         verifyNoMoreInteractions(areaRepository);
+    }
+
+    @Test
+    void listarParaUsuario_conAdministrador_debeRetornarTodasLasAreas() {
+        Area area1 = areaMock(1L, "ADM", "Administracion", "desc1", true);
+        when(areaRepository.findAll()).thenReturn(List.of(area1));
+        AuthenticatedUser admin = new AuthenticatedUser(1L, "admin@plantarsas.com", RolEnum.ADMINISTRADOR);
+        when(usuarioAreaAutorizacionService.esAdministrador(admin)).thenReturn(true);
+
+        List<AreaResponse> resultado = areaServiceImpl.listarParaUsuario(admin);
+
+        assertThat(resultado).hasSize(1);
+        verify(areaRepository).findAll();
+    }
+
+    @Test
+    void listarParaUsuario_conAdministrativo_debeRetornarSoloSusAreas() {
+        Area area = areaMock(10L, "ASE", "Aseo", "desc", true);
+        when(usuarioAreaAutorizacionService.esAdministrador(administrativo())).thenReturn(false);
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(administrativo())).thenReturn(Set.of(10L));
+        when(areaRepository.findByIdIn(Set.of(10L))).thenReturn(List.of(area));
+
+        List<AreaResponse> resultado = areaServiceImpl.listarParaUsuario(administrativo());
+
+        assertThat(resultado).hasSize(1);
+        assertThat(resultado.get(0).id()).isEqualTo(10L);
+        verify(areaRepository).findByIdIn(Set.of(10L));
+        verify(areaRepository, never()).findAll();
+    }
+
+    @Test
+    void listarParaUsuario_conUsuarioSinAreas_debeRetornarListaVacia() {
+        when(usuarioAreaAutorizacionService.esAdministrador(administrativo())).thenReturn(false);
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(administrativo())).thenReturn(Set.of());
+
+        List<AreaResponse> resultado = areaServiceImpl.listarParaUsuario(administrativo());
+
+        assertThat(resultado).isEmpty();
+        verify(areaRepository, never()).findAll();
+        verify(areaRepository, never()).findByIdIn(any());
     }
 
     @Test

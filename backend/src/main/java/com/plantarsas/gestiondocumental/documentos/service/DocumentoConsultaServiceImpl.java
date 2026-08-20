@@ -15,9 +15,9 @@ import com.plantarsas.gestiondocumental.documentos.repository.VersionDocumentoRe
 import com.plantarsas.gestiondocumental.documentos.specification.DocumentoSpecifications;
 import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
+import com.plantarsas.gestiondocumental.security.UsuarioAreaAutorizacionService;
 import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
 import com.plantarsas.gestiondocumental.storage.StorageService;
-import com.plantarsas.gestiondocumental.usuarios.repository.UsuarioAreaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -30,7 +30,6 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -39,7 +38,7 @@ public class DocumentoConsultaServiceImpl implements DocumentoConsultaService {
     private final DocumentoRepository documentoRepository;
     private final DocumentoAreaRepository documentoAreaRepository;
     private final VersionDocumentoRepository versionDocumentoRepository;
-    private final UsuarioAreaRepository usuarioAreaRepository;
+    private final UsuarioAreaAutorizacionService usuarioAreaAutorizacionService;
     private final DocumentoMapper documentoMapper;
     private final StorageService storageService;
 
@@ -188,8 +187,6 @@ public class DocumentoConsultaServiceImpl implements DocumentoConsultaService {
         if (usuarioAutenticado.rol() == RolEnum.ADMINISTRADOR) {
             return Set.of();
         }
-        return usuarioAreaRepository.findByUsuario_Id(usuarioAutenticado.id()).stream()
-                .map(usuarioArea -> usuarioArea.getArea().getId())
-                .collect(Collectors.toSet());
+        return usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(usuarioAutenticado);
     }
 }

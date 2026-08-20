@@ -6,11 +6,13 @@ import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaRequest;
 import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaResponse;
 import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaUpdateRequest;
 import com.plantarsas.gestiondocumental.subprogramas.service.SubprogramaService;
+import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,9 +39,11 @@ public class SubprogramaController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
-    public ApiResponse<List<SubprogramaResponse>> listar() {
-        return ApiResponse.exitosa(subprogramaService.listar());
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'JEFE_AREA', 'ADMINISTRATIVO')")
+    public ApiResponse<List<SubprogramaResponse>> listar(
+            @AuthenticationPrincipal AuthenticatedUser usuarioAutenticado
+    ) {
+        return ApiResponse.exitosa(subprogramaService.listarParaUsuario(usuarioAutenticado));
     }
 
     @GetMapping("/{id}")
@@ -67,7 +71,11 @@ public class SubprogramaController {
     }
 
     @GetMapping("/area/{areaId}/activos")
-    public ApiResponse<List<SubprogramaResponse>> listarActivosPorArea(@PathVariable Long areaId) {
-        return ApiResponse.exitosa(subprogramaService.listarActivosPorArea(areaId));
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'JEFE_AREA', 'ADMINISTRATIVO')")
+    public ApiResponse<List<SubprogramaResponse>> listarActivosPorArea(
+            @PathVariable Long areaId,
+            @AuthenticationPrincipal AuthenticatedUser usuarioAutenticado
+    ) {
+        return ApiResponse.exitosa(subprogramaService.listarActivosPorArea(areaId, usuarioAutenticado));
     }
 }

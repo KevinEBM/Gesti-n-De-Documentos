@@ -8,6 +8,8 @@ import com.plantarsas.gestiondocumental.areas.mapper.AreaMapper;
 import com.plantarsas.gestiondocumental.areas.repository.AreaRepository;
 import com.plantarsas.gestiondocumental.exception.BusinessException;
 import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
+import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
+import com.plantarsas.gestiondocumental.security.UsuarioAreaAutorizacionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ public class AreaServiceImpl implements AreaService, AreaLookupService {
 
     private final AreaRepository areaRepository;
     private final AreaMapper areaMapper;
+    private final UsuarioAreaAutorizacionService usuarioAreaAutorizacionService;
 
     @Override
     @Transactional
@@ -36,6 +39,23 @@ public class AreaServiceImpl implements AreaService, AreaLookupService {
     @Transactional(readOnly = true)
     public List<AreaResponse> listar() {
         return areaRepository.findAll().stream()
+                .map(areaMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AreaResponse> listarParaUsuario(AuthenticatedUser usuario) {
+        if (usuarioAreaAutorizacionService.esAdministrador(usuario)) {
+            return listar();
+        }
+
+        var areaIds = usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(usuario);
+        if (areaIds.isEmpty()) {
+            return List.of();
+        }
+
+        return areaRepository.findByIdIn(areaIds).stream()
                 .map(areaMapper::toResponse)
                 .toList();
     }

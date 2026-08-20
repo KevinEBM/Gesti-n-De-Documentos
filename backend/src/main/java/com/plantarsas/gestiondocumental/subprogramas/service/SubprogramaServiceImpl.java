@@ -4,6 +4,8 @@ import com.plantarsas.gestiondocumental.areas.entity.Area;
 import com.plantarsas.gestiondocumental.areas.service.AreaLookupService;
 import com.plantarsas.gestiondocumental.exception.BusinessException;
 import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
+import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
+import com.plantarsas.gestiondocumental.security.UsuarioAreaAutorizacionService;
 import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaEstadoRequest;
 import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaRequest;
 import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaResponse;
@@ -25,6 +27,7 @@ public class SubprogramaServiceImpl implements SubprogramaService, SubprogramaLo
     private final SubprogramaRepository subprogramaRepository;
     private final AreaLookupService areaLookupService;
     private final SubprogramaMapper subprogramaMapper;
+    private final UsuarioAreaAutorizacionService usuarioAreaAutorizacionService;
 
     @Override
     @Transactional
@@ -47,6 +50,23 @@ public class SubprogramaServiceImpl implements SubprogramaService, SubprogramaLo
     @Transactional(readOnly = true)
     public List<SubprogramaResponse> listar() {
         return subprogramaRepository.findAll().stream()
+                .map(subprogramaMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SubprogramaResponse> listarParaUsuario(AuthenticatedUser usuario) {
+        if (usuarioAreaAutorizacionService.esAdministrador(usuario)) {
+            return listar();
+        }
+
+        var areaIds = usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(usuario);
+        if (areaIds.isEmpty()) {
+            return List.of();
+        }
+
+        return subprogramaRepository.findByArea_IdInOrderByNombreAsc(areaIds).stream()
                 .map(subprogramaMapper::toResponse)
                 .toList();
     }
@@ -89,7 +109,8 @@ public class SubprogramaServiceImpl implements SubprogramaService, SubprogramaLo
 
     @Override
     @Transactional(readOnly = true)
-    public List<SubprogramaResponse> listarActivosPorArea(Long areaId) {
+    public List<SubprogramaResponse> listarActivosPorArea(Long areaId, AuthenticatedUser usuario) {
+        usuarioAreaAutorizacionService.validarAccesoArea(usuario, areaId);
         areaLookupService.obtenerActivaPorId(areaId);
         return subprogramaRepository.findByAreaIdAndActivoTrueOrderByNombreAsc(areaId).stream()
                 .map(subprogramaMapper::toResponse)

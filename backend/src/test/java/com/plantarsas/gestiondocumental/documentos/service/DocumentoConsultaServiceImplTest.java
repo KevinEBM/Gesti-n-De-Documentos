@@ -57,7 +57,6 @@ package com.plantarsas.gestiondocumental.documentos.service;
  * comportamiento no se alteró al extraer el helper).
  */
 
-import com.plantarsas.gestiondocumental.areas.entity.Area;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoArchivoDescarga;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoFiltroRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
@@ -72,11 +71,10 @@ import com.plantarsas.gestiondocumental.documentos.repository.DocumentoRepositor
 import com.plantarsas.gestiondocumental.documentos.repository.VersionDocumentoRepository;
 import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
+import com.plantarsas.gestiondocumental.security.UsuarioAreaAutorizacionService;
 import com.plantarsas.gestiondocumental.shared.enums.DocumentoEstado;
 import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
 import com.plantarsas.gestiondocumental.storage.StorageService;
-import com.plantarsas.gestiondocumental.usuarios.entity.UsuarioArea;
-import com.plantarsas.gestiondocumental.usuarios.repository.UsuarioAreaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -95,6 +93,7 @@ import java.io.UncheckedIOException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -123,7 +122,7 @@ class DocumentoConsultaServiceImplTest {
     private VersionDocumentoRepository versionDocumentoRepository;
 
     @Mock
-    private UsuarioAreaRepository usuarioAreaRepository;
+    private UsuarioAreaAutorizacionService usuarioAreaAutorizacionService;
 
     @Mock
     private DocumentoMapper documentoMapper;
@@ -139,7 +138,7 @@ class DocumentoConsultaServiceImplTest {
                 documentoRepository,
                 documentoAreaRepository,
                 versionDocumentoRepository,
-                usuarioAreaRepository,
+                usuarioAreaAutorizacionService,
                 documentoMapper,
                 storageService
         );
@@ -173,61 +172,56 @@ class DocumentoConsultaServiceImplTest {
 
         documentoConsultaServiceImpl.listar(administrador(), sinFiltros(), pageable);
 
-        verify(usuarioAreaRepository, never()).findByUsuario_Id(any());
+        verify(usuarioAreaAutorizacionService, never()).obtenerAreaIdsAutorizadas(any());
     }
 
     @Test
     void listar_conJefeArea_debeConsultarLasAreasRealesDelUsuarioAutenticado() {
         Pageable pageable = PageRequest.of(0, 20);
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of()));
 
         documentoConsultaServiceImpl.listar(jefeArea(), sinFiltros(), pageable);
 
-        verify(usuarioAreaRepository).findByUsuario_Id(USUARIO_ID);
+        verify(usuarioAreaAutorizacionService).obtenerAreaIdsAutorizadas(any());
     }
 
     @Test
     void listar_conAdministrativo_debeConsultarLasAreasRealesDelUsuarioAutenticado() {
         Pageable pageable = PageRequest.of(0, 20);
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of()));
 
         documentoConsultaServiceImpl.listar(administrativo(), sinFiltros(), pageable);
 
-        verify(usuarioAreaRepository).findByUsuario_Id(USUARIO_ID);
+        verify(usuarioAreaAutorizacionService).obtenerAreaIdsAutorizadas(any());
     }
 
     @Test
     void listar_conUsuarioSinAreasAsignadas_noDebeLanzarErrorYDebeConsultarIgual() {
         Pageable pageable = PageRequest.of(0, 20);
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of()));
 
         Page<DocumentoResumenResponse> resultado = documentoConsultaServiceImpl.listar(jefeArea(), sinFiltros(), pageable);
 
         assertThat(resultado.getContent()).isEmpty();
-        verify(usuarioAreaRepository).findByUsuario_Id(USUARIO_ID);
+        verify(usuarioAreaAutorizacionService).obtenerAreaIdsAutorizadas(any());
     }
 
     @Test
     void listar_debeResolverAreasDesdeAsociacionesRealesYNoDesdeElCliente() {
         Pageable pageable = PageRequest.of(0, 20);
-        Area area = mock(Area.class);
-        when(area.getId()).thenReturn(77L);
-        UsuarioArea usuarioArea = mock(UsuarioArea.class);
-        when(usuarioArea.getArea()).thenReturn(area);
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of(usuarioArea));
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(jefeArea())).thenReturn(Set.of(77L));
         when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of()));
 
         documentoConsultaServiceImpl.listar(jefeArea(), sinFiltros(), pageable);
 
-        verify(usuarioAreaRepository).findByUsuario_Id(USUARIO_ID);
-        verify(area).getId();
+        verify(usuarioAreaAutorizacionService).obtenerAreaIdsAutorizadas(jefeArea());
     }
 
     @Test
@@ -470,7 +464,7 @@ class DocumentoConsultaServiceImplTest {
 
         documentoConsultaServiceImpl.obtenerPorId(DOCUMENTO_ID, administrador());
 
-        verify(usuarioAreaRepository, never()).findByUsuario_Id(any());
+        verify(usuarioAreaAutorizacionService, never()).obtenerAreaIdsAutorizadas(any());
     }
 
     @Test
@@ -481,7 +475,7 @@ class DocumentoConsultaServiceImplTest {
         VersionDocumento version = mock(VersionDocumento.class);
         DocumentoResponse respuesta = mock(DocumentoResponse.class);
 
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
         when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID))
                 .thenReturn(Optional.of(principal));
@@ -502,7 +496,7 @@ class DocumentoConsultaServiceImplTest {
         // Misma ruta de código para ambos casos: findOne(spec) devuelve Optional.empty()
         // tanto si el id no existe como si el documento existe pero no es visible para
         // este usuario. No hay ninguna consulta anterior que permita diferenciarlos.
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> documentoConsultaServiceImpl.obtenerPorId(DOCUMENTO_ID, jefeArea()))
@@ -513,7 +507,7 @@ class DocumentoConsultaServiceImplTest {
     void obtenerPorId_sinAreaPrincipalAsignada_debeLanzarResourceNotFoundException() {
         Documento documento = mock(Documento.class);
 
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
         when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID))
                 .thenReturn(Optional.empty());
@@ -527,7 +521,7 @@ class DocumentoConsultaServiceImplTest {
         Documento documento = mock(Documento.class);
         DocumentoArea principal = mock(DocumentoArea.class);
 
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
         when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID))
                 .thenReturn(Optional.of(principal));
@@ -550,7 +544,7 @@ class DocumentoConsultaServiceImplTest {
         VersionDocumento version = mock(VersionDocumento.class);
         InputStream contenido = InputStream.nullInputStream();
 
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
         when(versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(DOCUMENTO_ID))
                 .thenReturn(Optional.of(version));
@@ -572,7 +566,7 @@ class DocumentoConsultaServiceImplTest {
 
     @Test
     void descargarVersionVigente_conDocumentoInexistenteONoVisible_debeLanzarResourceNotFoundExceptionSinConsultarStorage() {
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> documentoConsultaServiceImpl.descargarVersionVigente(DOCUMENTO_ID, jefeArea()))
@@ -585,7 +579,7 @@ class DocumentoConsultaServiceImplTest {
     void descargarVersionVigente_sinVersionVigenteRegistrada_debeLanzarIllegalStateExceptionSinConsultarStorage() {
         Documento documento = mock(Documento.class);
 
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
         when(versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(DOCUMENTO_ID))
                 .thenReturn(Optional.empty());
@@ -601,7 +595,7 @@ class DocumentoConsultaServiceImplTest {
         Documento documento = mock(Documento.class);
         VersionDocumento version = mock(VersionDocumento.class);
 
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
         when(versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(DOCUMENTO_ID))
                 .thenReturn(Optional.of(version));
@@ -634,7 +628,7 @@ class DocumentoConsultaServiceImplTest {
                 documentoConsultaServiceImpl.listarHistorico(DOCUMENTO_ID, administrador());
 
         assertThat(resultado).containsExactly(r2, r1);
-        verify(usuarioAreaRepository, never()).findByUsuario_Id(any());
+        verify(usuarioAreaAutorizacionService, never()).obtenerAreaIdsAutorizadas(any());
     }
 
     @Test
@@ -643,7 +637,7 @@ class DocumentoConsultaServiceImplTest {
         VersionDocumento version = mock(VersionDocumento.class);
         VersionHistoricaResponse respuesta = mock(VersionHistoricaResponse.class);
 
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
         when(versionDocumentoRepository.findByDocumento_IdOrderByNumeroVersionDesc(DOCUMENTO_ID))
                 .thenReturn(List.of(version));
@@ -657,7 +651,7 @@ class DocumentoConsultaServiceImplTest {
 
     @Test
     void listarHistorico_conDocumentoInexistenteONoVisible_debeLanzarResourceNotFoundExceptionSinConsultarVersiones() {
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> documentoConsultaServiceImpl.listarHistorico(DOCUMENTO_ID, jefeArea()))
@@ -700,7 +694,7 @@ class DocumentoConsultaServiceImplTest {
         VersionDocumento version = mock(VersionDocumento.class);
         InputStream contenido = InputStream.nullInputStream();
 
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
         when(versionDocumentoRepository.findByIdAndDocumento_Id(VERSION_ID, DOCUMENTO_ID))
                 .thenReturn(Optional.of(version));
@@ -722,7 +716,7 @@ class DocumentoConsultaServiceImplTest {
 
     @Test
     void descargarVersionHistorica_conDocumentoInexistenteONoVisible_debeLanzarResourceNotFoundExceptionSinConsultarVersion() {
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> documentoConsultaServiceImpl
@@ -737,7 +731,7 @@ class DocumentoConsultaServiceImplTest {
     void descargarVersionHistorica_conVersionIdInexistente_debeLanzarResourceNotFoundException() {
         Documento documento = mock(Documento.class);
 
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
         when(versionDocumentoRepository.findByIdAndDocumento_Id(VERSION_ID, DOCUMENTO_ID))
                 .thenReturn(Optional.empty());
@@ -757,7 +751,7 @@ class DocumentoConsultaServiceImplTest {
         // no existiera. Mismo 404, sin distinguir el caso.
         Documento documento = mock(Documento.class);
 
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
         when(versionDocumentoRepository.findByIdAndDocumento_Id(VERSION_ID, DOCUMENTO_ID))
                 .thenReturn(Optional.empty());
@@ -774,7 +768,7 @@ class DocumentoConsultaServiceImplTest {
         Documento documento = mock(Documento.class);
         VersionDocumento version = mock(VersionDocumento.class);
 
-        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of());
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
         when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
         when(versionDocumentoRepository.findByIdAndDocumento_Id(VERSION_ID, DOCUMENTO_ID))
                 .thenReturn(Optional.of(version));
@@ -784,5 +778,37 @@ class DocumentoConsultaServiceImplTest {
         assertThatThrownBy(() -> documentoConsultaServiceImpl
                 .descargarVersionHistorica(DOCUMENTO_ID, VERSION_ID, jefeArea()))
                 .isInstanceOf(UncheckedIOException.class);
+    }
+
+    @Test
+    void listar_conAdministrativoYManipulacionAreaIdAjena_debeSeguirResolviendoVisibilidadDesdeAreasDelUsuario() {
+        Pageable pageable = PageRequest.of(0, 20);
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(administrativo())).thenReturn(Set.of(10L));
+        when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        DocumentoFiltroRequest filtroManipulado = new DocumentoFiltroRequest(
+                null, null, 99L, null, null, null, null, null
+        );
+
+        documentoConsultaServiceImpl.listar(administrativo(), filtroManipulado, pageable);
+
+        verify(usuarioAreaAutorizacionService).obtenerAreaIdsAutorizadas(administrativo());
+    }
+
+    @Test
+    void listar_conAdministrativoYManipulacionSubprogramaIdAjeno_debeSeguirResolviendoVisibilidadDesdeAreasDelUsuario() {
+        Pageable pageable = PageRequest.of(0, 20);
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
+        when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        DocumentoFiltroRequest filtroManipulado = new DocumentoFiltroRequest(
+                null, null, null, 888L, null, null, null, null
+        );
+
+        documentoConsultaServiceImpl.listar(administrativo(), filtroManipulado, pageable);
+
+        verify(usuarioAreaAutorizacionService).obtenerAreaIdsAutorizadas(any());
     }
 }

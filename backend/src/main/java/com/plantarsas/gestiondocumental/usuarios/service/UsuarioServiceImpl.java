@@ -49,8 +49,8 @@ public class UsuarioServiceImpl implements UsuarioService {
         }
 
         Rol rol = rolLookupService.obtenerActivoPorId(request.rolId());
+        validarAsignacionAreasPorRol(rol, request.areaIds(), request.areaPrincipalId());
         List<Area> areas = validarYObtenerAreas(request.areaIds());
-        validarAreaPrincipal(rol, request.areaIds(), request.areaPrincipalId());
 
         String passwordHash = passwordEncoder.encode(request.password());
 
@@ -102,8 +102,8 @@ public class UsuarioServiceImpl implements UsuarioService {
         }
 
         Rol rol = rolLookupService.obtenerActivoPorId(request.rolId());
+        validarAsignacionAreasPorRol(rol, request.areaIds(), request.areaPrincipalId());
         List<Area> areas = validarYObtenerAreas(request.areaIds());
-        validarAreaPrincipal(rol, request.areaIds(), request.areaPrincipalId());
 
         usuario.actualizarDatos(request.nombres(), request.apellidos(), request.correo());
         usuario.cambiarRol(rol);
@@ -153,21 +153,36 @@ public class UsuarioServiceImpl implements UsuarioService {
                 .toList();
     }
 
-    private void validarAreaPrincipal(Rol rol, Set<Long> areaIds, Long areaPrincipalId) {
-        if (areaPrincipalId != null && !areaIds.contains(areaPrincipalId)) {
+    private void validarAsignacionAreasPorRol(Rol rol, Set<Long> areaIds, Long areaPrincipalId) {
+        if (requiereUnicaArea(rol)) {
+            if (areaIds == null || areaIds.size() != 1) {
+                throw new BusinessException(
+                        "El rol '" + rol.getNombre() + "' requiere exactamente un área asignada"
+                );
+            }
+            if (areaPrincipalId == null) {
+                throw new BusinessException(
+                        "El rol '" + rol.getNombre() + "' requiere exactamente un área principal"
+                );
+            }
+            if (!areaIds.contains(areaPrincipalId)) {
+                throw new BusinessException(
+                        "El área principal debe estar incluida en las áreas asignadas"
+                );
+            }
+            return;
+        }
+
+        if (areaPrincipalId != null && (areaIds == null || !areaIds.contains(areaPrincipalId))) {
             throw new BusinessException(
                     "El área principal debe estar incluida en las áreas asignadas"
             );
         }
+    }
 
-        boolean requierePrincipal = rol.getNombre() == RolEnum.JEFE_AREA
+    private boolean requiereUnicaArea(Rol rol) {
+        return rol.getNombre() == RolEnum.JEFE_AREA
                 || rol.getNombre() == RolEnum.ADMINISTRATIVO;
-
-        if (requierePrincipal && areaPrincipalId == null) {
-            throw new BusinessException(
-                    "El rol '" + rol.getNombre() + "' requiere exactamente un área principal"
-            );
-        }
     }
 
     private List<UsuarioArea> crearAsignaciones(Usuario usuario, List<Area> areas, Long areaPrincipalId) {

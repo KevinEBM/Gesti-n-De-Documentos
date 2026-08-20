@@ -4,6 +4,10 @@ import com.plantarsas.gestiondocumental.areas.entity.Area;
 import com.plantarsas.gestiondocumental.areas.service.AreaLookupService;
 import com.plantarsas.gestiondocumental.exception.BusinessException;
 import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
+import com.plantarsas.gestiondocumental.exception.UnauthorizedException;
+import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
+import com.plantarsas.gestiondocumental.security.UsuarioAreaAutorizacionService;
+import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
 import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaEstadoRequest;
 import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaRequest;
 import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaResponse;
@@ -20,10 +24,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -42,14 +49,26 @@ class SubprogramaServiceImplTest {
     @Mock
     private SubprogramaMapper subprogramaMapper;
 
+    @Mock
+    private UsuarioAreaAutorizacionService usuarioAreaAutorizacionService;
+
     private SubprogramaServiceImpl subprogramaServiceImpl;
+
+    private AuthenticatedUser administrador() {
+        return new AuthenticatedUser(1L, "admin@plantarsas.com", RolEnum.ADMINISTRADOR);
+    }
+
+    private AuthenticatedUser administrativo() {
+        return new AuthenticatedUser(4L, "administrativo@plantarsas.com", RolEnum.ADMINISTRATIVO);
+    }
 
     @BeforeEach
     void inicializar() {
         subprogramaServiceImpl = new SubprogramaServiceImpl(
                 subprogramaRepository,
                 areaLookupService,
-                subprogramaMapper
+                subprogramaMapper,
+                usuarioAreaAutorizacionService
         );
     }
 
@@ -280,20 +299,52 @@ class SubprogramaServiceImplTest {
         when(subprogramaRepository.findByAreaIdAndActivoTrueOrderByNombreAsc(areaId))
                 .thenReturn(List.of(subprograma1));
         when(subprogramaMapper.toResponse(subprograma1)).thenReturn(respuestaEsperada);
+        doNothing().when(usuarioAreaAutorizacionService).validarAccesoArea(administrador(), areaId);
 
-        List<SubprogramaResponse> resultado = subprogramaServiceImpl.listarActivosPorArea(areaId);
+        List<SubprogramaResponse> resultado = subprogramaServiceImpl.listarActivosPorArea(areaId, administrador());
 
         assertThat(resultado).containsExactly(respuestaEsperada);
         verify(subprogramaRepository).findByAreaIdAndActivoTrueOrderByNombreAsc(areaId);
+        verify(usuarioAreaAutorizacionService).validarAccesoArea(administrador(), areaId);
+    }
+
+    @Test
+    void listarActivosPorArea_debeRechazarAreaNoAutorizada() {
+        Long areaId = 99L;
+        doThrow(new UnauthorizedException("No tiene permisos para consultar el área solicitada"))
+                .when(usuarioAreaAutorizacionService).validarAccesoArea(administrativo(), areaId);
+
+        assertThatThrownBy(() -> subprogramaServiceImpl.listarActivosPorArea(areaId, administrativo()))
+                .isInstanceOf(UnauthorizedException.class);
+
+        verifyNoInteractions(subprogramaRepository);
+        verify(areaLookupService, never()).obtenerActivaPorId(any());
+    }
+
+    @Test
+    void listarParaUsuario_conAdministrativo_debeRetornarSoloSubprogramasDeSusAreas() {
+        Subprograma subprograma = mock(Subprograma.class);
+        SubprogramaResponse respuesta = respuestaDePrueba(1L);
+        when(usuarioAreaAutorizacionService.esAdministrador(administrativo())).thenReturn(false);
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(administrativo())).thenReturn(Set.of(10L));
+        when(subprogramaRepository.findByArea_IdInOrderByNombreAsc(Set.of(10L))).thenReturn(List.of(subprograma));
+        when(subprogramaMapper.toResponse(subprograma)).thenReturn(respuesta);
+
+        List<SubprogramaResponse> resultado = subprogramaServiceImpl.listarParaUsuario(administrativo());
+
+        assertThat(resultado).containsExactly(respuesta);
+        verify(subprogramaRepository).findByArea_IdInOrderByNombreAsc(Set.of(10L));
+        verify(subprogramaRepository, never()).findAll();
     }
 
     @Test
     void listarActivosPorArea_debeRechazarAreaInexistente() {
         Long areaId = 99L;
+        doNothing().when(usuarioAreaAutorizacionService).validarAccesoArea(administrador(), areaId);
         when(areaLookupService.obtenerActivaPorId(areaId))
                 .thenThrow(new ResourceNotFoundException("No existe un área con id 99"));
 
-        assertThatThrownBy(() -> subprogramaServiceImpl.listarActivosPorArea(areaId))
+        assertThatThrownBy(() -> subprogramaServiceImpl.listarActivosPorArea(areaId, administrador()))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verifyNoInteractions(subprogramaRepository);
@@ -302,10 +353,11 @@ class SubprogramaServiceImplTest {
     @Test
     void listarActivosPorArea_debeRechazarAreaInactiva() {
         Long areaId = 1L;
+        doNothing().when(usuarioAreaAutorizacionService).validarAccesoArea(administrador(), areaId);
         when(areaLookupService.obtenerActivaPorId(areaId))
                 .thenThrow(new BusinessException("El área 'Compras' está inactiva y no puede utilizarse"));
 
-        assertThatThrownBy(() -> subprogramaServiceImpl.listarActivosPorArea(areaId))
+        assertThatThrownBy(() -> subprogramaServiceImpl.listarActivosPorArea(areaId, administrador()))
                 .isInstanceOf(BusinessException.class);
 
         verifyNoInteractions(subprogramaRepository);

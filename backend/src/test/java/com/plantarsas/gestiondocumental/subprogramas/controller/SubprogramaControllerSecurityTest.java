@@ -1,12 +1,14 @@
 package com.plantarsas.gestiondocumental.subprogramas.controller;
 
 import com.plantarsas.gestiondocumental.config.SecurityConfig;
+import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 import com.plantarsas.gestiondocumental.security.JwtAccessDeniedHandler;
 import com.plantarsas.gestiondocumental.security.JwtAuthenticationEntryPoint;
 import com.plantarsas.gestiondocumental.security.JwtAuthenticationFilter;
 import com.plantarsas.gestiondocumental.security.JwtService;
 import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaResponse;
 import com.plantarsas.gestiondocumental.subprogramas.service.SubprogramaService;
+import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
 import com.plantarsas.gestiondocumental.usuarios.repository.UsuarioRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,14 +20,18 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
@@ -115,6 +121,16 @@ class SubprogramaControllerSecurityTest {
         assertThat(json.get("mensaje").asText()).isEqualTo(mensajeEsperado);
     }
 
+    private RequestPostProcessor usuarioAutenticado(RolEnum rol) {
+        AuthenticatedUser usuario = new AuthenticatedUser(4L, "usuario@plantarsas.com", rol);
+        UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(
+                usuario,
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_" + rol.name()))
+        );
+        return SecurityMockMvcRequestPostProcessors.authentication(token);
+    }
+
     @Test
     void crear_sinAutenticacion_debeResponder401() throws Exception {
         MvcResult result = mockMvc.perform(post("/api/subprogramas")
@@ -166,22 +182,36 @@ class SubprogramaControllerSecurityTest {
 
     @Test
     @WithMockUser(roles = "ADMINISTRATIVO")
-    void listar_conAdministrativo_debeResponder403() throws Exception {
-        mockMvc.perform(get("/api/subprogramas"))
-                .andExpect(status().isForbidden());
+    void listar_conAdministrativo_debeResponder200() throws Exception {
+        when(subprogramaService.listarParaUsuario(any())).thenReturn(List.of(respuestaDePrueba(1L)));
 
-        verifyNoInteractions(subprogramaService);
+        mockMvc.perform(get("/api/subprogramas").with(usuarioAutenticado(RolEnum.ADMINISTRATIVO)))
+                .andExpect(status().isOk());
+
+        verify(subprogramaService).listarParaUsuario(any());
+        verify(subprogramaService, never()).listar();
+    }
+
+    @Test
+    @WithMockUser(roles = "JEFE_AREA")
+    void listar_conJefeArea_debeResponder200() throws Exception {
+        when(subprogramaService.listarParaUsuario(any())).thenReturn(List.of(respuestaDePrueba(1L)));
+
+        mockMvc.perform(get("/api/subprogramas").with(usuarioAutenticado(RolEnum.JEFE_AREA)))
+                .andExpect(status().isOk());
+
+        verify(subprogramaService).listarParaUsuario(any());
     }
 
     @Test
     @WithMockUser(roles = "ADMINISTRADOR")
     void listar_conAdministrador_debeResponder200() throws Exception {
-        when(subprogramaService.listar()).thenReturn(List.of(respuestaDePrueba(1L)));
+        when(subprogramaService.listarParaUsuario(any())).thenReturn(List.of(respuestaDePrueba(1L)));
 
-        mockMvc.perform(get("/api/subprogramas"))
+        mockMvc.perform(get("/api/subprogramas").with(usuarioAutenticado(RolEnum.ADMINISTRADOR)))
                 .andExpect(status().isOk());
 
-        verify(subprogramaService).listar();
+        verify(subprogramaService).listarParaUsuario(any());
     }
 
     @Test
@@ -255,34 +285,34 @@ class SubprogramaControllerSecurityTest {
     @Test
     @WithMockUser(roles = "ADMINISTRADOR")
     void listarActivosPorArea_conAdministrador_debeResponder200() throws Exception {
-        when(subprogramaService.listarActivosPorArea(1L)).thenReturn(List.of(respuestaDePrueba(1L)));
+        when(subprogramaService.listarActivosPorArea(eq(1L), any())).thenReturn(List.of(respuestaDePrueba(1L)));
 
-        mockMvc.perform(get("/api/subprogramas/area/1/activos"))
+        mockMvc.perform(get("/api/subprogramas/area/1/activos").with(usuarioAutenticado(RolEnum.ADMINISTRADOR)))
                 .andExpect(status().isOk());
 
-        verify(subprogramaService).listarActivosPorArea(1L);
+        verify(subprogramaService).listarActivosPorArea(eq(1L), any());
     }
 
     @Test
     @WithMockUser(roles = "JEFE_AREA")
     void listarActivosPorArea_conJefeArea_debeResponder200() throws Exception {
-        when(subprogramaService.listarActivosPorArea(1L)).thenReturn(List.of(respuestaDePrueba(1L)));
+        when(subprogramaService.listarActivosPorArea(eq(1L), any())).thenReturn(List.of(respuestaDePrueba(1L)));
 
-        mockMvc.perform(get("/api/subprogramas/area/1/activos"))
+        mockMvc.perform(get("/api/subprogramas/area/1/activos").with(usuarioAutenticado(RolEnum.JEFE_AREA)))
                 .andExpect(status().isOk());
 
-        verify(subprogramaService).listarActivosPorArea(1L);
+        verify(subprogramaService).listarActivosPorArea(eq(1L), any());
     }
 
     @Test
     @WithMockUser(roles = "ADMINISTRATIVO")
     void listarActivosPorArea_conAdministrativo_debeResponder200() throws Exception {
-        when(subprogramaService.listarActivosPorArea(1L)).thenReturn(List.of(respuestaDePrueba(1L)));
+        when(subprogramaService.listarActivosPorArea(eq(1L), any())).thenReturn(List.of(respuestaDePrueba(1L)));
 
-        mockMvc.perform(get("/api/subprogramas/area/1/activos"))
+        mockMvc.perform(get("/api/subprogramas/area/1/activos").with(usuarioAutenticado(RolEnum.ADMINISTRATIVO)))
                 .andExpect(status().isOk());
 
-        verify(subprogramaService).listarActivosPorArea(1L);
+        verify(subprogramaService).listarActivosPorArea(eq(1L), any());
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaEstadoReques
 import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaRequest;
 import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaResponse;
 import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaUpdateRequest;
+import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 
 import java.util.List;
 
@@ -13,11 +14,13 @@ public interface SubprogramaService {
 
     List<SubprogramaResponse> listar();
 
+    List<SubprogramaResponse> listarParaUsuario(AuthenticatedUser usuario);
+
     SubprogramaResponse obtenerPorId(Long id);
 
     SubprogramaResponse actualizar(Long id, SubprogramaUpdateRequest request);
 
     SubprogramaResponse cambiarEstado(Long id, SubprogramaEstadoRequest request);
 
-    List<SubprogramaResponse> listarActivosPorArea(Long areaId);
+    List<SubprogramaResponse> listarActivosPorArea(Long areaId, AuthenticatedUser usuario);
 }
