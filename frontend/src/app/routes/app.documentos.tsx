@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { LayoutGrid, List, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { toast } from "sonner";
@@ -69,6 +69,7 @@ function opcionesFiltrosApi(esAdmin: boolean) {
 }
 
 function Biblioteca() {
+    const navigate = useNavigate();
     const { sesion } = useIntranet();
     const esAdmin = sesion?.rol === "administrador";
 
@@ -283,6 +284,13 @@ function Biblioteca() {
         }
     }, []);
 
+    const verDocumento = useCallback(
+        (documento: DocumentoResumen) => {
+            navigate({ to: "/app/documento/$id", params: { id: documento.id } });
+        },
+        [navigate],
+    );
+
     const opcionesEstado = esAdmin
         ? [
               { v: "PUBLICADO", l: "Publicado" },
@@ -392,6 +400,7 @@ function Biblioteca() {
                                                 documento={documento}
                                                 descargandoId={descargandoId}
                                                 onDescargar={descargarDocumento}
+                                                onVer={verDocumento}
                                             />
                                         </TableCell>
                                     </TableRow>
@@ -448,6 +457,7 @@ function Biblioteca() {
                                     documento={documento}
                                     descargandoId={descargandoId}
                                     onDescargar={descargarDocumento}
+                                    onVer={verDocumento}
                                     apilado
                                 />
                             </CardContent>

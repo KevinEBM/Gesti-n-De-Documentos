@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Search, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -67,6 +67,7 @@ const OPCIONES_ESTADO = [
 ];
 
 function GestionDocumentos() {
+    const navigate = useNavigate();
     const { permisos } = useIntranet();
 
     const [areasCatalogo, setAreasCatalogo] = useState<AreaCatalogo[]>([]);
@@ -245,6 +246,13 @@ function GestionDocumentos() {
         }
     }, []);
 
+    const verDocumento = useCallback(
+        (documento: DocumentoResumen) => {
+            navigate({ to: "/app/documento/$id", params: { id: documento.id } });
+        },
+        [navigate],
+    );
+
     if (!permisos.actualizarDocumentos) {
         return (
             <AppShell titulo="Gestión de documentos">
@@ -357,7 +365,7 @@ function GestionDocumentos() {
                                             documento={documento}
                                             descargandoId={descargandoId}
                                             onDescargar={descargarDocumento}
-                                            tituloVer="Disponible al integrar detalle"
+                                            onVer={verDocumento}
                                         />
                                     </TableCell>
                                 </TableRow>

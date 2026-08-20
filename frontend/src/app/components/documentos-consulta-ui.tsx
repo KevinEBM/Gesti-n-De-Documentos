@@ -38,18 +38,21 @@ export function DocumentoAcciones({
     documento,
     descargandoId,
     onDescargar,
+    onVer,
     apilado = false,
-    verDeshabilitado = true,
-    tituloVer = "El detalle estará disponible próximamente.",
+    verDeshabilitado = false,
+    tituloVer,
 }: {
     documento: DocumentoResumen;
     descargandoId: string | null;
     onDescargar: (documento: DocumentoResumen) => void;
+    onVer?: (documento: DocumentoResumen) => void;
     apilado?: boolean;
     verDeshabilitado?: boolean;
     tituloVer?: string;
 }) {
     const descargando = descargandoId === documento.id;
+    const verInhabilitado = verDeshabilitado || !onVer;
 
     return (
         <div
@@ -61,9 +64,10 @@ export function DocumentoAcciones({
             <Button
                 size="sm"
                 variant="outline"
-                disabled={verDeshabilitado}
+                disabled={verInhabilitado}
                 title={tituloVer}
                 className="gap-1.5"
+                onClick={() => onVer?.(documento)}
             >
                 <Eye className="size-4" />
                 Ver
