@@ -428,6 +428,31 @@ function EditarDocumentoPage() {
         );
     }
 
+    if (documento.estado === "OBSOLETO") {
+        return (
+            <AppShell titulo="Editar publicación">
+                <Button asChild variant="ghost" size="sm" className="-ml-2 mb-4 gap-1.5">
+                    <Link to="/app/documento/$id" params={{ id }}>
+                        <ArrowLeft className="size-4" /> Volver al detalle
+                    </Link>
+                </Button>
+                <Card>
+                    <CardContent className="py-8 text-center">
+                        <p className="text-sm font-medium text-amber-800">
+                            Este documento está obsoleto y no puede editarse.
+                        </p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                            Actívalo nuevamente desde Gestión de documentos para poder modificarlo.
+                        </p>
+                        <Button asChild variant="outline" className="mt-4">
+                            <Link to="/app/gestion-documentos">Ir a Gestión de documentos</Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+            </AppShell>
+        );
+    }
+
     return (
         <AppShell
             titulo="Editar publicación"

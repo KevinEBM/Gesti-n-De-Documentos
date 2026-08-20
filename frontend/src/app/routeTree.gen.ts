@@ -21,6 +21,7 @@ import { Route as AppGestionDocumentosRouteImport } from './routes/app.gestion-d
 import { Route as AppDocumentosRouteImport } from './routes/app.documentos'
 import { Route as AppDocumentoIdRouteImport } from './routes/app.documento.$id'
 import { Route as AppDocumentoIdEditarRouteImport } from './routes/app.documento.$id.editar'
+import { Route as AppDocumentoIdActualizarRouteImport } from './routes/app.documento.$id.actualizar'
 import { Route as AppCambiarContrasenaRouteImport } from './routes/app.cambiar-contrasena'
 
 
@@ -84,6 +85,11 @@ const AppDocumentoIdEditarRoute = AppDocumentoIdEditarRouteImport.update({
     path: '/documento/$id/editar',
     getParentRoute: () => AppRoute,
 } as any)
+const AppDocumentoIdActualizarRoute = AppDocumentoIdActualizarRouteImport.update({
+    id: '/documento/$id/actualizar',
+    path: '/documento/$id/actualizar',
+    getParentRoute: () => AppRoute,
+} as any)
 const AppCambiarContrasenaRoute = AppCambiarContrasenaRouteImport.update({
     id: '/cambiar-contrasena',
     path: '/cambiar-contrasena',
@@ -104,6 +110,7 @@ export interface FileRoutesByFullPath {
     '/app/cambiar-contrasena': typeof AppCambiarContrasenaRoute
     '/app/documento/$id': typeof AppDocumentoIdRoute
     '/app/documento/$id/editar': typeof AppDocumentoIdEditarRoute
+    '/app/documento/$id/actualizar': typeof AppDocumentoIdActualizarRoute
 }
 export interface FileRoutesByTo {
     '/': typeof IndexRoute
@@ -119,6 +126,7 @@ export interface FileRoutesByTo {
     '/app/cambiar-contrasena': typeof AppCambiarContrasenaRoute
     '/app/documento/$id': typeof AppDocumentoIdRoute
     '/app/documento/$id/editar': typeof AppDocumentoIdEditarRoute
+    '/app/documento/$id/actualizar': typeof AppDocumentoIdActualizarRoute
 }
 export interface FileRoutesById {
     __root__: typeof rootRouteImport
@@ -135,6 +143,7 @@ export interface FileRoutesById {
     '/app/cambiar-contrasena': typeof AppCambiarContrasenaRoute
     '/app/documento/$id': typeof AppDocumentoIdRoute
     '/app/documento/$id/editar': typeof AppDocumentoIdEditarRoute
+    '/app/documento/$id/actualizar': typeof AppDocumentoIdActualizarRoute
 }
 export interface FileRouteTypes {
     fileRoutesByFullPath: FileRoutesByFullPath
@@ -167,6 +176,7 @@ export interface FileRouteTypes {
         | '/app/cambiar-contrasena'
         | '/app/documento/$id'
         | '/app/documento/$id/editar'
+        | '/app/documento/$id/actualizar'
     id:
         | '__root__'
         | '/'
@@ -182,6 +192,7 @@ export interface FileRouteTypes {
         | '/app/cambiar-contrasena'
         | '/app/documento/$id'
         | '/app/documento/$id/editar'
+        | '/app/documento/$id/actualizar'
     fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -282,6 +293,13 @@ declare module '@tanstack/react-router' {
             preLoaderRoute: typeof AppDocumentoIdEditarRouteImport
             parentRoute: typeof AppRoute
         }
+        '/app/documento/$id/actualizar': {
+            id: '/app/documento/$id/actualizar'
+            path: '/documento/$id/actualizar'
+            fullPath: '/app/documento/$id/actualizar'
+            preLoaderRoute: typeof AppDocumentoIdActualizarRouteImport
+            parentRoute: typeof AppRoute
+        }
     }
 }
 
@@ -297,6 +315,7 @@ interface AppRouteChildren {
     AppCambiarContrasenaRoute: typeof AppCambiarContrasenaRoute
     AppDocumentoIdRoute: typeof AppDocumentoIdRoute
     AppDocumentoIdEditarRoute: typeof AppDocumentoIdEditarRoute
+    AppDocumentoIdActualizarRoute: typeof AppDocumentoIdActualizarRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -311,6 +330,7 @@ const AppRouteChildren: AppRouteChildren = {
     AppCambiarContrasenaRoute: AppCambiarContrasenaRoute,
     AppDocumentoIdRoute: AppDocumentoIdRoute,
     AppDocumentoIdEditarRoute: AppDocumentoIdEditarRoute,
+    AppDocumentoIdActualizarRoute: AppDocumentoIdActualizarRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

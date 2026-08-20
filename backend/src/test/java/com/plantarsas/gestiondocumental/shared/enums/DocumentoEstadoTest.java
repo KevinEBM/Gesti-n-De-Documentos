@@ -37,4 +37,15 @@ class DocumentoEstadoTest {
     void permitePublicarNuevaVersion_debeRechazarObsoleto() {
         assertThat(DocumentoEstado.OBSOLETO.permitePublicarNuevaVersion()).isFalse();
     }
+
+    @Test
+    void permiteEditarPublicacion_debePermitirPublicadoEInactivo() {
+        assertThat(DocumentoEstado.PUBLICADO.permiteEditarPublicacion()).isTrue();
+        assertThat(DocumentoEstado.INACTIVO.permiteEditarPublicacion()).isTrue();
+    }
+
+    @Test
+    void permiteEditarPublicacion_debeRechazarObsoleto() {
+        assertThat(DocumentoEstado.OBSOLETO.permiteEditarPublicacion()).isFalse();
+    }
 }

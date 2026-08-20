@@ -1201,6 +1201,20 @@ class DocumentoControllerSecurityTest {
         verify(documentoService).actualizarMetadatos(eq(DOCUMENTO_ID), any(), any());
     }
 
+    @Test
+    void actualizarMetadatos_conDocumentoObsoleto_debeResponder400() throws Exception {
+        when(documentoService.actualizarMetadatos(eq(DOCUMENTO_ID), any(), any()))
+                .thenThrow(new BusinessException(
+                        "No se puede editar una publicación obsoleta. Actívala nuevamente para modificarla."
+                ));
+
+        mockMvc.perform(put(URL_ACTUALIZACION)
+                        .contentType("application/json")
+                        .content(METADATA_ACTUALIZACION_VALIDA_JSON)
+                        .with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+    }
+
     // ------------------------------------------------------------------
     // PATCH /api/documentos/{id}/estado (E1)
     // ------------------------------------------------------------------

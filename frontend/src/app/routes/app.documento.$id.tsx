@@ -1,5 +1,5 @@
 import { Link, createFileRoute, useParams } from "@tanstack/react-router";
-import { ArrowLeft, Download, FileText, Pencil } from "lucide-react";
+import { ArrowLeft, Download, FileText, Pencil, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -225,15 +225,7 @@ function DetalleDocumento() {
                     <CardHeader>
                         <CardTitle className="text-base">Acciones</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        {permisos.actualizarDocumentos ? (
-                            <Button asChild variant="outline" className="mb-2 w-full justify-between">
-                                <Link to="/app/documento/$id/editar" params={{ id }}>
-                                    Editar publicación
-                                    <Pencil className="size-4" />
-                                </Link>
-                            </Button>
-                        ) : null}
+                    <CardContent className="space-y-2">
                         <Button
                             variant="outline"
                             className="w-full justify-between"
@@ -243,6 +235,22 @@ function DetalleDocumento() {
                             {descargando ? "Descargando..." : "Descargar"}
                             <Download className="size-4" />
                         </Button>
+                        {permisos.actualizarDocumentos && documento.estado !== "OBSOLETO" ? (
+                            <Button asChild variant="outline" className="w-full justify-between">
+                                <Link to="/app/documento/$id/editar" params={{ id }}>
+                                    Editar publicación
+                                    <Pencil className="size-4" />
+                                </Link>
+                            </Button>
+                        ) : null}
+                        {permisos.actualizarDocumentos && documento.estado !== "OBSOLETO" ? (
+                            <Button asChild variant="outline" className="w-full justify-between">
+                                <Link to="/app/documento/$id/actualizar" params={{ id }}>
+                                    Actualizar documento
+                                    <Upload className="size-4" />
+                                </Link>
+                            </Button>
+                        ) : null}
                     </CardContent>
                 </Card>
             </div>

@@ -41,6 +41,10 @@ export interface DocumentoEstadoActualizacionRequestDto {
     estado: DocumentoEstado;
 }
 
+export interface NuevaVersionDocumentoRequestDto {
+    descripcionCambio: string;
+}
+
 export interface DocumentoResumenResponseDto {
     id: number;
     codigo: string;
@@ -302,6 +306,26 @@ export async function publicarDocumentoInicial(
     formData.append("archivo", archivo);
 
     const dto = await apiFetch<DocumentoResponseDto>("/api/documentos", {
+        method: "POST",
+        body: formData,
+    });
+    return mapDocumentoResponseDto(dto);
+}
+
+export async function publicarNuevaVersion(
+    id: string,
+    descripcionCambio: string,
+    archivo: File,
+): Promise<DocumentoDetalle> {
+    const metadata: NuevaVersionDocumentoRequestDto = { descripcionCambio };
+    const formData = new FormData();
+    formData.append(
+        "metadata",
+        new Blob([JSON.stringify(metadata)], { type: "application/json" }),
+    );
+    formData.append("archivo", archivo);
+
+    const dto = await apiFetch<DocumentoResponseDto>(`/api/documentos/${id}/versiones`, {
         method: "POST",
         body: formData,
     });

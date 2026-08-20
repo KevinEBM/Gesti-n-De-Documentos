@@ -20,6 +20,10 @@ public enum DocumentoEstado {
     }
 
     public boolean permitePublicarNuevaVersion() {
+        return permiteEditarPublicacion();
+    }
+
+    public boolean permiteEditarPublicacion() {
         return this != OBSOLETO;
     }
 }

@@ -1,4 +1,4 @@
-import { Download, Eye, Pencil } from "lucide-react";
+import { Download, Eye, Pencil, Upload } from "lucide-react";
 import type { ComponentType } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +41,7 @@ export function DocumentoAcciones({
     onDescargar,
     onVer,
     onEditar,
+    onActualizar,
     apilado = false,
     verDeshabilitado = false,
     tituloVer,
@@ -50,12 +51,16 @@ export function DocumentoAcciones({
     onDescargar: (documento: DocumentoResumen) => void;
     onVer?: (documento: DocumentoResumen) => void;
     onEditar?: (documento: DocumentoResumen) => void;
+    onActualizar?: (documento: DocumentoResumen) => void;
     apilado?: boolean;
     verDeshabilitado?: boolean;
     tituloVer?: string;
 }) {
     const descargando = descargandoId === documento.id;
     const verInhabilitado = verDeshabilitado || !onVer;
+    const contenidoEditable = documento.estado !== "OBSOLETO";
+    const puedeEditar = onEditar && contenidoEditable;
+    const puedeActualizar = onActualizar && contenidoEditable;
 
     return (
         <div
@@ -64,7 +69,7 @@ export function DocumentoAcciones({
                 apilado ? "flex-col sm:flex-row" : "flex-wrap items-center justify-end",
             )}
         >
-            {onEditar ? (
+            {puedeEditar ? (
                 <Button
                     size="sm"
                     variant="outline"
@@ -73,6 +78,17 @@ export function DocumentoAcciones({
                 >
                     <Pencil className="size-4" />
                     Editar publicación
+                </Button>
+            ) : null}
+            {puedeActualizar ? (
+                <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={() => onActualizar(documento)}
+                >
+                    <Upload className="size-4" />
+                    Actualizar documento
                 </Button>
             ) : null}
             <Button

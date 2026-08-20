@@ -317,6 +317,13 @@ function GestionDocumentos() {
         [navigate],
     );
 
+    const actualizarDocumento = useCallback(
+        (documento: DocumentoResumen) => {
+            navigate({ to: "/app/documento/$id/actualizar", params: { id: documento.id } });
+        },
+        [navigate],
+    );
+
     const aplicarCambioEstado = useCallback(
         async (documento: DocumentoResumen, destino: DocumentoEstado) => {
             setAlternandoEstadoId(documento.id);
@@ -489,6 +496,7 @@ function GestionDocumentos() {
                                             onDescargar={descargarDocumento}
                                             onVer={verDocumento}
                                             onEditar={editarDocumento}
+                                            onActualizar={actualizarDocumento}
                                         />
                                     </TableCell>
                                 </TableRow>

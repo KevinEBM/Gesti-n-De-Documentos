@@ -279,6 +279,12 @@ public class DocumentoServiceImpl implements DocumentoService {
                         "No existe un documento con id " + documentoId
                 ));
 
+        if (!documento.getEstado().permiteEditarPublicacion()) {
+            throw new BusinessException(
+                    "No se puede editar una publicación obsoleta. Actívala nuevamente para modificarla."
+            );
+        }
+
         String codigoNormalizado = request.codigo().trim();
         validarCodigoDocumentoUnico(codigoNormalizado, documentoId);
 

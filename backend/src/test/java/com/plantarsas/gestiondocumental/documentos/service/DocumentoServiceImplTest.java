@@ -1697,6 +1697,47 @@ class DocumentoServiceImplTest {
     }
 
     @Test
+    void actualizarMetadatos_conDocumentoObsoleto_debeRechazar() {
+        Documento documento = documentoPersistidoDePrueba();
+        documento.cambiarEstado(DocumentoEstado.OBSOLETO);
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+
+        assertThatThrownBy(() -> documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID, requestActualizacionValido(), usuarioAdministrador()
+        ))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(
+                        "No se puede editar una publicación obsoleta. Actívala nuevamente para modificarla."
+                );
+
+        verify(documentoRepository, never()).save(any(Documento.class));
+        verify(documentoAreaRepository, never()).deleteAllByDocumento_IdAndEsPrincipalFalse(anyLong());
+        verify(versionDocumentoRepository, never()).save(any(VersionDocumento.class));
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void actualizarMetadatos_conDocumentoInactivo_debePermitir() {
+        Documento documento = documentoPersistidoDePrueba();
+        documento.cambiarEstado(DocumentoEstado.INACTIVO);
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        stubActualizacionMetadatosExitosa(documento, area, subprograma, tipoDocumento, principal);
+
+        documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID, requestActualizacionValido(), usuarioAdministrador()
+        );
+
+        assertThat(documento.getTitulo()).isEqualTo("Título actualizado");
+        assertThat(documento.getEstado()).isEqualTo(DocumentoEstado.INACTIVO);
+        verify(documentoRepository).save(documento);
+        verify(versionDocumentoRepository, never()).save(any(VersionDocumento.class));
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
     void actualizarMetadatos_debeLanzarBusinessExceptionSiSubprogramaNoPerteneceAlArea() {
         Documento documento = documentoPersistidoDePrueba();
         Area area = areaActivaMock();
