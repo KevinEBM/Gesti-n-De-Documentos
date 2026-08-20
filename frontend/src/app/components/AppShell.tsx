@@ -5,6 +5,7 @@ import {
     FileStack,
     Files,
     Home,
+    KeyRound,
     LayoutGrid,
     LogOut,
     Menu,
@@ -121,6 +122,16 @@ export function AppShell({
                         </div>
                     )}
                 </nav>
+
+                <div className="mt-auto border-t border-sidebar-border px-3 py-4">
+                    <NavItem
+                        to="/app/cambiar-contrasena"
+                        label="Cambiar contraseña"
+                        icon={KeyRound}
+                        pathname={pathname}
+                        onClick={() => setAbierto(false)}
+                    />
+                </div>
             </aside>
 
             <div className="flex min-w-0 flex-1 flex-col lg:ml-72">

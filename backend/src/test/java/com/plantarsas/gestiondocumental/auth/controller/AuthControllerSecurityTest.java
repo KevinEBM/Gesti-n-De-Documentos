@@ -85,13 +85,16 @@ class AuthControllerSecurityTest {
     private static final Long USUARIO_ID = 7L;
 
     private static final String REQUEST_VALIDO_JSON =
-            "{\"contrasenaActual\":\"actual123\",\"nuevaContrasena\":\"nueva12345\"}";
+            "{\"contrasenaActual\":\"actual123\",\"nuevaContrasena\":\"nueva12345\",\"confirmacionContrasena\":\"nueva12345\"}";
 
     private static final String REQUEST_CONTRASENA_ACTUAL_VACIA_JSON =
-            "{\"contrasenaActual\":\"\",\"nuevaContrasena\":\"nueva12345\"}";
+            "{\"contrasenaActual\":\"\",\"nuevaContrasena\":\"nueva12345\",\"confirmacionContrasena\":\"nueva12345\"}";
 
     private static final String REQUEST_NUEVA_CONTRASENA_CORTA_JSON =
-            "{\"contrasenaActual\":\"actual123\",\"nuevaContrasena\":\"corta\"}";
+            "{\"contrasenaActual\":\"actual123\",\"nuevaContrasena\":\"corta\",\"confirmacionContrasena\":\"corta\"}";
+
+    private static final String REQUEST_CONFIRMACION_DISTINTA_JSON =
+            "{\"contrasenaActual\":\"actual123\",\"nuevaContrasena\":\"nueva12345\",\"confirmacionContrasena\":\"otra12345\"}";
 
     @MockitoBean
     private AuthService authService;
@@ -220,8 +223,19 @@ class AuthControllerSecurityTest {
     }
 
     @Test
+    void cambiarContrasena_conConfirmacionDistinta_debeResponder400() throws Exception {
+        mockMvc.perform(put(URL_CAMBIAR_CONTRASENA)
+                        .contentType("application/json")
+                        .content(REQUEST_CONFIRMACION_DISTINTA_JSON)
+                        .with(usuarioAutenticado(RolEnum.ADMINISTRADOR)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(usuarioService);
+    }
+
+    @Test
     void cambiarContrasena_conContrasenaActualIncorrectaSegunElServicio_debeResponder400() throws Exception {
-        doThrow(new BusinessException("La contraseña actual no es correcta"))
+        doThrow(new BusinessException("La contraseña actual es incorrecta."))
                 .when(usuarioService).cambiarContrasena(eq(USUARIO_ID), anyString(), anyString());
 
         mockMvc.perform(put(URL_CAMBIAR_CONTRASENA)

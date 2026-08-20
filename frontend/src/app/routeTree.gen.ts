@@ -21,6 +21,7 @@ import { Route as AppGestionDocumentosRouteImport } from './routes/app.gestion-d
 import { Route as AppDocumentosRouteImport } from './routes/app.documentos'
 import { Route as AppDocumentoIdRouteImport } from './routes/app.documento.$id'
 import { Route as AppDocumentoIdEditarRouteImport } from './routes/app.documento.$id.editar'
+import { Route as AppCambiarContrasenaRouteImport } from './routes/app.cambiar-contrasena'
 
 
 const AppRoute = AppRouteImport.update({
@@ -83,6 +84,11 @@ const AppDocumentoIdEditarRoute = AppDocumentoIdEditarRouteImport.update({
     path: '/documento/$id/editar',
     getParentRoute: () => AppRoute,
 } as any)
+const AppCambiarContrasenaRoute = AppCambiarContrasenaRouteImport.update({
+    id: '/cambiar-contrasena',
+    path: '/cambiar-contrasena',
+    getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
     '/': typeof IndexRoute
@@ -95,6 +101,7 @@ export interface FileRoutesByFullPath {
     '/app/parametrizacion': typeof AppParametrizacionRoute
     '/app/publicar': typeof AppPublicarRoute
     '/app/usuarios': typeof AppUsuariosRoute
+    '/app/cambiar-contrasena': typeof AppCambiarContrasenaRoute
     '/app/documento/$id': typeof AppDocumentoIdRoute
     '/app/documento/$id/editar': typeof AppDocumentoIdEditarRoute
 }
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
     '/app/parametrizacion': typeof AppParametrizacionRoute
     '/app/publicar': typeof AppPublicarRoute
     '/app/usuarios': typeof AppUsuariosRoute
+    '/app/cambiar-contrasena': typeof AppCambiarContrasenaRoute
     '/app/documento/$id': typeof AppDocumentoIdRoute
     '/app/documento/$id/editar': typeof AppDocumentoIdEditarRoute
 }
@@ -124,6 +132,7 @@ export interface FileRoutesById {
     '/app/parametrizacion': typeof AppParametrizacionRoute
     '/app/publicar': typeof AppPublicarRoute
     '/app/usuarios': typeof AppUsuariosRoute
+    '/app/cambiar-contrasena': typeof AppCambiarContrasenaRoute
     '/app/documento/$id': typeof AppDocumentoIdRoute
     '/app/documento/$id/editar': typeof AppDocumentoIdEditarRoute
 }
@@ -140,6 +149,7 @@ export interface FileRouteTypes {
         | '/app/parametrizacion'
         | '/app/publicar'
         | '/app/usuarios'
+        | '/app/cambiar-contrasena'
         | '/app/documento/$id'
         | '/app/documento/$id/editar'
     fileRoutesByTo: FileRoutesByTo
@@ -154,6 +164,7 @@ export interface FileRouteTypes {
         | '/app/parametrizacion'
         | '/app/publicar'
         | '/app/usuarios'
+        | '/app/cambiar-contrasena'
         | '/app/documento/$id'
         | '/app/documento/$id/editar'
     id:
@@ -168,6 +179,7 @@ export interface FileRouteTypes {
         | '/app/parametrizacion'
         | '/app/publicar'
         | '/app/usuarios'
+        | '/app/cambiar-contrasena'
         | '/app/documento/$id'
         | '/app/documento/$id/editar'
     fileRoutesById: FileRoutesById
@@ -249,6 +261,13 @@ declare module '@tanstack/react-router' {
             preLoaderRoute: typeof AppDocumentosRouteImport
             parentRoute: typeof AppRoute
         }
+        '/app/cambiar-contrasena': {
+            id: '/app/cambiar-contrasena'
+            path: '/cambiar-contrasena'
+            fullPath: '/app/cambiar-contrasena'
+            preLoaderRoute: typeof AppCambiarContrasenaRouteImport
+            parentRoute: typeof AppRoute
+        }
         '/app/documento/$id': {
             id: '/app/documento/$id'
             path: '/documento/$id'
@@ -275,6 +294,7 @@ interface AppRouteChildren {
     AppParametrizacionRoute: typeof AppParametrizacionRoute
     AppPublicarRoute: typeof AppPublicarRoute
     AppUsuariosRoute: typeof AppUsuariosRoute
+    AppCambiarContrasenaRoute: typeof AppCambiarContrasenaRoute
     AppDocumentoIdRoute: typeof AppDocumentoIdRoute
     AppDocumentoIdEditarRoute: typeof AppDocumentoIdEditarRoute
 }
@@ -288,6 +308,7 @@ const AppRouteChildren: AppRouteChildren = {
     AppParametrizacionRoute: AppParametrizacionRoute,
     AppPublicarRoute: AppPublicarRoute,
     AppUsuariosRoute: AppUsuariosRoute,
+    AppCambiarContrasenaRoute: AppCambiarContrasenaRoute,
     AppDocumentoIdRoute: AppDocumentoIdRoute,
     AppDocumentoIdEditarRoute: AppDocumentoIdEditarRoute,
 }

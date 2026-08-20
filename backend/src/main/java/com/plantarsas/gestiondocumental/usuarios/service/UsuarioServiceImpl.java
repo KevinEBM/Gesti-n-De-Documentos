@@ -130,7 +130,7 @@ public class UsuarioServiceImpl implements UsuarioService {
         Usuario usuario = obtenerEntidadPorId(usuarioId);
 
         if (!usuario.coincideConPassword(contrasenaActual, passwordEncoder)) {
-            throw new BusinessException("La contraseña actual no es correcta");
+            throw new BusinessException("La contraseña actual es incorrecta.");
         }
 
         if (usuario.coincideConPassword(nuevaContrasena, passwordEncoder)) {

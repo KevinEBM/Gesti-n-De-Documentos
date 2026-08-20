@@ -518,7 +518,7 @@ class UsuarioServiceImplTest {
 
         assertThatThrownBy(() -> usuarioServiceImpl.cambiarContrasena(id, "actualEquivocada", "nueva12345"))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("La contraseña actual no es correcta");
+                .hasMessage("La contraseña actual es incorrecta.");
 
         verify(usuario, never()).actualizarPassword(anyString());
         verifyNoInteractions(passwordEncoder);
