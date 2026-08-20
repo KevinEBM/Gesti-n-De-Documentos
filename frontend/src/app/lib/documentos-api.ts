@@ -415,7 +415,7 @@ async function lanzarApiErrorDesdeRespuesta(response: Response): Promise<never> 
     }
 }
 
-export async function descargarVersionVigente(id: string): Promise<DocumentoDescarga> {
+async function descargarArchivoDocumento(path: string): Promise<DocumentoDescarga> {
     const headers = new Headers();
     const token = getToken();
 
@@ -423,7 +423,7 @@ export async function descargarVersionVigente(id: string): Promise<DocumentoDesc
         headers.set("Authorization", `Bearer ${token}`);
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/documentos/${id}/descarga`, {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
         headers,
     });
 
@@ -440,4 +440,17 @@ export async function descargarVersionVigente(id: string): Promise<DocumentoDesc
         nombreArchivo: extraerNombreArchivo(contentDisposition),
         tipoMime: tipoMime?.split(";")[0]?.trim() ?? null,
     };
+}
+
+export async function descargarVersionVigente(id: string): Promise<DocumentoDescarga> {
+    return descargarArchivoDocumento(`/api/documentos/${id}/descarga`);
+}
+
+export async function descargarVersionHistorica(
+    documentoId: string,
+    versionId: string,
+): Promise<DocumentoDescarga> {
+    return descargarArchivoDocumento(
+        `/api/documentos/${documentoId}/versiones/${versionId}/descarga`,
+    );
 }

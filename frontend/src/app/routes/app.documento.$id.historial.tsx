@@ -1,6 +1,7 @@
 import { Link, createFileRoute, useParams } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import { DocumentoEstadoBadge } from "@/components/documentos-consulta-ui";
 import { AppShell } from "@/components/AppShell";
@@ -9,8 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ApiError } from "@/lib/api";
-import { formatFechaDocumento } from "@/lib/documentos-consulta-shared";
 import {
+    dispararDescargaEnNavegador,
+    formatFechaDocumento,
+} from "@/lib/documentos-consulta-shared";
+import {
+    descargarVersionHistorica,
     listarVersionesDocumento,
     obtenerDocumento,
     type DocumentoDetalle,
@@ -41,6 +46,7 @@ function HistorialVersionesPage() {
     const [cargando, setCargando] = useState(true);
     const [noDisponible, setNoDisponible] = useState(false);
     const [errorCarga, setErrorCarga] = useState<string | null>(null);
+    const [versionDescargandoId, setVersionDescargandoId] = useState<string | null>(null);
 
     const requestIdRef = useRef(0);
 
@@ -85,6 +91,23 @@ function HistorialVersionesPage() {
             requestIdRef.current += 1;
         };
     }, [cargarDatos, permisos.verHistorialGlobal]);
+
+    const descargarVersion = async (version: VersionHistorica) => {
+        setVersionDescargandoId(version.id);
+        try {
+            const { blob, nombreArchivo } = await descargarVersionHistorica(id, version.id);
+            const nombre = nombreArchivo ?? version.nombreArchivoOriginal;
+            dispararDescargaEnNavegador(blob, nombre);
+        } catch (err) {
+            const mensaje =
+                err instanceof ApiError
+                    ? err.message
+                    : "No fue posible descargar la versión seleccionada.";
+            toast.error(mensaje);
+        } finally {
+            setVersionDescargandoId(null);
+        }
+    };
 
     if (!permisos.verHistorialGlobal) {
         return (
@@ -190,15 +213,29 @@ function HistorialVersionesPage() {
                             )}
                         >
                             <CardContent className="space-y-3 py-5">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <h3 className="text-base font-semibold">
-                                        Versión {version.numeroVersion}
-                                    </h3>
-                                    {version.vigente ? (
-                                        <Badge className="border-emerald-500/30 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/15">
-                                            Vigente
-                                        </Badge>
-                                    ) : null}
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <h3 className="text-base font-semibold">
+                                            Versión {version.numeroVersion}
+                                        </h3>
+                                        {version.vigente ? (
+                                            <Badge className="border-emerald-500/30 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/15">
+                                                Vigente
+                                            </Badge>
+                                        ) : null}
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1.5"
+                                        disabled={versionDescargandoId === version.id}
+                                        onClick={() => descargarVersion(version)}
+                                    >
+                                        {versionDescargandoId === version.id
+                                            ? "Descargando..."
+                                            : "Descargar versión"}
+                                        <Download className="size-4" />
+                                    </Button>
                                 </div>
 
                                 <p className="text-sm text-muted-foreground">
