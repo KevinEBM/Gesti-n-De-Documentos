@@ -1,54 +1,41 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import {
-    ArrowLeft,
-    Clock,
-    Download,
-    Eye,
-    FileText,
-    History,
-    Pencil,
-    Search,
-    Upload,
-} from "lucide-react";
-import { useMemo, useState } from "react";
+import { Search, Upload, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { AppShell } from "@/components/AppShell";
-import { AreasAutorizadas } from "@/components/AreasAutorizadas";
-import { DialogNuevaVersion } from "@/components/DialogNuevaVersion";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
+    DocumentoAcciones,
+    DocumentoEstadoBadge,
+    DocumentoFiltroSelect,
+} from "@/components/documentos-consulta-ui";
+import { AppShell } from "@/components/AppShell";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ApiError } from "@/lib/api";
+import { listarAreas, type AreaCatalogo } from "@/lib/areas-api";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+    construirFiltrosApi,
+    dispararDescargaEnNavegador,
+    etiquetasAlcance,
+    filtrosVacios,
+    formatFechaDocumento,
+    hayFiltrosActivos,
+    TODOS,
+    type FiltrosDocumentos,
+} from "@/lib/documentos-consulta-shared";
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
-import type { Documento, Estado } from "@/lib/data";
-import { useIntranet } from "@/lib/store";
-import { obtenerIconoArea } from "@/lib/iconos-areas";
+    descargarVersionVigente,
+    listarDocumentos,
+    type DocumentoResumen,
+} from "@/lib/documentos-api";
 import { obtenerIconoFormato } from "@/lib/iconos-formatos";
 import { obtenerIconoSubProceso } from "@/lib/iconos-subprocesos";
+import { listarSubprogramas, type SubprogramaCatalogo } from "@/lib/subprogramas-api";
+import { useIntranet } from "@/lib/store";
+import { listarTiposDocumento, type TipoDocumentoCatalogo } from "@/lib/tipos-documento-api";
 
 export const Route = createFileRoute("/app/gestion-documentos")({
     head: () => ({
@@ -57,7 +44,7 @@ export const Route = createFileRoute("/app/gestion-documentos")({
             {
                 name: "description",
                 content:
-                    "Administra documentos internos: edita información, publica nuevas versiones y cambia su estado.",
+                    "Consulta y administra documentos internos: filtra por área, subprograma, tipo, estado y fechas.",
             },
             {
                 property: "og:title",
@@ -66,124 +53,197 @@ export const Route = createFileRoute("/app/gestion-documentos")({
             {
                 property: "og:description",
                 content:
-                    "Edita, versiona y cambia el estado de los documentos internos.",
+                    "Consulta documentos internos con filtros avanzados y descarga de versiones vigentes.",
             },
         ],
     }),
     component: GestionDocumentos,
 });
 
-const TODOS = "todos";
+const OPCIONES_ESTADO = [
+    { v: "PUBLICADO", l: "Publicado" },
+    { v: "INACTIVO", l: "Inactivo" },
+    { v: "OBSOLETO", l: "Obsoleto" },
+];
 
 function GestionDocumentos() {
-    const {
-        documentos,
-        areas,
-        nombreArea,
-        nombreTipo,
-        nombreSub_Proceso,
-        actualizarDocumento,
-        permisos,
-    } = useIntranet();
+    const { permisos } = useIntranet();
 
-    const [busqueda, setBusqueda] = useState("");
-    const [area, setArea] = useState(TODOS);
-    const [estado, setEstado] = useState(TODOS);
+    const [areasCatalogo, setAreasCatalogo] = useState<AreaCatalogo[]>([]);
+    const [subprogramasCatalogo, setSubprogramasCatalogo] = useState<SubprogramaCatalogo[]>([]);
+    const [tiposCatalogo, setTiposCatalogo] = useState<TipoDocumentoCatalogo[]>([]);
+    const [cargandoCatalogos, setCargandoCatalogos] = useState(true);
+    const [errorCatalogos, setErrorCatalogos] = useState<string | null>(null);
+    const catalogosCargados = useRef(false);
 
-    const [editar, setEditar] = useState<Documento | null>(null);
-    const [versionar, setVersionar] = useState<Documento | null>(null);
-    const [historial, setHistorial] = useState<Documento | null>(null);
+    const [filtrosFormulario, setFiltrosFormulario] = useState(filtrosVacios);
+    const [filtrosAplicados, setFiltrosAplicados] = useState(filtrosVacios);
+    const [errorFechas, setErrorFechas] = useState<string | null>(null);
 
-    const [documentoSeleccionado, setDocumentoSeleccionado] =
-        useState<Documento | null>(null);
+    const [documentos, setDocumentos] = useState<DocumentoResumen[]>([]);
+    const [pagina, setPagina] = useState(0);
+    const [totalPaginas, setTotalPaginas] = useState(0);
+    const [totalElementos, setTotalElementos] = useState(0);
+    const [cargando, setCargando] = useState(true);
+    const [errorCarga, setErrorCarga] = useState<string | null>(null);
+    const requestIdRef = useRef(0);
 
-    const [previsualizar, setPrevisualizar] =
-        useState<Documento | null>(null);
+    const [descargandoId, setDescargandoId] = useState<string | null>(null);
 
-    const lista = useMemo(
-        () =>
-            documentos.filter((d) => {
-                const q = busqueda.trim().toLowerCase();
-
-                if (
-                    q &&
-                    !d.nombre.toLowerCase().includes(q) &&
-                    !d.archivo.toLowerCase().includes(q) &&
-                    !d.codigo.toLowerCase().includes(q)
-                )
-                    return false;
-
-                if (area !== TODOS && d.areaId !== area) return false;
-                if (estado !== TODOS && d.estado !== estado) return false;
-
-                return true;
-            }),
-        [documentos, busqueda, area, estado],
+    const areasActivas = useMemo(
+        () => areasCatalogo.filter((area) => area.activo),
+        [areasCatalogo],
     );
 
-    const ejecutarDescarga = (
-        nombreDoc: string,
-        archivoNombre: string,
-        versionTag: string,
-    ) => {
-        const ext = archivoNombre.split(".").pop()?.toLowerCase();
+    const subprogramasActivos = useMemo(() => {
+        if (filtrosFormulario.area === TODOS) {
+            return [];
+        }
+        return subprogramasCatalogo.filter(
+            (item) => item.activo && item.areaId === filtrosFormulario.area,
+        );
+    }, [subprogramasCatalogo, filtrosFormulario.area]);
 
-        let blob: Blob;
+    const tiposActivos = useMemo(
+        () => tiposCatalogo.filter((tipo) => tipo.activo),
+        [tiposCatalogo],
+    );
 
-        const nombreFinal = `${versionTag}_${archivoNombre}`;
+    const requiereSeleccionArea = filtrosFormulario.area === TODOS;
 
-        if (ext === "doc" || ext === "docx") {
-            const contenido = `{\\rtf1\\ansi\\deff0
-    {\\fonttbl{\\f0 Arial;}}
+    const filtrosAplicadosActivos = useMemo(
+        () => hayFiltrosActivos(filtrosAplicados),
+        [filtrosAplicados],
+    );
 
-    \\fs22
-    \\b SISTEMA DE GESTIÓN DOCUMENTAL\\b0\\par
-    \\par
-    \\b Documento:\\b0 ${nombreDoc}\\par
-    \\b Versión:\\b0 ${versionTag}\\par
-    \\b Archivo:\\b0 ${archivoNombre}\\par
-    \\b Fecha:\\b0 ${new Date().toLocaleString()}\\par
-    \\par
-    ------------------------------------------------------------\\par
-    Documento de demostración generado automáticamente.\\par
-    }`;
+    const cargarCatalogos = useCallback(async (forzar = false) => {
+        if (catalogosCargados.current && !forzar && !errorCatalogos) return;
 
-            blob = new Blob([contenido], {
-                type: "application/msword",
-            });
-        } else {
-            const contenido = `SISTEMA DE GESTIÓN DOCUMENTAL
+        setCargandoCatalogos(true);
+        setErrorCatalogos(null);
+        try {
+            const [areas, subprogramas, tipos] = await Promise.all([
+                listarAreas(),
+                listarSubprogramas(),
+                listarTiposDocumento(),
+            ]);
+            setAreasCatalogo(areas);
+            setSubprogramasCatalogo(subprogramas);
+            setTiposCatalogo(tipos);
+            catalogosCargados.current = true;
+        } catch (err) {
+            catalogosCargados.current = false;
+            const mensaje =
+                err instanceof ApiError
+                    ? err.message
+                    : "No fue posible cargar los catálogos de filtros.";
+            setErrorCatalogos(mensaje);
+        } finally {
+            setCargandoCatalogos(false);
+        }
+    }, [errorCatalogos]);
 
-    Documento : ${nombreDoc}
-    Versión    : ${versionTag}
-    Archivo    : ${archivoNombre}
-    Fecha      : ${new Date().toLocaleString()}
+    const cargarDocumentos = useCallback(async (filtros: FiltrosDocumentos, page: number) => {
+        const requestId = ++requestIdRef.current;
+        setCargando(true);
+        setErrorCarga(null);
 
-    --------------------------------------------------------
+        try {
+            const resultado = await listarDocumentos(construirFiltrosApi(filtros, page));
+            if (requestId !== requestIdRef.current) return;
 
-    Documento de demostración generado automáticamente.
-    `;
+            setDocumentos(resultado.contenido);
+            setPagina(resultado.pagina);
+            setTotalPaginas(resultado.totalPaginas);
+            setTotalElementos(resultado.totalElementos);
+        } catch (err) {
+            if (requestId !== requestIdRef.current) return;
+            const mensaje =
+                err instanceof ApiError
+                    ? err.message
+                    : "No fue posible cargar los documentos.";
+            setErrorCarga(mensaje);
+        } finally {
+            if (requestId === requestIdRef.current) {
+                setCargando(false);
+            }
+        }
+    }, []);
 
-            blob = new Blob([contenido], {
-                type: "text/plain;charset=utf-8",
-            });
+    useEffect(() => {
+        let activo = true;
+
+        const inicializar = async () => {
+            await cargarCatalogos();
+            if (!activo) return;
+            await cargarDocumentos(filtrosVacios, 0);
+        };
+
+        inicializar();
+        return () => {
+            activo = false;
+            requestIdRef.current += 1;
+        };
+        // Carga inicial única al montar.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const cambiarArea = (area: string) => {
+        setFiltrosFormulario((prev) => ({
+            ...prev,
+            area,
+            subprograma: TODOS,
+        }));
+    };
+
+    const aplicarFiltros = () => {
+        if (
+            filtrosFormulario.fechaDesde &&
+            filtrosFormulario.fechaHasta &&
+            filtrosFormulario.fechaDesde > filtrosFormulario.fechaHasta
+        ) {
+            setErrorFechas("La fecha inicial no puede ser posterior a la fecha final.");
+            return;
         }
 
-        const url = URL.createObjectURL(blob);
-
-        const link = document.createElement("a");
-
-        link.href = url;
-        link.download = nombreFinal;
-
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        URL.revokeObjectURL(url);
-
-        toast.success(`Descargando ${nombreFinal}`);
+        setErrorFechas(null);
+        setFiltrosAplicados(filtrosFormulario);
+        cargarDocumentos(filtrosFormulario, 0);
     };
+
+    const limpiarFiltros = () => {
+        setFiltrosFormulario(filtrosVacios);
+        setFiltrosAplicados(filtrosVacios);
+        setErrorFechas(null);
+        cargarDocumentos(filtrosVacios, 0);
+    };
+
+    const irPaginaAnterior = () => {
+        if (pagina <= 0 || cargando) return;
+        cargarDocumentos(filtrosAplicados, pagina - 1);
+    };
+
+    const irPaginaSiguiente = () => {
+        if (cargando || pagina >= totalPaginas - 1) return;
+        cargarDocumentos(filtrosAplicados, pagina + 1);
+    };
+
+    const descargarDocumento = useCallback(async (documento: DocumentoResumen) => {
+        setDescargandoId(documento.id);
+        try {
+            const { blob, nombreArchivo } = await descargarVersionVigente(documento.id);
+            const nombre = nombreArchivo ?? (documento.codigo || "documento");
+            dispararDescargaEnNavegador(blob, nombre);
+        } catch (err) {
+            const mensaje =
+                err instanceof ApiError
+                    ? err.message
+                    : "No fue posible descargar el documento.";
+            toast.error(mensaje);
+        } finally {
+            setDescargandoId(null);
+        }
+    }, []);
 
     if (!permisos.actualizarDocumentos) {
         return (
@@ -197,348 +257,124 @@ function GestionDocumentos() {
         );
     }
 
-    if (documentoSeleccionado) {
-        const totalAreas = documentoSeleccionado.visibleTodas
-            ? areas.length
-            : documentoSeleccionado.areasAutorizadas.length;
+    const contenidoListado = () => {
+        if (cargando) {
+            return (
+                <Card>
+                    <CardContent className="py-14 text-center text-sm text-muted-foreground">
+                        Cargando documentos...
+                    </CardContent>
+                </Card>
+            );
+        }
 
-        const textoAreas = documentoSeleccionado.visibleTodas
-            ? "Todas las áreas"
-            : documentoSeleccionado.areasAutorizadas
-                .map((id) => nombreArea(id))
-                .join(", ");
+        if (errorCarga) {
+            return (
+                <Card>
+                    <CardContent className="space-y-3 py-14 text-center">
+                        <p className="text-sm font-medium">{errorCarga}</p>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => cargarDocumentos(filtrosAplicados, pagina)}
+                        >
+                            Reintentar
+                        </Button>
+                    </CardContent>
+                </Card>
+            );
+        }
+
+        if (totalElementos === 0) {
+            return (
+                <Card>
+                    <CardContent className="py-14 text-center">
+                        <p className="text-sm font-medium">
+                            {filtrosAplicadosActivos
+                                ? "No se encontraron documentos con los filtros seleccionados."
+                                : "No hay documentos disponibles."}
+                        </p>
+                    </CardContent>
+                </Card>
+            );
+        }
 
         return (
-            <AppShell titulo="Detalle del documento">
-                <div className="space-y-6">
+            <Card className="overflow-hidden py-0">
+                <Table>
+                    <TableHeader>
+                        <TableRow className="bg-secondary/60">
+                            <TableHead>Código</TableHead>
+                            <TableHead>Título</TableHead>
+                            <TableHead>Subprograma</TableHead>
+                            <TableHead>Tipo</TableHead>
+                            <TableHead>Alcance</TableHead>
+                            <TableHead>Estado</TableHead>
+                            <TableHead>Actualización</TableHead>
+                            <TableHead className="text-right">Acciones</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {documentos.map((documento) => {
+                            const { icono: IconoTipo, color: colorTipo } = obtenerIconoFormato(
+                                documento.tipoDocumentoNombre,
+                            );
+                            const { icono: IconoSub, color: colorSub } = obtenerIconoSubProceso(
+                                documento.subprogramaNombre,
+                            );
 
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => setDocumentoSeleccionado(null)}
-                    >
-                        <ArrowLeft className="size-4" />
-                        Volver
-                    </Button>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-                        <Card className="lg:col-span-2">
-
-                            <CardContent className="p-6 space-y-6">
-
-                                <div className="flex items-start justify-between">
-
-                                    <div className="flex gap-3">
-
-                                        <div className="rounded-lg bg-secondary p-2">
-                                            <FileText className="size-6" />
+                            return (
+                                <TableRow key={documento.id}>
+                                    <TableCell className="font-mono font-semibold whitespace-nowrap">
+                                        {documento.codigo}
+                                    </TableCell>
+                                    <TableCell className="max-w-xs truncate font-medium">
+                                        {documento.titulo}
+                                    </TableCell>
+                                    <TableCell className="text-sm whitespace-nowrap">
+                                        <div className="flex items-center gap-1.5">
+                                            <IconoSub className={`size-4 ${colorSub}`} />
+                                            <span>{documento.subprogramaNombre}</span>
                                         </div>
-
-                                        <div>
-
-                                            <h1 className="text-xl font-bold">
-                                                {documentoSeleccionado.nombre}
-                                            </h1>
-
-                                            <p className="font-mono text-xs text-muted-foreground">
-                                                {documentoSeleccionado.archivo}
-                                            </p>
-
+                                    </TableCell>
+                                    <TableCell className="text-sm whitespace-nowrap">
+                                        <div className="flex items-center gap-1.5">
+                                            <IconoTipo className={`size-4 ${colorTipo}`} />
+                                            <span>{documento.tipoDocumentoNombre}</span>
                                         </div>
-
-                                    </div>
-
-                                    <Select
-                                        value={documentoSeleccionado.estado}
-                                        onValueChange={(v) => {
-                                            actualizarDocumento(
-                                                documentoSeleccionado.id,
-                                                {
-                                                    estado: v as Estado,
-                                                },
-                                            );
-
-                                            setDocumentoSeleccionado({
-                                                ...documentoSeleccionado,
-                                                estado: v as Estado,
-                                            });
-
-                                            toast.success(
-                                                "Estado actualizado.",
-                                            );
-                                        }}
-                                    >
-                                        <SelectTrigger className="w-[150px]">
-                                            <SelectValue />
-                                        </SelectTrigger>
-
-                                        <SelectContent>
-                                            <SelectItem value="publicado">
-                                                Publicado
-                                            </SelectItem>
-
-                                            <SelectItem value="borrador">
-                                                Borrador
-                                            </SelectItem>
-
-                                            <SelectItem value="inactivo">
-                                                Inactivo
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-
-                                </div>
-
-                                <p className="text-sm text-muted-foreground">
-                                    {documentoSeleccionado.descripcion}
-                                </p>
-
-                                <div className="grid grid-cols-2 gap-5 border-t pt-5">
-
-                                    <Dato titulo="Código">
-                                            <span className="font-mono">
-                                                {documentoSeleccionado.codigo}
-                                            </span>
-                                    </Dato>
-
-                                    <Dato titulo="Área responsable">
-                                        {nombreArea(documentoSeleccionado.areaId)}
-                                    </Dato>
-
-                                    <Dato titulo="Subproceso">
-                                        {nombreSub_Proceso(
-                                            documentoSeleccionado.subProcesoId,
-                                        )}
-                                    </Dato>
-
-                                    <Dato titulo="Tipo">
-                                        {nombreTipo(documentoSeleccionado.tipoId)}
-                                    </Dato>
-
-                                    <Dato titulo="Versión vigente">
-                                        v{documentoSeleccionado.version}
-                                    </Dato>
-
-                                    <Dato titulo="Fecha de publicación">
-                                        {new Date(
-                                            documentoSeleccionado.fechaPublicacion,
-                                        ).toLocaleDateString("es-CO", {
-                                            day: "2-digit",
-                                            month: "long",
-                                            year: "numeric",
-                                        })}
-                                    </Dato>
-
-                                    <Dato titulo="Áreas autorizadas">
-                                        {textoAreas}
-                                    </Dato>
-
-                                    <Dato titulo="Total de áreas">
-                                        {totalAreas}
-                                    </Dato>
-
-                                </div>
-
-                            </CardContent>
-
-                        </Card>
-
-                        <Card className="flex flex-col">
-
-                            <CardHeader>
-                                <CardTitle>Acciones</CardTitle>
-                            </CardHeader>
-
-                            <CardContent className="space-y-3">
-
-                                <Button
-                                    variant="outline"
-                                    className="justify-between"
-                                    onClick={() =>
-                                        setPrevisualizar(
-                                            documentoSeleccionado,
-                                        )
-                                    }
-                                >
-                                    Visualizar
-                                    <Eye className="size-4" />
-                                </Button>
-
-                                <Button
-                                    variant="outline"
-                                    className="justify-between"
-                                    onClick={() =>
-                                        ejecutarDescarga(
-                                            documentoSeleccionado.nombre,
-                                            documentoSeleccionado.archivo,
-                                            `v${documentoSeleccionado.version}`,
-                                        )
-                                    }
-                                >
-                                    Descargar
-                                    <Download className="size-4" />
-                                </Button>
-
-                            </CardContent>
-
-                            <div className="border-t p-6 text-center text-xs text-muted-foreground">
-
-                                Historial:
-                                {" "}
-                                {documentoSeleccionado.versiones.length}
-                                {" "}
-                                versión(es)
-
-                            </div>
-
-                        </Card>
-
-                    </div>
-                    {/* Historial de versiones */}
-
-                    <Card>
-
-                        <CardHeader className="flex flex-row items-center gap-2">
-
-                            <Clock className="size-5 text-muted-foreground" />
-
-                            <CardTitle>
-                                Historial de versiones
-                            </CardTitle>
-
-                        </CardHeader>
-
-                        <CardContent className="p-0">
-
-                            <div className="overflow-x-auto">
-
-                                <Table className="min-w-[2200px]">
-
-                                    <TableHeader>
-
-                                        <TableRow className="bg-secondary/60">
-
-                                            <TableHead>Código</TableHead>
-                                            <TableHead>Versión</TableHead>
-                                            <TableHead>Fecha</TableHead>
-                                            <TableHead>Publicado por</TableHead>
-                                            <TableHead>Descripción de cambios</TableHead>
-                                            <TableHead>Estado</TableHead>
-                                            <TableHead className="text-right">
-                                                Acción
-                                            </TableHead>
-
-                                        </TableRow>
-
-                                    </TableHeader>
-
-                                    <TableBody>
-
-                                        {documentoSeleccionado.versiones.map(
-                                            (v, indice) => (
-                                                <TableRow key={v.numero}>
-
-                                                    <TableCell className="font-mono">
-                                                        {documentoSeleccionado.codigo}
-                                                    </TableCell>
-
-                                                    <TableCell className="font-mono">
-                                                        v{v.numero}
-                                                    </TableCell>
-
-                                                    <TableCell className="w-[170px]">
-                                                        {new Date(
-                                                            v.fecha,
-                                                        ).toLocaleDateString(
-                                                            "es-CO",
-                                                            {
-                                                                day: "2-digit",
-                                                                month: "long",
-                                                                year: "numeric",
-                                                            },
-                                                        )}
-                                                    </TableCell>
-
-                                                    <TableCell className="w-[170px]">
-                                                        {v.autor}
-                                                    </TableCell>
-
-                                                    <TableCell className="text-muted-foreground">
-                                                        {v.notas}
-                                                    </TableCell>
-
-                                                    <TableCell className="w-[170px]">
-
-                                                        {indice === 0 ? (
-                                                            <span className="font-semibold text-emerald-600">
-                                                                    Vigente
-                                                                </span>
-                                                        ) : (
-                                                            <span className="text-muted-foreground">
-                                                                    Histórica
-                                                                </span>
-                                                        )}
-
-                                                    </TableCell>
-
-                                                    <TableCell className="text-right">
-
-                                                        <Button
-                                                            size="icon"
-                                                            variant="ghost"
-                                                            title="Descargar versión"
-                                                            onClick={() =>
-                                                                ejecutarDescarga(
-                                                                    documentoSeleccionado.nombre,
-                                                                    v.archivo ??
-                                                                    documentoSeleccionado.archivo,
-                                                                    `v${v.numero}`,
-                                                                )
-                                                            }
-                                                        >
-                                                            <Download className="size-4" />
-                                                        </Button>
-
-                                                    </TableCell>
-
-                                                </TableRow>
-                                            ),
-                                        )}
-
-                                    </TableBody>
-
-                                </Table>
-
-                            </div>
-
-                        </CardContent>
-
-                    </Card>
-
-                </div>
-
-                <DialogPrevisualizar
-                    doc={previsualizar}
-                    onClose={() => setPrevisualizar(null)}
-                />
-
-            </AppShell>
+                                    </TableCell>
+                                    <TableCell className="text-sm whitespace-nowrap">
+                                        {etiquetasAlcance[documento.alcance]}
+                                    </TableCell>
+                                    <TableCell>
+                                        <DocumentoEstadoBadge estado={documento.estado} />
+                                    </TableCell>
+                                    <TableCell className="text-sm whitespace-nowrap">
+                                        {formatFechaDocumento(documento.fechaActualizacion)}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <DocumentoAcciones
+                                            documento={documento}
+                                            descargandoId={descargandoId}
+                                            onDescargar={descargarDocumento}
+                                            tituloVer="Disponible al integrar detalle"
+                                        />
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+            </Card>
         );
-    }
+    };
 
     return (
-
         <AppShell
             titulo="Gestión de documentos"
-            descripcion={`${documentos.length} documentos publicados`}
+            descripcion={`${totalElementos} documento(s) encontrados`}
             acciones={
-                <Button
-                    asChild
-                    size="sm"
-                    className="gap-2"
-                >
+                <Button asChild size="sm" className="gap-2">
                     <Link to="/app/publicar">
                         <Upload className="size-4" />
                         Publicar documento
@@ -546,811 +382,164 @@ function GestionDocumentos() {
                 </Button>
             }
         >
-
             <Card>
-
-                <CardContent className="grid gap-3 py-5 md:grid-cols-[1fr_220px_220px]">
-
-                    <div className="relative">
-
-                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-
-                        <Input
-                            className="pl-9"
-                            placeholder="Buscar por código, nombre o archivo..."
-                            value={busqueda}
-                            onChange={(e) => setBusqueda(e.target.value)}
-                        />
-
-                    </div>
-
-                    <Select
-                        value={area}
-                        onValueChange={setArea}
-                    >
-
-                        <SelectTrigger>
-                            <SelectValue placeholder="Área" />
-                        </SelectTrigger>
-
-                        <SelectContent>
-
-                            <SelectItem value={TODOS}>
-                                Todas las áreas
-                            </SelectItem>
-
-                            {areas.map((a) => {
-
-                                const {
-                                    icono: Icono,
-                                    color,
-                                } = obtenerIconoArea(a.nombre);
-
-                                return (
-                                    <SelectItem
-                                        key={a.id}
-                                        value={a.id}
-                                    >
-                                        <div className="flex items-center gap-2">
-
-                                            <Icono
-                                                className={`size-4 ${color}`}
-                                            />
-
-                                            {a.nombre}
-
-                                        </div>
-                                    </SelectItem>
-                                );
-                            })}
-
-                        </SelectContent>
-
-                    </Select>
-
-                    <Select
-                        value={estado}
-                        onValueChange={setEstado}
-                    >
-
-                        <SelectTrigger>
-                            <SelectValue />
-                        </SelectTrigger>
-
-                        <SelectContent>
-
-                            <SelectItem value={TODOS}>
-                                Todos los estados
-                            </SelectItem>
-
-                            <SelectItem value="publicado">
-                                Publicado
-                            </SelectItem>
-
-                            <SelectItem value="borrador">
-                                Borrador
-                            </SelectItem>
-
-                            <SelectItem value="inactivo">
-                                Inactivo
-                            </SelectItem>
-
-                        </SelectContent>
-
-                    </Select>
-
-                </CardContent>
-
-            </Card>
-
-            <Card className="w-full max-w-full overflow-hidden">
-
-                <CardContent className="p-0">
-
-                    <div className="w-full overflow-x-auto">
-
-                        <Table className="w-full min-w-[1250px]">
-
-                            <TableHeader>
-
-                                <TableRow className="bg-secondary/60">
-
-                                    <TableHead>Código</TableHead>
-                                    <TableHead>Documento</TableHead>
-                                    <TableHead>Área</TableHead>
-                                    <TableHead>Subproceso</TableHead>
-                                    <TableHead>Tipo</TableHead>
-                                    <TableHead>Versión</TableHead>
-                                    <TableHead>Estado</TableHead>
-                                    <TableHead>Publicación</TableHead>
-                                    <TableHead className="w-[170px] text-right">
-                                        Acciones
-                                    </TableHead>
-
-                                </TableRow>
-
-                            </TableHeader>
-
-                            <TableBody>
-
-                                {lista.map((d) => (
-                                    <TableRow key={d.id}>
-
-                                        <TableCell className="font-mono font-semibold whitespace-nowrap">
-                                            {d.codigo}
-                                        </TableCell>
-
-                                        <TableCell className="w-[320px]">
-
-                                            <button
-                                                type="button"
-                                                className="truncate text-left font-medium text-primary hover:underline"
-                                                onClick={() => setDocumentoSeleccionado(d)}
-                                            >
-                                                {d.nombre}
-                                            </button>
-
-                                            <p className="truncate text-xs text-muted-foreground">
-                                                {d.archivo}
-                                            </p>
-
-                                        </TableCell>
-
-                                        <TableCell className="w-[170px]">
-
-                                            {(() => {
-
-                                                const nombre = nombreArea(d.areaId);
-
-                                                const {
-                                                    icono: Icono,
-                                                    color,
-                                                } = obtenerIconoArea(nombre);
-
-                                                return (
-
-                                                    <div className="flex items-center gap-2">
-
-                                                        <Icono
-                                                            className={`size-4 ${color}`}
-                                                        />
-
-                                                        <span>{nombre}</span>
-
-                                                    </div>
-
-                                                );
-
-                                            })()}
-
-                                        </TableCell>
-
-                                        <TableCell className="w-[170px]">
-
-                                            {(() => {
-
-                                                const nombre =
-                                                    nombreSub_Proceso(
-                                                        d.subProcesoId,
-                                                    );
-
-                                                const {
-                                                    icono: Icono,
-                                                    color,
-                                                } =
-                                                    obtenerIconoSubProceso(
-                                                        nombre,
-                                                    );
-
-                                                return (
-
-                                                    <div className="flex items-center gap-2">
-
-                                                        <Icono
-                                                            className={`size-4 ${color}`}
-                                                        />
-
-                                                        <span>{nombre}</span>
-
-                                                    </div>
-
-                                                );
-
-                                            })()}
-
-                                        </TableCell>
-
-                                        <TableCell className="w-[170px]">
-                                            {nombreTipo(d.tipoId)}
-                                        </TableCell>
-
-                                        <TableCell className="font-mono">
-                                            v{d.version}
-                                        </TableCell>
-
-                                        <TableCell className="w-[170px]">
-
-                                            <Select
-                                                value={d.estado}
-                                                onValueChange={(v) => {
-
-                                                    actualizarDocumento(
-                                                        d.id,
-                                                        {
-                                                            estado:
-                                                                v as Estado,
-                                                        },
-                                                    );
-
-                                                    toast.success(
-                                                        "Estado actualizado.",
-                                                    );
-
-                                                }}
-                                            >
-
-                                                <SelectTrigger className="h-8 w-[140px]">
-
-                                                    <SelectValue />
-
-                                                </SelectTrigger>
-
-                                                <SelectContent>
-
-                                                    <SelectItem value="publicado">
-                                                        Publicado
-                                                    </SelectItem>
-
-                                                    <SelectItem value="borrador">
-                                                        Borrador
-                                                    </SelectItem>
-
-                                                    <SelectItem value="inactivo">
-                                                        Inactivo
-                                                    </SelectItem>
-
-                                                </SelectContent>
-
-                                            </Select>
-
-                                        </TableCell>
-
-                                        <TableCell className="w-[170px]">
-
-                                            {new Date(
-                                                d.fechaPublicacion,
-                                            ).toLocaleDateString(
-                                                "es-CO",
-                                                {
-                                                    day: "2-digit",
-                                                    month: "short",
-                                                    year: "numeric",
-                                                },
-                                            )}
-
-                                        </TableCell>
-
-                                        <TableCell className="w-[170px]">
-
-                                            <div className="flex justify-end gap-1">
-
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    title="Ver detalle"
-                                                    onClick={() =>
-                                                        setDocumentoSeleccionado(d)
-                                                    }
-                                                >
-                                                    <Eye className="size-4" />
-                                                </Button>
-
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    title="Editar"
-                                                    onClick={() =>
-                                                        setEditar(d)
-                                                    }
-                                                >
-                                                    <Pencil className="size-4" />
-                                                </Button>
-
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    title="Nueva versión"
-                                                    onClick={() =>
-                                                        setVersionar(d)
-                                                    }
-                                                >
-                                                    <Upload className="size-4" />
-                                                </Button>
-
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    title="Historial"
-                                                    onClick={() =>
-                                                        setHistorial(d)
-                                                    }
-                                                >
-                                                    <History className="size-4" />
-                                                </Button>
-
-                                            </div>
-
-                                        </TableCell>
-
-                                    </TableRow>
-                                ))}
-
-                            </TableBody>
-
-
-                        </Table>
-
-                    </div>
-
-                </CardContent>
-
-            </Card>
-
-            <DialogEditar
-                doc={editar}
-                onClose={() => setEditar(null)}
-                onSave={actualizarDocumento}
-            />
-
-            <DialogNuevaVersion
-                doc={versionar}
-                onClose={() => setVersionar(null)}
-            />
-
-            <Dialog
-                open={!!historial}
-                onOpenChange={(o) =>
-                    !o && setHistorial(null)
-                }
-            >
-
-                <DialogContent className="max-w-4xl">
-
-                    <DialogHeader>
-
-                        <DialogTitle>
-                            Historial de versiones
-                        </DialogTitle>
-
-                        <DialogDescription>
-
-                            {historial?.nombre}
-
-                        </DialogDescription>
-
-                    </DialogHeader>
-
-                    <div className="max-h-[420px] overflow-y-auto">
-
-                        <Table>
-
-                            <TableHeader>
-
-                                <TableRow>
-
-                                    <TableHead>#</TableHead>
-                                    <TableHead>Versión</TableHead>
-                                    <TableHead>Fecha</TableHead>
-                                    <TableHead>Publicado por</TableHead>
-                                    <TableHead>Descripción de cambios</TableHead>
-                                    <TableHead>Estado</TableHead>
-                                    <TableHead className="text-right">
-                                        Acción
-                                    </TableHead>
-
-                                </TableRow>
-
-                            </TableHeader>
-
-                            <TableBody>
-                                {historial?.versiones.map((v, indice) => (
-                                    <TableRow key={v.numero}>
-
-                                        <TableCell className="font-mono">
-                                            #{indice + 1}
-                                        </TableCell>
-
-                                        <TableCell className="font-mono">
-                                            v{v.numero}
-                                        </TableCell>
-
-                                        <TableCell className="w-[170px]">
-                                            {new Date(v.fecha).toLocaleDateString(
-                                                "es-CO",
-                                                {
-                                                    day: "2-digit",
-                                                    month: "long",
-                                                    year: "numeric",
-                                                },
-                                            )}
-                                        </TableCell>
-
-                                        <TableCell className="w-[170px]">{v.autor}</TableCell>
-
-                                        <TableCell className="text-muted-foreground">
-                                            {v.notas}
-                                        </TableCell>
-
-                                        <TableCell className="w-[170px]">
-                                            {indice === 0 ? (
-                                                <span className="font-semibold text-emerald-600">
-                                                Vigente
-                                            </span>
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                Histórica
-                                            </span>
-                                            )}
-                                        </TableCell>
-
-                                        <TableCell className="text-right">
-
-                                            <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                title="Descargar versión"
-                                                onClick={() =>
-                                                    ejecutarDescarga(
-                                                        historial.nombre,
-                                                        v.archivo ??
-                                                        historial.archivo,
-                                                        `v${v.numero}`,
-                                                    )
-                                                }
-                                            >
-                                                <Download className="size-4" />
-                                            </Button>
-
-                                        </TableCell>
-
-                                    </TableRow>
-                                ))}
-
-                            </TableBody>
-
-                        </Table>
-
-                    </div>
-
-                </DialogContent>
-
-            </Dialog>
-
-        </AppShell>
-    );
-}
-
-function DialogEditar({
-                          doc,
-                          onClose,
-                          onSave,
-                      }: {
-    doc: Documento | null;
-    onClose: () => void;
-    onSave: (id: string, cambios: Partial<Documento>) => void;
-}) {
-    const { areas, sub_proceso, tipos } = useIntranet();
-
-    const [nombre, setNombre] = useState("");
-    const [descripcion, setDescripcion] = useState("");
-    const [areaId, setAreaId] = useState("");
-    const [subProcesoId, setSubProcesoId] = useState("");
-    const [tipoId, setTipoId] = useState("");
-    const [visibleTodas, setVisibleTodas] = useState(false);
-    const [autorizadas, setAutorizadas] = useState<string[]>([]);
-    const [cargado, setCargado] = useState<string | null>(null);
-
-    if (doc && cargado !== doc.id) {
-        setCargado(doc.id);
-        setNombre(doc.nombre);
-        setDescripcion(doc.descripcion);
-        setAreaId(doc.areaId);
-        setSubProcesoId(doc.subProcesoId);
-        setTipoId(doc.tipoId);
-        setVisibleTodas(doc.visibleTodas);
-        setAutorizadas(doc.areasAutorizadas);
-    }
-
-    return (
-        <Dialog
-            open={!!doc}
-            onOpenChange={(o) => !o && onClose()}
-        >
-            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-
-                <DialogHeader>
-
-                    <DialogTitle>
-                        Editar documento
-                    </DialogTitle>
-
-                    <DialogDescription>
-                        Actualiza la información sin crear una nueva versión.
-                    </DialogDescription>
-
-                </DialogHeader>
-
-                <div className="space-y-5">
-
-                    <div className="space-y-2">
-                        <Label>Código</Label>
-                        <Input
-                            value={doc?.codigo ?? ""}
-                            disabled
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Nombre</Label>
-                        <Input
-                            value={nombre}
-                            onChange={(e) =>
-                                setNombre(e.target.value)
-                            }
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Descripción</Label>
-
-                        <Textarea
-                            rows={4}
-                            value={descripcion}
-                            onChange={(e) =>
-                                setDescripcion(
-                                    e.target.value,
-                                )
-                            }
-                        />
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-3">
-
-                        <SelectorSimple
-                            label="Área"
-                            value={areaId}
-                            onChange={setAreaId}
-                            opciones={areas}
-                        />
-
-                        <SelectorSimple
-                            label="Subproceso"
-                            value={subProcesoId}
-                            onChange={setSubProcesoId}
-                            opciones={sub_proceso}
-                        />
-
-                        <SelectorSimple
-                            label="Tipo"
-                            value={tipoId}
-                            onChange={setTipoId}
-                            opciones={tipos}
-                        />
-
-                    </div>
-
-                    <div className="space-y-2">
-
-                        <Label>
-                            Áreas autorizadas
-                        </Label>
-
-                        <AreasAutorizadas
-                            idCheckbox="editar-visible"
-                            areas={areas}
-                            seleccionadas={autorizadas}
-                            onChange={setAutorizadas}
-                            visibleTodas={visibleTodas}
-                            onVisibleTodas={setVisibleTodas}
-                        />
-
-                    </div>
-
-                </div>
-
-                <DialogFooter>
-
-                    <Button
-                        variant="outline"
-                        onClick={onClose}
-                    >
-                        Cancelar
-                    </Button>
-
-                    <Button
-                        onClick={() => {
-
-                            if (!doc) return;
-
-                            if (!nombre.trim())
-                                return toast.error(
-                                    "El nombre es obligatorio.",
-                                );
-
-                            if (
-                                !visibleTodas &&
-                                autorizadas.length === 0
-                            )
-                                return toast.error(
-                                    "Seleccione al menos un área.",
-                                );
-
-                            onSave(doc.id, {
-                                nombre,
-                                descripcion,
-                                areaId,
-                                subProcesoId,
-                                tipoId,
-                                visibleTodas,
-                                areasAutorizadas:
-                                    visibleTodas
-                                        ? []
-                                        : autorizadas,
-                            });
-
-                            toast.success(
-                                "Documento actualizado.",
-                            );
-
-                            onClose();
-
-                        }}
-                    >
-                        Guardar cambios
-                    </Button>
-
-                </DialogFooter>
-
-            </DialogContent>
-
-        </Dialog>
-    );
-}
-
-function DialogPrevisualizar({
-                                 doc,
-                                 onClose,
-                             }: {
-    doc: Documento | null;
-    onClose: () => void;
-}) {
-    return (
-        <Dialog
-            open={!!doc}
-            onOpenChange={(o) => !o && onClose()}
-        >
-            <DialogContent className="max-w-3xl">
-
-                <DialogHeader>
-
-                    <DialogTitle>
-                        Vista previa
-                    </DialogTitle>
-
-                    <DialogDescription>
-                        {doc?.nombre} · Versión v{doc?.version}
-                    </DialogDescription>
-
-                </DialogHeader>
-
-                <div className="rounded-lg border bg-muted p-6">
-
-                    <p className="font-semibold border-b pb-2">
-                        Visualizador interno
-                    </p>
-
-                    <div className="mt-4 space-y-3 text-sm">
-
-                        <p>
-                            <strong>Archivo:</strong>{" "}
-                            {doc?.archivo}
-                        </p>
-
-                        <p>
-                            <strong>Descripción:</strong>{" "}
-                            {doc?.descripcion}
-                        </p>
-
-                        <div className="rounded border bg-background p-4 text-xs leading-relaxed text-muted-foreground">
-
-                            Aquí se mostrará el visor PDF,
-                            Word o cualquier formato soportado
-                            cuando el proyecto se conecte con
-                            el backend.
-
+                <CardContent className="space-y-4 py-5">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="relative">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                placeholder="Código del documento…"
+                                className="pl-9"
+                                value={filtrosFormulario.codigo}
+                                onChange={(e) =>
+                                    setFiltrosFormulario((prev) => ({
+                                        ...prev,
+                                        codigo: e.target.value,
+                                    }))
+                                }
+                            />
                         </div>
-
+                        <Input
+                            placeholder="Título del documento…"
+                            value={filtrosFormulario.titulo}
+                            onChange={(e) =>
+                                setFiltrosFormulario((prev) => ({
+                                    ...prev,
+                                    titulo: e.target.value,
+                                }))
+                            }
+                        />
                     </div>
 
-                </div>
+                    {errorCatalogos ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm">
+                            <span>{errorCatalogos}</span>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => cargarCatalogos(true)}
+                                disabled={cargandoCatalogos}
+                            >
+                                Reintentar catálogos
+                            </Button>
+                        </div>
+                    ) : cargandoCatalogos ? (
+                        <p className="text-sm text-muted-foreground">Cargando catálogos de filtros...</p>
+                    ) : null}
 
-                <DialogFooter>
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                        <DocumentoFiltroSelect
+                            label="Área"
+                            value={filtrosFormulario.area}
+                            onChange={cambiarArea}
+                            opciones={areasActivas.map((area) => ({ v: area.id, l: area.nombre }))}
+                            tipoFiltro="area"
+                            disabled={cargandoCatalogos || !!errorCatalogos}
+                        />
+                        <DocumentoFiltroSelect
+                            label="Subprograma"
+                            value={filtrosFormulario.subprograma}
+                            onChange={(subprograma) =>
+                                setFiltrosFormulario((prev) => ({ ...prev, subprograma }))
+                            }
+                            opciones={subprogramasActivos.map((item) => ({
+                                v: item.id,
+                                l: item.nombre,
+                            }))}
+                            tipoFiltro="subproceso"
+                            disabled={cargandoCatalogos || !!errorCatalogos || requiereSeleccionArea}
+                            placeholder={
+                                requiereSeleccionArea ? "Seleccione primero un área" : undefined
+                            }
+                        />
+                        <DocumentoFiltroSelect
+                            label="Tipo"
+                            value={filtrosFormulario.tipo}
+                            onChange={(tipo) =>
+                                setFiltrosFormulario((prev) => ({ ...prev, tipo }))
+                            }
+                            opciones={tiposActivos.map((tipo) => ({ v: tipo.id, l: tipo.nombre }))}
+                            tipoFiltro="tipo"
+                            disabled={cargandoCatalogos || !!errorCatalogos}
+                        />
+                        <DocumentoFiltroSelect
+                            label="Estado"
+                            value={filtrosFormulario.estado}
+                            onChange={(estado) =>
+                                setFiltrosFormulario((prev) => ({ ...prev, estado }))
+                            }
+                            opciones={OPCIONES_ESTADO}
+                        />
+                        <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Desde</Label>
+                            <Input
+                                type="date"
+                                value={filtrosFormulario.fechaDesde}
+                                onChange={(e) =>
+                                    setFiltrosFormulario((prev) => ({
+                                        ...prev,
+                                        fechaDesde: e.target.value,
+                                    }))
+                                }
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Hasta</Label>
+                            <Input
+                                type="date"
+                                value={filtrosFormulario.fechaHasta}
+                                onChange={(e) =>
+                                    setFiltrosFormulario((prev) => ({
+                                        ...prev,
+                                        fechaHasta: e.target.value,
+                                    }))
+                                }
+                            />
+                        </div>
+                    </div>
 
-                    <Button onClick={onClose}>
-                        Cerrar
-                    </Button>
+                    {errorFechas ? (
+                        <p className="text-sm text-destructive">{errorFechas}</p>
+                    ) : null}
 
-                </DialogFooter>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm" onClick={limpiarFiltros} className="gap-1.5">
+                            <X className="size-4" /> Limpiar
+                        </Button>
+                        <Button size="sm" onClick={aplicarFiltros} className="gap-1.5">
+                            <Search className="size-4" /> Buscar
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
 
-            </DialogContent>
+            {contenidoListado()}
 
-        </Dialog>
-    );
-}
-
-function SelectorSimple({
-                            label,
-                            value,
-                            onChange,
-                            opciones,
-                        }: {
-    label: string;
-    value: string;
-    onChange: (v: string) => void;
-    opciones: { id: string; nombre: string }[];
-}) {
-    return (
-        <div className="space-y-2">
-
-            <Label className="text-xs text-muted-foreground">
-                {label}
-            </Label>
-
-            <Select
-                value={value}
-                onValueChange={onChange}
-            >
-                <SelectTrigger>
-                    <SelectValue />
-                </SelectTrigger>
-
-                <SelectContent>
-
-                    {opciones.map((o) => (
-                        <SelectItem
-                            key={o.id}
-                            value={o.id}
+            {!cargando && !errorCarga && totalElementos > 0 ? (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm text-muted-foreground">
+                        Página {pagina + 1} de {Math.max(totalPaginas, 1)}
+                    </p>
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={irPaginaAnterior}
+                            disabled={pagina <= 0}
                         >
-                            {o.nombre}
-                        </SelectItem>
-                    ))}
-
-                </SelectContent>
-
-            </Select>
-
-        </div>
-    );
-}
-
-function Dato({
-                  titulo,
-                  children,
-              }: {
-    titulo: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <div>
-
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {titulo}
-            </p>
-
-            <div className="text-sm">
-                {children}
-            </div>
-
-        </div>
+                            Anterior
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={irPaginaSiguiente}
+                            disabled={pagina >= totalPaginas - 1}
+                        >
+                            Siguiente
+                        </Button>
+                    </div>
+                </div>
+            ) : null}
+        </AppShell>
     );
 }

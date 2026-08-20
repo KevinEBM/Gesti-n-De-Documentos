@@ -1,39 +1,41 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Download, Eye, LayoutGrid, List, Search, X } from "lucide-react";
+import { LayoutGrid, List, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { toast } from "sonner";
 
+import {
+    DocumentoAcciones,
+    DocumentoEstadoBadge,
+    DocumentoFiltroSelect,
+} from "@/components/documentos-consulta-ui";
 import { AppShell } from "@/components/AppShell";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ApiError, apiFetch } from "@/lib/api";
 import { listarAreas, type AreaCatalogo } from "@/lib/areas-api";
 import {
+    construirFiltrosApi,
+    dispararDescargaEnNavegador,
+    etiquetasAlcance,
+    filtrosVacios,
+    formatFechaDocumento,
+    hayFiltrosActivos,
+    TODOS,
+    type FiltrosDocumentos,
+} from "@/lib/documentos-consulta-shared";
+import {
     descargarVersionVigente,
     listarDocumentos,
-    type DocumentoAlcance,
-    type DocumentoEstado,
-    type DocumentoFiltros,
     type DocumentoResumen,
 } from "@/lib/documentos-api";
-import { obtenerIconoArea } from "@/lib/iconos-areas";
 import { obtenerIconoFormato } from "@/lib/iconos-formatos";
 import { obtenerIconoSubProceso } from "@/lib/iconos-subprocesos";
 import { listarSubprogramas, type SubprogramaCatalogo } from "@/lib/subprogramas-api";
 import { useIntranet } from "@/lib/store";
 import { listarTiposDocumento, mapTipoDocumentoResponseDto, type TipoDocumentoCatalogo, type TipoDocumentoResponseDto } from "@/lib/tipos-documento-api";
-import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/documentos")({
     head: () => ({
@@ -50,84 +52,9 @@ export const Route = createFileRoute("/app/documentos")({
     component: Biblioteca,
 });
 
-const TODOS = "todos";
-const TAMANO_PAGINA = 20;
-
-const SELECT_CONTENT_CLASS =
-    "!bg-white !text-slate-900 border border-slate-200 shadow-2xl z-[99999]";
-
-const SELECT_TRIGGER_CLASS = "w-full !bg-white !text-slate-900";
-
-const SELECT_ITEM_CLASS =
-    "!text-slate-900 focus:!bg-slate-100 focus:!text-slate-900 data-[highlighted]:!bg-slate-100 data-[highlighted]:!text-slate-900";
-
 async function listarTiposConsultaBiblioteca(): Promise<TipoDocumentoCatalogo[]> {
     const datos = await apiFetch<TipoDocumentoResponseDto[]>("/api/tipos-documento/activos");
     return datos.map(mapTipoDocumentoResponseDto);
-}
-
-interface FiltrosDocumentos {
-    codigo: string;
-    titulo: string;
-    area: string;
-    subprograma: string;
-    tipo: string;
-    estado: string;
-    fechaDesde: string;
-    fechaHasta: string;
-}
-
-const filtrosVacios: FiltrosDocumentos = {
-    codigo: "",
-    titulo: "",
-    area: TODOS,
-    subprograma: TODOS,
-    tipo: TODOS,
-    estado: TODOS,
-    fechaDesde: "",
-    fechaHasta: "",
-};
-
-const etiquetasAlcance: Record<DocumentoAlcance, string> = {
-    AREA_RESPONSABLE: "Área responsable",
-    AREAS_ESPECIFICAS: "Áreas específicas",
-    GLOBAL: "Global",
-};
-
-const estilosEstado: Record<DocumentoEstado, string> = {
-    PUBLICADO: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-    INACTIVO: "border-zinc-500/30 bg-zinc-500/10 text-zinc-600 dark:text-zinc-400",
-    OBSOLETO: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
-};
-
-const etiquetasEstado: Record<DocumentoEstado, string> = {
-    PUBLICADO: "Publicado",
-    INACTIVO: "Inactivo",
-    OBSOLETO: "Obsoleto",
-};
-
-function formatFecha(fecha: string): string {
-    try {
-        return new Intl.DateTimeFormat("es-CO", {
-            dateStyle: "medium",
-            timeStyle: "short",
-        }).format(new Date(fecha));
-    } catch {
-        return fecha;
-    }
-}
-
-function hayFiltrosActivos(filtros: FiltrosDocumentos): boolean {
-    return (
-        !!filtros.codigo.trim() ||
-        !!filtros.titulo.trim() ||
-        filtros.area !== TODOS ||
-        filtros.subprograma !== TODOS ||
-        filtros.tipo !== TODOS ||
-        filtros.estado !== TODOS ||
-        !!filtros.fechaDesde ||
-        !!filtros.fechaHasta
-    );
 }
 
 function construirFiltrosBase(esAdmin: boolean, areasActivas: AreaCatalogo[]): FiltrosDocumentos {
@@ -137,40 +64,8 @@ function construirFiltrosBase(esAdmin: boolean, areasActivas: AreaCatalogo[]): F
     return filtrosVacios;
 }
 
-function construirFiltrosApi(filtros: FiltrosDocumentos, page: number): DocumentoFiltros {
-    const api: DocumentoFiltros = { page, size: TAMANO_PAGINA };
-
-    const codigo = filtros.codigo.trim();
-    const titulo = filtros.titulo.trim();
-
-    if (codigo) api.codigo = codigo;
-    if (titulo) api.titulo = titulo;
-    if (filtros.area !== TODOS) api.areaId = Number(filtros.area);
-    if (filtros.subprograma !== TODOS) api.subprogramaId = Number(filtros.subprograma);
-    if (filtros.tipo !== TODOS) api.tipoDocumentoId = Number(filtros.tipo);
-    if (filtros.estado !== TODOS) api.estado = filtros.estado as DocumentoEstado;
-    if (filtros.fechaDesde) api.fechaDesde = filtros.fechaDesde;
-    if (filtros.fechaHasta) api.fechaHasta = filtros.fechaHasta;
-
-    return api;
-}
-
-function DocumentoEstadoBadge({ estado }: { estado: DocumentoEstado }) {
-    return (
-        <Badge variant="outline" className={cn("gap-1.5 font-medium", estilosEstado[estado])}>
-            <span className="size-1.5 rounded-full bg-current" />
-            {etiquetasEstado[estado]}
-        </Badge>
-    );
-}
-
-function dispararDescargaEnNavegador(blob: Blob, nombreArchivo: string) {
-    const url = URL.createObjectURL(blob);
-    const enlace = document.createElement("a");
-    enlace.href = url;
-    enlace.download = nombreArchivo;
-    enlace.click();
-    URL.revokeObjectURL(url);
+function opcionesFiltrosApi(esAdmin: boolean) {
+    return { incluirAreaEnConsulta: esAdmin };
 }
 
 function Biblioteca() {
@@ -204,27 +99,38 @@ function Biblioteca() {
         [areasCatalogo],
     );
 
+    const areaUnicaPreseleccionada = !esAdmin && areasActivas.length === 1;
+    const areaObligatoriaNoAdmin =
+        areaUnicaPreseleccionada && areasActivas.length === 1 ? areasActivas[0].id : undefined;
+    const areaEfectivaFormulario =
+        filtrosFormulario.area !== TODOS
+            ? filtrosFormulario.area
+            : areaObligatoriaNoAdmin ?? TODOS;
+    const requiereSeleccionArea = areaEfectivaFormulario === TODOS;
+
     const subprogramasActivos = useMemo(() => {
-        if (filtrosFormulario.area === TODOS) {
+        if (areaEfectivaFormulario === TODOS) {
             return [];
         }
         return subprogramasCatalogo.filter(
-            (item) => item.activo && item.areaId === filtrosFormulario.area,
+            (item) => item.activo && item.areaId === areaEfectivaFormulario,
         );
-    }, [subprogramasCatalogo, filtrosFormulario.area]);
+    }, [subprogramasCatalogo, areaEfectivaFormulario]);
 
     const tiposActivos = useMemo(() => tiposCatalogo, [tiposCatalogo]);
 
-    const areaUnicaPreseleccionada = !esAdmin && areasActivas.length === 1;
-    const requiereSeleccionArea = filtrosFormulario.area === TODOS;
-
     const filtrosAplicadosActivos = useMemo(
-        () => hayFiltrosActivos(filtrosAplicados),
-        [filtrosAplicados],
+        () =>
+            hayFiltrosActivos(filtrosAplicados, {
+                areaNoCuentaComoFiltro: areaObligatoriaNoAdmin,
+            }),
+        [filtrosAplicados, areaObligatoriaNoAdmin],
     );
 
-    const cargarCatalogos = useCallback(async (forzar = false) => {
-        if (catalogosCargados.current && !forzar && !errorCatalogos) return;
+    const cargarCatalogos = useCallback(async (forzar = false): Promise<AreaCatalogo[]> => {
+        if (catalogosCargados.current && !forzar && !errorCatalogos) {
+            return areasCatalogo;
+        }
 
         setCargandoCatalogos(true);
         setErrorCatalogos(null);
@@ -249,6 +155,8 @@ function Biblioteca() {
                     prev.area === TODOS ? { ...prev, area: areaId, subprograma: TODOS } : prev,
                 );
             }
+
+            return areas;
         } catch (err) {
             catalogosCargados.current = false;
             const mensaje =
@@ -256,45 +164,56 @@ function Biblioteca() {
                     ? err.message
                     : "No fue posible cargar los catálogos de filtros.";
             setErrorCatalogos(mensaje);
+            return [];
         } finally {
             setCargandoCatalogos(false);
         }
-    }, [errorCatalogos, esAdmin]);
+    }, [areasCatalogo, errorCatalogos, esAdmin]);
 
-    const cargarDocumentos = useCallback(async (filtros: FiltrosDocumentos, page: number) => {
-        const requestId = ++requestIdRef.current;
-        setCargando(true);
-        setErrorCarga(null);
+    const cargarDocumentos = useCallback(
+        async (filtros: FiltrosDocumentos, page: number) => {
+            const requestId = ++requestIdRef.current;
+            setCargando(true);
+            setErrorCarga(null);
 
-        try {
-            const resultado = await listarDocumentos(construirFiltrosApi(filtros, page));
-            if (requestId !== requestIdRef.current) return;
+            try {
+                const resultado = await listarDocumentos(
+                    construirFiltrosApi(filtros, page, opcionesFiltrosApi(esAdmin)),
+                );
+                if (requestId !== requestIdRef.current) return;
 
-            setDocumentos(resultado.contenido);
-            setPagina(resultado.pagina);
-            setTotalPaginas(resultado.totalPaginas);
-            setTotalElementos(resultado.totalElementos);
-        } catch (err) {
-            if (requestId !== requestIdRef.current) return;
-            const mensaje =
-                err instanceof ApiError
-                    ? err.message
-                    : "No fue posible cargar los documentos.";
-            setErrorCarga(mensaje);
-        } finally {
-            if (requestId === requestIdRef.current) {
-                setCargando(false);
+                setDocumentos(resultado.contenido);
+                setPagina(resultado.pagina);
+                setTotalPaginas(resultado.totalPaginas);
+                setTotalElementos(resultado.totalElementos);
+            } catch (err) {
+                if (requestId !== requestIdRef.current) return;
+                const mensaje =
+                    err instanceof ApiError
+                        ? err.message
+                        : "No fue posible cargar los documentos.";
+                setErrorCarga(mensaje);
+            } finally {
+                if (requestId === requestIdRef.current) {
+                    setCargando(false);
+                }
             }
-        }
-    }, []);
+        },
+        [esAdmin],
+    );
 
     useEffect(() => {
         let activo = true;
 
         const inicializar = async () => {
-            await cargarCatalogos();
+            const areas = await cargarCatalogos();
             if (!activo) return;
-            await cargarDocumentos(filtrosVacios, 0);
+
+            const areasActivasCargadas = areas.filter((area) => area.activo);
+            const filtrosIniciales = construirFiltrosBase(esAdmin, areasActivasCargadas);
+            setFiltrosFormulario(filtrosIniciales);
+            setFiltrosAplicados(filtrosIniciales);
+            await cargarDocumentos(filtrosIniciales, 0);
         };
 
         inicializar();
@@ -466,10 +385,10 @@ function Biblioteca() {
                                             <DocumentoEstadoBadge estado={documento.estado} />
                                         </TableCell>
                                         <TableCell className="text-sm whitespace-nowrap">
-                                            {formatFecha(documento.fechaActualizacion)}
+                                            {formatFechaDocumento(documento.fechaActualizacion)}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <AccionesDocumento
+                                            <DocumentoAcciones
                                                 documento={documento}
                                                 descargandoId={descargandoId}
                                                 onDescargar={descargarDocumento}
@@ -522,10 +441,10 @@ function Biblioteca() {
                                     <Dato k="Alcance" v={etiquetasAlcance[documento.alcance]} />
                                     <Dato
                                         k="Actualización"
-                                        v={formatFecha(documento.fechaActualizacion)}
+                                        v={formatFechaDocumento(documento.fechaActualizacion)}
                                     />
                                 </dl>
-                                <AccionesDocumento
+                                <DocumentoAcciones
                                     documento={documento}
                                     descargandoId={descargandoId}
                                     onDescargar={descargarDocumento}
@@ -610,7 +529,7 @@ function Biblioteca() {
                     ) : null}
 
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-                        <Filtro
+                        <DocumentoFiltroSelect
                             label="Área"
                             value={filtrosFormulario.area}
                             onChange={cambiarArea}
@@ -622,7 +541,7 @@ function Biblioteca() {
                                 areaUnicaPreseleccionada
                             }
                         />
-                        <Filtro
+                        <DocumentoFiltroSelect
                             label="Subprograma"
                             value={filtrosFormulario.subprograma}
                             onChange={(subprograma) =>
@@ -640,7 +559,7 @@ function Biblioteca() {
                                     : undefined
                             }
                         />
-                        <Filtro
+                        <DocumentoFiltroSelect
                             label="Tipo"
                             value={filtrosFormulario.tipo}
                             onChange={(tipo) =>
@@ -650,7 +569,7 @@ function Biblioteca() {
                             tipoFiltro="tipo"
                             disabled={cargandoCatalogos || !!errorCatalogos}
                         />
-                        <Filtro
+                        <DocumentoFiltroSelect
                             label="Estado"
                             value={filtrosFormulario.estado}
                             onChange={(estado) =>
@@ -750,111 +669,6 @@ function Dato({
                 {Icon ? <Icon className={`size-3.5 ${color}`} /> : null}
                 <span>{v}</span>
             </dd>
-        </div>
-    );
-}
-
-function AccionesDocumento({
-    documento,
-    descargandoId,
-    onDescargar,
-    apilado = false,
-}: {
-    documento: DocumentoResumen;
-    descargandoId: string | null;
-    onDescargar: (documento: DocumentoResumen) => void;
-    apilado?: boolean;
-}) {
-    const descargando = descargandoId === documento.id;
-
-    return (
-        <div
-            className={cn(
-                "flex gap-2",
-                apilado ? "flex-col sm:flex-row" : "flex-wrap items-center justify-end",
-            )}
-        >
-            <Button
-                size="sm"
-                variant="outline"
-                disabled
-                title="El detalle estará disponible próximamente."
-                className="gap-1.5"
-            >
-                <Eye className="size-4" />
-                Ver
-            </Button>
-            <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5"
-                disabled={descargando}
-                onClick={() => onDescargar(documento)}
-            >
-                <Download className="size-4" />
-                {descargando ? "Descargando..." : "Descargar"}
-            </Button>
-        </div>
-    );
-}
-
-function Filtro({
-    label,
-    value,
-    onChange,
-    opciones,
-    tipoFiltro,
-    disabled = false,
-    placeholder,
-}: {
-    label: string;
-    value: string;
-    onChange: (v: string) => void;
-    opciones: { v: string; l: string }[];
-    tipoFiltro?: "area" | "subproceso" | "tipo";
-    disabled?: boolean;
-    placeholder?: string;
-}) {
-    return (
-        <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">{label}</Label>
-            <Select value={value} onValueChange={onChange} disabled={disabled}>
-                <SelectTrigger className={SELECT_TRIGGER_CLASS}>
-                    <SelectValue placeholder={placeholder} />
-                </SelectTrigger>
-                <SelectContent className={SELECT_CONTENT_CLASS}>
-                    <SelectItem value={TODOS} className={SELECT_ITEM_CLASS}>
-                        Todos
-                    </SelectItem>
-                    {opciones.map((opcion) => {
-                        let Icono: ComponentType<{ className?: string }> | undefined;
-                        let color: string | undefined;
-
-                        if (tipoFiltro === "area") {
-                            const res = obtenerIconoArea(opcion.l);
-                            Icono = res.icono;
-                            color = res.color;
-                        } else if (tipoFiltro === "subproceso") {
-                            const res = obtenerIconoSubProceso(opcion.l);
-                            Icono = res.icono;
-                            color = res.color;
-                        } else if (tipoFiltro === "tipo") {
-                            const res = obtenerIconoFormato(opcion.l);
-                            Icono = res.icono;
-                            color = res.color;
-                        }
-
-                        return (
-                            <SelectItem key={opcion.v} value={opcion.v} className={SELECT_ITEM_CLASS}>
-                                <div className="flex items-center gap-2">
-                                    {Icono ? <Icono className={`size-4 ${color}`} /> : null}
-                                    <span>{opcion.l}</span>
-                                </div>
-                            </SelectItem>
-                        );
-                    })}
-                </SelectContent>
-            </Select>
         </div>
     );
 }

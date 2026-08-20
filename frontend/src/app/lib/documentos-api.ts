@@ -1,5 +1,6 @@
 import { API_BASE_URL, ApiError, type ApiResponse, apiFetch } from "./api";
 import { getToken } from "./auth-storage";
+import { DOCUMENTOS_PAGE_SIZE } from "./documentos-consulta-shared";
 
 export type DocumentoEstado = "PUBLICADO" | "INACTIVO" | "OBSOLETO";
 
@@ -192,7 +193,7 @@ export function mapDocumentoResponseDto(dto: DocumentoResponseDto): DocumentoDet
 function construirQueryDocumentos(filtros: DocumentoFiltros = {}): string {
     const params = new URLSearchParams();
     const page = filtros.page ?? 0;
-    const size = filtros.size ?? 20;
+    const size = filtros.size ?? DOCUMENTOS_PAGE_SIZE;
 
     params.set("page", String(page));
     params.set("size", String(size));
