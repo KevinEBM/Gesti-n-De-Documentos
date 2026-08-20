@@ -50,7 +50,7 @@ function Login() {
         if (cargando) return;
         setError(null);
         const nuevos: { correo?: string; password?: string } = {};
-        if (!correo.trim()) nuevos.correo = "El correo institucional es obligatorio.";
+        if (!correo.trim()) nuevos.correo = "El correo electrónico es obligatorio.";
         else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo.trim()))
             nuevos.correo = "Ingresa un correo válido, por ejemplo nombre@empresa.com.";
         if (!password) nuevos.password = "La contraseña es obligatoria.";
@@ -106,10 +106,6 @@ function Login() {
                     </ul>
                 </div>
 
-                {/*<p className="flex items-center gap-2 text-xs opacity-70">
-                    <ShieldCheck className="size-4" />
-                    Prototipo de demostración con datos ficticios.
-                </p> */}
             </div>
 
             {/* SECCIÓN DERECHA: Formulario de Login */}
@@ -139,12 +135,12 @@ function Login() {
 
                     <h1 className="text-2xl font-semibold">Iniciar sesión</h1>
                     <p className="mt-1.5 text-sm text-muted-foreground">
-                        Usa tu correo institucional. Las cuentas son creadas por el administrador.
+                        Usa tu correo electrónico. Las cuentas son creadas por el administrador.
                     </p>
 
                     <form onSubmit={enviar} noValidate className="mt-7 space-y-4">
                         <div className="space-y-1.5">
-                            <Label htmlFor="correo">Correo institucional</Label>
+                            <Label htmlFor="correo">Correo electrónico</Label>
                             <div className="relative">
                                 <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                                 <Input
