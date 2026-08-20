@@ -438,7 +438,7 @@ function NuevoDocumentoPage() {
         }
     };
 
-    if (!permisos?.actualizarDocumentos) {
+    if (!permisos?.publicarDocumentos) {
         return (
             <AppShell titulo="Publicar documento">
                 <Card>
