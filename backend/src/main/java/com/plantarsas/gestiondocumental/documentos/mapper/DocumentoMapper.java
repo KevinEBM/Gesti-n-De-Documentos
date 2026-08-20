@@ -7,6 +7,7 @@ import com.plantarsas.gestiondocumental.documentos.dto.VersionHistoricaResponse;
 import com.plantarsas.gestiondocumental.documentos.entity.Documento;
 import com.plantarsas.gestiondocumental.documentos.entity.DocumentoArea;
 import com.plantarsas.gestiondocumental.documentos.entity.VersionDocumento;
+import com.plantarsas.gestiondocumental.usuarios.entity.Usuario;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -66,6 +67,7 @@ public class DocumentoMapper {
     }
 
     public VersionHistoricaResponse toHistorico(VersionDocumento version) {
+        Usuario publicadoPor = version.getPublicadoPor();
         return new VersionHistoricaResponse(
                 version.getId(),
                 version.getNumeroVersion(),
@@ -74,8 +76,21 @@ public class DocumentoMapper {
                 version.getTamanoBytes(),
                 version.getDescripcionCambio(),
                 version.getFechaPublicacion(),
-                version.getPublicadoPor().getId(),
+                publicadoPor != null ? publicadoPor.getId() : null,
+                nombrePublicador(publicadoPor),
                 version.isVigente()
         );
+    }
+
+    private String nombrePublicador(Usuario usuario) {
+        if (usuario == null) {
+            return "Usuario no disponible";
+        }
+
+        String nombres = usuario.getNombres() == null ? "" : usuario.getNombres().trim();
+        String apellidos = usuario.getApellidos() == null ? "" : usuario.getApellidos().trim();
+        String nombreCompleto = (nombres + " " + apellidos).trim();
+
+        return nombreCompleto.isBlank() ? "Usuario no disponible" : nombreCompleto;
     }
 }

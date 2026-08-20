@@ -332,6 +332,52 @@ export async function publicarNuevaVersion(
     return mapDocumentoResponseDto(dto);
 }
 
+export interface VersionHistoricaResponseDto {
+    id: number;
+    numeroVersion: number;
+    nombreArchivoOriginal: string;
+    tipoMime: string;
+    tamanoBytes: number;
+    descripcionCambio: string;
+    fechaPublicacion: string;
+    publicadoPorId: number;
+    publicadoPorNombre: string;
+    vigente: boolean;
+}
+
+export interface VersionHistorica {
+    id: string;
+    numeroVersion: number;
+    nombreArchivoOriginal: string;
+    tipoMime: string;
+    tamanoBytes: number;
+    descripcionCambio: string;
+    fechaPublicacion: string;
+    publicadoPorId: string;
+    publicadoPorNombre: string;
+    vigente: boolean;
+}
+
+function mapVersionHistoricaResponseDto(dto: VersionHistoricaResponseDto): VersionHistorica {
+    return {
+        id: String(dto.id),
+        numeroVersion: dto.numeroVersion,
+        nombreArchivoOriginal: dto.nombreArchivoOriginal,
+        tipoMime: dto.tipoMime,
+        tamanoBytes: dto.tamanoBytes,
+        descripcionCambio: dto.descripcionCambio,
+        fechaPublicacion: dto.fechaPublicacion,
+        publicadoPorId: String(dto.publicadoPorId),
+        publicadoPorNombre: dto.publicadoPorNombre?.trim() || "Usuario no disponible",
+        vigente: dto.vigente,
+    };
+}
+
+export async function listarVersionesDocumento(id: string): Promise<VersionHistorica[]> {
+    const dto = await apiFetch<VersionHistoricaResponseDto[]>(`/api/documentos/${id}/versiones`);
+    return dto.map(mapVersionHistoricaResponseDto);
+}
+
 function extraerNombreArchivo(contentDisposition: string | null): string | null {
     if (!contentDisposition) return null;
 

@@ -215,4 +215,77 @@ class DocumentoMapperTest {
         assertThat(resultado.tipoDocumentoNombre()).isEqualTo("Tipo de prueba");
         assertThat(resultado.fechaActualizacion()).isEqualTo(fechaActualizacion);
     }
+
+    @Test
+    void toHistorico_debeMapearPublicadorConNombreCompleto() {
+        Usuario publicadoPor = mock(Usuario.class);
+        when(publicadoPor.getId()).thenReturn(50L);
+        when(publicadoPor.getNombres()).thenReturn("Test");
+        when(publicadoPor.getApellidos()).thenReturn("Prueba");
+
+        LocalDateTime fechaPublicacion = LocalDateTime.of(2026, 8, 20, 12, 8);
+
+        VersionDocumento version = mock(VersionDocumento.class);
+        when(version.getId()).thenReturn(10L);
+        when(version.getNumeroVersion()).thenReturn(2);
+        when(version.getNombreArchivoOriginal()).thenReturn("archivo.pdf");
+        when(version.getTipoMime()).thenReturn("application/pdf");
+        when(version.getTamanoBytes()).thenReturn(2048L);
+        when(version.getDescripcionCambio()).thenReturn("prueba 2 inactiva");
+        when(version.getFechaPublicacion()).thenReturn(fechaPublicacion);
+        when(version.getPublicadoPor()).thenReturn(publicadoPor);
+        when(version.isVigente()).thenReturn(true);
+
+        var resultado = documentoMapper.toHistorico(version);
+
+        assertThat(resultado.id()).isEqualTo(10L);
+        assertThat(resultado.numeroVersion()).isEqualTo(2);
+        assertThat(resultado.descripcionCambio()).isEqualTo("prueba 2 inactiva");
+        assertThat(resultado.publicadoPorId()).isEqualTo(50L);
+        assertThat(resultado.publicadoPorNombre()).isEqualTo("Test Prueba");
+        assertThat(resultado.vigente()).isTrue();
+    }
+
+    @Test
+    void toHistorico_conPublicadorSinNombresCargados_debeUsarFallbackAunConId() {
+        Usuario publicadoPor = mock(Usuario.class);
+        when(publicadoPor.getId()).thenReturn(23L);
+        when(publicadoPor.getNombres()).thenReturn(null);
+        when(publicadoPor.getApellidos()).thenReturn(null);
+
+        VersionDocumento version = mock(VersionDocumento.class);
+        when(version.getId()).thenReturn(10L);
+        when(version.getNumeroVersion()).thenReturn(2);
+        when(version.getNombreArchivoOriginal()).thenReturn("archivo.pdf");
+        when(version.getTipoMime()).thenReturn("application/pdf");
+        when(version.getTamanoBytes()).thenReturn(1024L);
+        when(version.getDescripcionCambio()).thenReturn("prueba 2 inactiva");
+        when(version.getFechaPublicacion()).thenReturn(LocalDateTime.now());
+        when(version.getPublicadoPor()).thenReturn(publicadoPor);
+        when(version.isVigente()).thenReturn(true);
+
+        var resultado = documentoMapper.toHistorico(version);
+
+        assertThat(resultado.publicadoPorId()).isEqualTo(23L);
+        assertThat(resultado.publicadoPorNombre()).isEqualTo("Usuario no disponible");
+    }
+
+    @Test
+    void toHistorico_conPublicadorNulo_debeUsarFallbackDeNombre() {
+        VersionDocumento version = mock(VersionDocumento.class);
+        when(version.getId()).thenReturn(10L);
+        when(version.getNumeroVersion()).thenReturn(1);
+        when(version.getNombreArchivoOriginal()).thenReturn("archivo.pdf");
+        when(version.getTipoMime()).thenReturn("application/pdf");
+        when(version.getTamanoBytes()).thenReturn(1024L);
+        when(version.getDescripcionCambio()).thenReturn("Publicación inicial");
+        when(version.getFechaPublicacion()).thenReturn(LocalDateTime.now());
+        when(version.getPublicadoPor()).thenReturn(null);
+        when(version.isVigente()).thenReturn(false);
+
+        var resultado = documentoMapper.toHistorico(version);
+
+        assertThat(resultado.publicadoPorId()).isNull();
+        assertThat(resultado.publicadoPorNombre()).isEqualTo("Usuario no disponible");
+    }
 }

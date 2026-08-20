@@ -1,6 +1,7 @@
 package com.plantarsas.gestiondocumental.documentos.repository;
 
 import com.plantarsas.gestiondocumental.documentos.entity.VersionDocumento;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,6 +13,7 @@ public interface VersionDocumentoRepository extends JpaRepository<VersionDocumen
 
     Optional<VersionDocumento> findByDocumento_IdAndVigenteTrue(Long documentoId);
 
+    @EntityGraph(attributePaths = "publicadoPor")
     List<VersionDocumento> findByDocumento_IdOrderByNumeroVersionDesc(Long documentoId);
 
     Optional<VersionDocumento> findByIdAndDocumento_Id(Long id, Long documentoId);

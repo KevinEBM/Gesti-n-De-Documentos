@@ -11,6 +11,7 @@ public record VersionHistoricaResponse(
         String descripcionCambio,
         LocalDateTime fechaPublicacion,
         Long publicadoPorId,
+        String publicadoPorNombre,
         boolean vigente
 ) {
 }

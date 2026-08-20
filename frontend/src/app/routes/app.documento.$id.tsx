@@ -1,5 +1,5 @@
 import { Link, createFileRoute, useParams } from "@tanstack/react-router";
-import { ArrowLeft, Download, FileText, Pencil, Upload } from "lucide-react";
+import { ArrowLeft, Download, FileText, History, Pencil, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -248,6 +248,14 @@ function DetalleDocumento() {
                                 <Link to="/app/documento/$id/actualizar" params={{ id }}>
                                     Actualizar documento
                                     <Upload className="size-4" />
+                                </Link>
+                            </Button>
+                        ) : null}
+                        {permisos.verHistorialGlobal ? (
+                            <Button asChild variant="outline" className="w-full justify-between">
+                                <Link to="/app/documento/$id/historial" params={{ id }}>
+                                    Historial
+                                    <History className="size-4" />
                                 </Link>
                             </Button>
                         ) : null}

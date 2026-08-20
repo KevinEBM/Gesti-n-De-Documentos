@@ -310,7 +310,7 @@ class DocumentoControllerSecurityTest {
     private VersionHistoricaResponse versionHistoricaDePrueba() {
         return new VersionHistoricaResponse(
                 2L, 2, "informe-v2.pdf", "application/pdf", 9L,
-                "Corrección de erratas", LocalDateTime.now(), 1L, true
+                "Corrección de erratas", LocalDateTime.now(), 1L, "Administrador Local", true
         );
     }
 

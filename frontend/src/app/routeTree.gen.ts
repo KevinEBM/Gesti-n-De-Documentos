@@ -22,6 +22,7 @@ import { Route as AppDocumentosRouteImport } from './routes/app.documentos'
 import { Route as AppDocumentoIdRouteImport } from './routes/app.documento.$id'
 import { Route as AppDocumentoIdEditarRouteImport } from './routes/app.documento.$id.editar'
 import { Route as AppDocumentoIdActualizarRouteImport } from './routes/app.documento.$id.actualizar'
+import { Route as AppDocumentoIdHistorialRouteImport } from './routes/app.documento.$id.historial'
 import { Route as AppCambiarContrasenaRouteImport } from './routes/app.cambiar-contrasena'
 
 
@@ -90,6 +91,11 @@ const AppDocumentoIdActualizarRoute = AppDocumentoIdActualizarRouteImport.update
     path: '/documento/$id/actualizar',
     getParentRoute: () => AppRoute,
 } as any)
+const AppDocumentoIdHistorialRoute = AppDocumentoIdHistorialRouteImport.update({
+    id: '/documento/$id/historial',
+    path: '/documento/$id/historial',
+    getParentRoute: () => AppRoute,
+} as any)
 const AppCambiarContrasenaRoute = AppCambiarContrasenaRouteImport.update({
     id: '/cambiar-contrasena',
     path: '/cambiar-contrasena',
@@ -111,6 +117,7 @@ export interface FileRoutesByFullPath {
     '/app/documento/$id': typeof AppDocumentoIdRoute
     '/app/documento/$id/editar': typeof AppDocumentoIdEditarRoute
     '/app/documento/$id/actualizar': typeof AppDocumentoIdActualizarRoute
+    '/app/documento/$id/historial': typeof AppDocumentoIdHistorialRoute
 }
 export interface FileRoutesByTo {
     '/': typeof IndexRoute
@@ -127,6 +134,7 @@ export interface FileRoutesByTo {
     '/app/documento/$id': typeof AppDocumentoIdRoute
     '/app/documento/$id/editar': typeof AppDocumentoIdEditarRoute
     '/app/documento/$id/actualizar': typeof AppDocumentoIdActualizarRoute
+    '/app/documento/$id/historial': typeof AppDocumentoIdHistorialRoute
 }
 export interface FileRoutesById {
     __root__: typeof rootRouteImport
@@ -144,6 +152,7 @@ export interface FileRoutesById {
     '/app/documento/$id': typeof AppDocumentoIdRoute
     '/app/documento/$id/editar': typeof AppDocumentoIdEditarRoute
     '/app/documento/$id/actualizar': typeof AppDocumentoIdActualizarRoute
+    '/app/documento/$id/historial': typeof AppDocumentoIdHistorialRoute
 }
 export interface FileRouteTypes {
     fileRoutesByFullPath: FileRoutesByFullPath
@@ -161,6 +170,8 @@ export interface FileRouteTypes {
         | '/app/cambiar-contrasena'
         | '/app/documento/$id'
         | '/app/documento/$id/editar'
+        | '/app/documento/$id/actualizar'
+        | '/app/documento/$id/historial'
     fileRoutesByTo: FileRoutesByTo
     to:
         | '/'
@@ -177,6 +188,7 @@ export interface FileRouteTypes {
         | '/app/documento/$id'
         | '/app/documento/$id/editar'
         | '/app/documento/$id/actualizar'
+        | '/app/documento/$id/historial'
     id:
         | '__root__'
         | '/'
@@ -193,6 +205,7 @@ export interface FileRouteTypes {
         | '/app/documento/$id'
         | '/app/documento/$id/editar'
         | '/app/documento/$id/actualizar'
+        | '/app/documento/$id/historial'
     fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -300,6 +313,13 @@ declare module '@tanstack/react-router' {
             preLoaderRoute: typeof AppDocumentoIdActualizarRouteImport
             parentRoute: typeof AppRoute
         }
+        '/app/documento/$id/historial': {
+            id: '/app/documento/$id/historial'
+            path: '/documento/$id/historial'
+            fullPath: '/app/documento/$id/historial'
+            preLoaderRoute: typeof AppDocumentoIdHistorialRouteImport
+            parentRoute: typeof AppRoute
+        }
     }
 }
 
@@ -316,6 +336,7 @@ interface AppRouteChildren {
     AppDocumentoIdRoute: typeof AppDocumentoIdRoute
     AppDocumentoIdEditarRoute: typeof AppDocumentoIdEditarRoute
     AppDocumentoIdActualizarRoute: typeof AppDocumentoIdActualizarRoute
+    AppDocumentoIdHistorialRoute: typeof AppDocumentoIdHistorialRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -331,6 +352,7 @@ const AppRouteChildren: AppRouteChildren = {
     AppDocumentoIdRoute: AppDocumentoIdRoute,
     AppDocumentoIdEditarRoute: AppDocumentoIdEditarRoute,
     AppDocumentoIdActualizarRoute: AppDocumentoIdActualizarRoute,
+    AppDocumentoIdHistorialRoute: AppDocumentoIdHistorialRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

@@ -66,6 +66,7 @@ import com.plantarsas.gestiondocumental.documentos.entity.Documento;
 import com.plantarsas.gestiondocumental.documentos.entity.DocumentoArea;
 import com.plantarsas.gestiondocumental.documentos.entity.VersionDocumento;
 import com.plantarsas.gestiondocumental.documentos.mapper.DocumentoMapper;
+import com.plantarsas.gestiondocumental.usuarios.entity.Usuario;
 import com.plantarsas.gestiondocumental.documentos.repository.DocumentoAreaRepository;
 import com.plantarsas.gestiondocumental.documentos.repository.DocumentoRepository;
 import com.plantarsas.gestiondocumental.documentos.repository.VersionDocumentoRepository;
@@ -609,6 +610,55 @@ class DocumentoConsultaServiceImplTest {
     // ------------------------------------------------------------------
     // listarHistorico(...) (Etapa 3D)
     // ------------------------------------------------------------------
+
+    @Test
+    void listarHistorico_debeMapearElMismoPublicadorParaAdministradorYJefe() {
+        DocumentoMapper mapperReal = new DocumentoMapper();
+        documentoConsultaServiceImpl = new DocumentoConsultaServiceImpl(
+                documentoRepository,
+                documentoAreaRepository,
+                versionDocumentoRepository,
+                usuarioAreaAutorizacionService,
+                mapperReal,
+                storageService
+        );
+
+        Documento documento = mock(Documento.class);
+        when(documentoRepository.findOne(any(Specification.class))).thenReturn(Optional.of(documento));
+
+        Usuario publicador = mock(Usuario.class);
+        when(publicador.getId()).thenReturn(23L);
+        when(publicador.getNombres()).thenReturn("Administrador");
+        when(publicador.getApellidos()).thenReturn("Local");
+
+        VersionDocumento version = mock(VersionDocumento.class);
+        when(version.getId()).thenReturn(100L);
+        when(version.getNumeroVersion()).thenReturn(2);
+        when(version.getNombreArchivoOriginal()).thenReturn("archivo.pdf");
+        when(version.getTipoMime()).thenReturn("application/pdf");
+        when(version.getTamanoBytes()).thenReturn(1024L);
+        when(version.getDescripcionCambio()).thenReturn("prueba 2 inactiva");
+        when(version.getFechaPublicacion()).thenReturn(java.time.LocalDateTime.of(2026, 8, 20, 12, 0));
+        when(version.getPublicadoPor()).thenReturn(publicador);
+        when(version.isVigente()).thenReturn(true);
+
+        when(versionDocumentoRepository.findByDocumento_IdOrderByNumeroVersionDesc(DOCUMENTO_ID))
+                .thenReturn(List.of(version));
+
+        List<VersionHistoricaResponse> admin =
+                documentoConsultaServiceImpl.listarHistorico(DOCUMENTO_ID, administrador());
+
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of());
+        List<VersionHistoricaResponse> jefe =
+                documentoConsultaServiceImpl.listarHistorico(DOCUMENTO_ID, jefeArea());
+
+        assertThat(admin).hasSize(1);
+        assertThat(jefe).hasSize(1);
+        assertThat(admin.get(0).publicadoPorId()).isEqualTo(23L);
+        assertThat(admin.get(0).publicadoPorNombre()).isEqualTo("Administrador Local");
+        assertThat(jefe.get(0).publicadoPorId()).isEqualTo(23L);
+        assertThat(jefe.get(0).publicadoPorNombre()).isEqualTo("Administrador Local");
+    }
 
     @Test
     void listarHistorico_conAdministrador_debeRetornarElHistoricoCompleto() {
