@@ -37,6 +37,10 @@ export interface DocumentoActualizacionRequestDto {
     areasAdicionalesIds: number[];
 }
 
+export interface DocumentoEstadoActualizacionRequestDto {
+    estado: DocumentoEstado;
+}
+
 export interface DocumentoResumenResponseDto {
     id: number;
     codigo: string;
@@ -271,6 +275,17 @@ export async function actualizarDocumento(
     const dto = await apiFetch<DocumentoResponseDto>(`/api/documentos/${id}`, {
         method: "PUT",
         body: JSON.stringify(metadata),
+    });
+    return mapDocumentoResponseDto(dto);
+}
+
+export async function actualizarEstadoDocumento(
+    id: string,
+    estado: DocumentoEstado,
+): Promise<DocumentoDetalle> {
+    const dto = await apiFetch<DocumentoResponseDto>(`/api/documentos/${id}/estado`, {
+        method: "PATCH",
+        body: JSON.stringify({ estado } satisfies DocumentoEstadoActualizacionRequestDto),
     });
     return mapDocumentoResponseDto(dto);
 }

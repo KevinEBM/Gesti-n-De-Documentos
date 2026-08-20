@@ -2,6 +2,7 @@ package com.plantarsas.gestiondocumental.documentos.controller;
 
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoActualizacionRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoArchivoDescarga;
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoEstadoActualizacionRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoFiltroRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoPublicacionInicialRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
@@ -32,6 +33,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -130,6 +132,18 @@ public class DocumentoController {
     ) {
         return ApiResponse.exitosa(
                 documentoService.actualizarMetadatos(id, request, usuarioAutenticado)
+        );
+    }
+
+    @PatchMapping("/{id}/estado")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ApiResponse<DocumentoResponse> cambiarEstado(
+            @PathVariable Long id,
+            @Valid @RequestBody DocumentoEstadoActualizacionRequest request,
+            @AuthenticationPrincipal AuthenticatedUser usuarioAutenticado
+    ) {
+        return ApiResponse.exitosa(
+                documentoService.cambiarEstado(id, request, usuarioAutenticado)
         );
     }
 

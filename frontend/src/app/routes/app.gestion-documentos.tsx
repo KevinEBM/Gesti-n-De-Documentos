@@ -5,10 +5,21 @@ import { toast } from "sonner";
 
 import {
     DocumentoAcciones,
+    DocumentoEstadoAdminSelect,
     DocumentoEstadoBadge,
     DocumentoFiltroSelect,
 } from "@/components/documentos-consulta-ui";
 import { AppShell } from "@/components/AppShell";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,6 +28,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ApiError } from "@/lib/api";
 import { listarAreas, type AreaCatalogo } from "@/lib/areas-api";
 import {
+    ALERT_DIALOG_ACTION_CLASS,
+    ALERT_DIALOG_CANCEL_CLASS,
+    ALERT_DIALOG_CONTENT_CLASS,
+    ALERT_DIALOG_DESCRIPTION_CLASS,
+    ALERT_DIALOG_TITLE_CLASS,
+    ALERT_DIALOG_TITLE_DESACTIVAR_CLASS,
     construirFiltrosApi,
     dispararDescargaEnNavegador,
     etiquetasAlcance,
@@ -27,8 +44,10 @@ import {
     type FiltrosDocumentos,
 } from "@/lib/documentos-consulta-shared";
 import {
+    actualizarEstadoDocumento,
     descargarVersionVigente,
     listarDocumentos,
+    type DocumentoEstado,
     type DocumentoResumen,
 } from "@/lib/documentos-api";
 import { obtenerIconoFormato } from "@/lib/iconos-formatos";
@@ -66,6 +85,40 @@ const OPCIONES_ESTADO = [
     { v: "OBSOLETO", l: "Obsoleto" },
 ];
 
+type ConfirmacionEstadoPendiente = {
+    documento: DocumentoResumen;
+    destino: DocumentoEstado;
+};
+
+function mensajeConfirmacionEstado(destino: DocumentoEstado): { titulo: string; descripcion: string } {
+    if (destino === "INACTIVO") {
+        return {
+            titulo: "Desactivar publicación",
+            descripcion:
+                "Esta publicación dejará de ser visible para los demás usuarios. Podrás activarla nuevamente.",
+        };
+    }
+    if (destino === "OBSOLETO") {
+        return {
+            titulo: "Obsoleto",
+            descripcion:
+                "Esta publicación dejará de ser visible y no podrá recibir nuevas versiones mientras esté obsoleta. Podrás activarla nuevamente.",
+        };
+    }
+    return { titulo: "", descripcion: "" };
+}
+
+function mensajeExitoEstado(destino: DocumentoEstado): string {
+    switch (destino) {
+        case "PUBLICADO":
+            return "Publicación activada correctamente.";
+        case "INACTIVO":
+            return "Publicación desactivada correctamente.";
+        case "OBSOLETO":
+            return "Publicación marcada como obsoleta.";
+    }
+}
+
 function GestionDocumentos() {
     const navigate = useNavigate();
     const { permisos } = useIntranet();
@@ -90,6 +143,10 @@ function GestionDocumentos() {
     const requestIdRef = useRef(0);
 
     const [descargandoId, setDescargandoId] = useState<string | null>(null);
+    const [alternandoEstadoId, setAlternandoEstadoId] = useState<string | null>(null);
+    const [confirmacionEstado, setConfirmacionEstado] = useState<ConfirmacionEstadoPendiente | null>(
+        null,
+    );
 
     const areasActivas = useMemo(
         () => areasCatalogo.filter((area) => area.activo),
@@ -260,6 +317,50 @@ function GestionDocumentos() {
         [navigate],
     );
 
+    const aplicarCambioEstado = useCallback(
+        async (documento: DocumentoResumen, destino: DocumentoEstado) => {
+            setAlternandoEstadoId(documento.id);
+            try {
+                const actualizado = await actualizarEstadoDocumento(documento.id, destino);
+                setDocumentos((prev) =>
+                    prev.map((item) =>
+                        item.id === documento.id
+                            ? { ...item, estado: actualizado.estado }
+                            : item,
+                    ),
+                );
+                toast.success(mensajeExitoEstado(destino));
+            } catch (err) {
+                const mensaje =
+                    err instanceof ApiError
+                        ? err.message
+                        : "No fue posible cambiar el estado del documento.";
+                toast.error(mensaje);
+            } finally {
+                setAlternandoEstadoId(null);
+            }
+        },
+        [],
+    );
+
+    const solicitarCambioEstado = useCallback(
+        (documento: DocumentoResumen, destino: DocumentoEstado, requiereConfirmacion: boolean) => {
+            if (requiereConfirmacion) {
+                setConfirmacionEstado({ documento, destino });
+                return;
+            }
+            void aplicarCambioEstado(documento, destino);
+        },
+        [aplicarCambioEstado],
+    );
+
+    const confirmarCambioEstado = useCallback(async () => {
+        if (!confirmacionEstado) return;
+        const { documento, destino } = confirmacionEstado;
+        setConfirmacionEstado(null);
+        await aplicarCambioEstado(documento, destino);
+    }, [aplicarCambioEstado, confirmacionEstado]);
+
     if (!permisos.actualizarDocumentos) {
         return (
             <AppShell titulo="Gestión de documentos">
@@ -362,7 +463,21 @@ function GestionDocumentos() {
                                         {etiquetasAlcance[documento.alcance]}
                                     </TableCell>
                                     <TableCell>
-                                        <DocumentoEstadoBadge estado={documento.estado} />
+                                        {permisos.administrarEstados ? (
+                                            <DocumentoEstadoAdminSelect
+                                                estado={documento.estado}
+                                                deshabilitado={alternandoEstadoId === documento.id}
+                                                onSolicitarCambio={(destino, requiereConfirmacion) =>
+                                                    solicitarCambioEstado(
+                                                        documento,
+                                                        destino,
+                                                        requiereConfirmacion,
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <DocumentoEstadoBadge estado={documento.estado} />
+                                        )}
                                     </TableCell>
                                     <TableCell className="text-sm whitespace-nowrap">
                                         {formatFechaDocumento(documento.fechaActualizacion)}
@@ -556,6 +671,45 @@ function GestionDocumentos() {
                     </div>
                 </div>
             ) : null}
+
+            <AlertDialog
+                open={confirmacionEstado !== null}
+                onOpenChange={(abierto) => {
+                    if (!abierto) setConfirmacionEstado(null);
+                }}
+            >
+                <AlertDialogContent className={ALERT_DIALOG_CONTENT_CLASS}>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle
+                            className={
+                                confirmacionEstado?.destino === "INACTIVO"
+                                    ? ALERT_DIALOG_TITLE_DESACTIVAR_CLASS
+                                    : ALERT_DIALOG_TITLE_CLASS
+                            }
+                        >
+                            {confirmacionEstado
+                                ? mensajeConfirmacionEstado(confirmacionEstado.destino).titulo
+                                : ""}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className={ALERT_DIALOG_DESCRIPTION_CLASS}>
+                            {confirmacionEstado
+                                ? mensajeConfirmacionEstado(confirmacionEstado.destino).descripcion
+                                : ""}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className={ALERT_DIALOG_CANCEL_CLASS}>
+                            Cancelar
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            className={ALERT_DIALOG_ACTION_CLASS}
+                            onClick={() => void confirmarCambioEstado()}
+                        >
+                            Confirmar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AppShell>
     );
 }

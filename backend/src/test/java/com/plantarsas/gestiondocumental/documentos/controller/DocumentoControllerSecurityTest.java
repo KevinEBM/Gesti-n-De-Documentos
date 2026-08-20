@@ -49,6 +49,7 @@ package com.plantarsas.gestiondocumental.documentos.controller;
 import com.plantarsas.gestiondocumental.config.SecurityConfig;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoActualizacionRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoArchivoDescarga;
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoEstadoActualizacionRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoFiltroRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResumenResponse;
@@ -120,6 +121,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -168,6 +170,12 @@ class DocumentoControllerSecurityTest {
     private static final Long DOCUMENTO_ID = 10L;
 
     private static final String URL_ACTUALIZACION = "/api/documentos/" + DOCUMENTO_ID;
+
+    private static final String URL_ESTADO = "/api/documentos/" + DOCUMENTO_ID + "/estado";
+
+    private static final String ESTADO_INACTIVO_REQUEST_JSON = "{\"estado\":\"INACTIVO\"}";
+
+    private static final String ESTADO_REQUEST_INVALIDO_JSON = "{\"estado\":null}";
 
     private static final String URL_NUEVA_VERSION = "/api/documentos/" + DOCUMENTO_ID + "/versiones";
 
@@ -623,18 +631,16 @@ class DocumentoControllerSecurityTest {
     }
 
     @Test
-    void publicarNuevaVersion_conDocumentoInactivo_debeResponder400() throws Exception {
+    void publicarNuevaVersion_conDocumentoInactivo_debePermitirAcceso() throws Exception {
         when(documentoService.publicarNuevaVersion(
                 anyLong(), any(), any(), anyString(), any(InputStream.class), anyString(), anyLong()
-        )).thenThrow(new BusinessException(
-                "El documento 'PROC-001' no permite publicar nuevas versiones en su estado actual"
-        ));
+        )).thenReturn(respuestaDePrueba());
 
         mockMvc.perform(multipart(URL_NUEVA_VERSION)
                         .file(metadataNuevaVersionValida())
                         .file(archivoValido())
                         .with(administradorAutenticado()))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isCreated());
     }
 
     @Test
@@ -642,7 +648,7 @@ class DocumentoControllerSecurityTest {
         when(documentoService.publicarNuevaVersion(
                 anyLong(), any(), any(), anyString(), any(InputStream.class), anyString(), anyLong()
         )).thenThrow(new BusinessException(
-                "El documento 'PROC-002' no permite publicar nuevas versiones en su estado actual"
+                "El documento 'PROC-002' no permite publicar nuevas versiones mientras esté obsoleto"
         ));
 
         mockMvc.perform(multipart(URL_NUEVA_VERSION)
@@ -1193,6 +1199,66 @@ class DocumentoControllerSecurityTest {
                 .andExpect(status().isOk());
 
         verify(documentoService).actualizarMetadatos(eq(DOCUMENTO_ID), any(), any());
+    }
+
+    // ------------------------------------------------------------------
+    // PATCH /api/documentos/{id}/estado (E1)
+    // ------------------------------------------------------------------
+
+    @Test
+    void cambiarEstado_sinAutenticacion_debeResponder401() throws Exception {
+        mockMvc.perform(patch(URL_ESTADO)
+                        .contentType("application/json")
+                        .content(ESTADO_INACTIVO_REQUEST_JSON))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    @WithMockUser(roles = "JEFE_AREA")
+    void cambiarEstado_conJefeArea_debeResponder403() throws Exception {
+        mockMvc.perform(patch(URL_ESTADO)
+                        .contentType("application/json")
+                        .content(ESTADO_INACTIVO_REQUEST_JSON))
+                .andExpect(status().isForbidden());
+
+        verify(documentoService, never()).cambiarEstado(anyLong(), any(), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMINISTRATIVO")
+    void cambiarEstado_conAdministrativo_debeResponder403() throws Exception {
+        mockMvc.perform(patch(URL_ESTADO)
+                        .contentType("application/json")
+                        .content(ESTADO_INACTIVO_REQUEST_JSON))
+                .andExpect(status().isForbidden());
+
+        verify(documentoService, never()).cambiarEstado(anyLong(), any(), any());
+    }
+
+    @Test
+    void cambiarEstado_conAdministrador_debePermitirAcceso() throws Exception {
+        when(documentoService.cambiarEstado(eq(DOCUMENTO_ID), any(), any())).thenReturn(respuestaDePrueba());
+
+        mockMvc.perform(patch(URL_ESTADO)
+                        .contentType("application/json")
+                        .content(ESTADO_INACTIVO_REQUEST_JSON)
+                        .with(administradorAutenticado()))
+                .andExpect(status().isOk());
+
+        verify(documentoService).cambiarEstado(eq(DOCUMENTO_ID), any(), any());
+    }
+
+    @Test
+    void cambiarEstado_conEstadoNulo_debeResponder400() throws Exception {
+        mockMvc.perform(patch(URL_ESTADO)
+                        .contentType("application/json")
+                        .content(ESTADO_REQUEST_INVALIDO_JSON)
+                        .with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verify(documentoService, never()).cambiarEstado(anyLong(), any(), any());
     }
 
     @Configuration

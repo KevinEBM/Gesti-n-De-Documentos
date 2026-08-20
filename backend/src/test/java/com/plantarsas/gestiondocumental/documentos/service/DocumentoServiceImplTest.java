@@ -3,6 +3,7 @@ package com.plantarsas.gestiondocumental.documentos.service;
 import com.plantarsas.gestiondocumental.areas.entity.Area;
 import com.plantarsas.gestiondocumental.areas.service.AreaLookupService;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoActualizacionRequest;
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoEstadoActualizacionRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoPublicacionInicialRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.NuevaVersionDocumentoRequest;
 import com.plantarsas.gestiondocumental.documentos.entity.Documento;
@@ -1062,17 +1063,22 @@ class DocumentoServiceImplTest {
     }
 
     @Test
-    void publicarNuevaVersion_debeLanzarBusinessExceptionSiDocumentoInactivo() {
+    void publicarNuevaVersion_conDocumentoInactivo_debePermitirNuevaVersionYConservarEstado() throws IOException {
         Documento documento = documentoPublicadoDePrueba();
         documento.cambiarEstado(DocumentoEstado.INACTIVO);
-        when(documentoRepository.buscarPorIdConBloqueoPesimista(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        stubAlmacenamientoYPersistenciaExitosaNuevaVersion(3);
 
-        assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
+        documentoServiceImpl.publicarNuevaVersion(
                 DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
                 "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
-        )).isInstanceOf(BusinessException.class);
+        );
 
-        verifyNoInteractions(storageService);
+        assertThat(documento.getEstado()).isEqualTo(DocumentoEstado.INACTIVO);
+        verify(versionDocumentoRepository).save(any(VersionDocumento.class));
     }
 
     @Test
@@ -2352,5 +2358,146 @@ class DocumentoServiceImplTest {
         )).isInstanceOf(BusinessException.class);
 
         verify(documentoRepository, never()).save(any(Documento.class));
+    }
+
+    private void stubCambioEstadoExitoso(Documento documento, VersionDocumento versionVigente) {
+        DocumentoArea principal = DocumentoArea.principal(documento, mock(Area.class));
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        lenient().when(documentoRepository.save(documento)).thenReturn(documento);
+        when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID))
+                .thenReturn(Optional.of(principal));
+        when(documentoAreaRepository.findAllByDocumento_IdAndEsPrincipalFalse(DOCUMENTO_ID))
+                .thenReturn(List.of());
+        when(versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(DOCUMENTO_ID))
+                .thenReturn(Optional.of(versionVigente));
+    }
+
+    @Test
+    void cambiarEstado_dePublicadoAInactivo_debeActualizarEstadoSinNuevaVersion() {
+        Documento documento = documentoPersistidoDePrueba();
+        VersionDocumento versionVigente = versionVigenteDePrueba(documento);
+        stubCambioEstadoExitoso(documento, versionVigente);
+
+        documentoServiceImpl.cambiarEstado(
+                DOCUMENTO_ID,
+                new DocumentoEstadoActualizacionRequest(DocumentoEstado.INACTIVO),
+                usuarioAdministrador()
+        );
+
+        assertThat(documento.getEstado()).isEqualTo(DocumentoEstado.INACTIVO);
+        verify(documentoRepository).save(documento);
+        verify(versionDocumentoRepository, never()).save(any(VersionDocumento.class));
+        verifyNoInteractions(storageService);
+        assertThat(versionVigente.getNumeroVersion()).isEqualTo(3);
+    }
+
+    @Test
+    void cambiarEstado_dePublicadoAObsoleto_debeActualizarEstado() {
+        Documento documento = documentoPersistidoDePrueba();
+        VersionDocumento versionVigente = versionVigenteDePrueba(documento);
+        stubCambioEstadoExitoso(documento, versionVigente);
+
+        documentoServiceImpl.cambiarEstado(
+                DOCUMENTO_ID,
+                new DocumentoEstadoActualizacionRequest(DocumentoEstado.OBSOLETO),
+                usuarioAdministrador()
+        );
+
+        assertThat(documento.getEstado()).isEqualTo(DocumentoEstado.OBSOLETO);
+    }
+
+    @Test
+    void cambiarEstado_deInactivoAPublicado_debeReactivarSinNuevaVersion() {
+        Documento documento = documentoPersistidoDePrueba();
+        documento.cambiarEstado(DocumentoEstado.INACTIVO);
+        VersionDocumento versionVigente = versionVigenteDePrueba(documento);
+        stubCambioEstadoExitoso(documento, versionVigente);
+
+        documentoServiceImpl.cambiarEstado(
+                DOCUMENTO_ID,
+                new DocumentoEstadoActualizacionRequest(DocumentoEstado.PUBLICADO),
+                usuarioAdministrador()
+        );
+
+        assertThat(documento.getEstado()).isEqualTo(DocumentoEstado.PUBLICADO);
+        verify(versionDocumentoRepository, never()).save(any(VersionDocumento.class));
+    }
+
+    @Test
+    void cambiarEstado_deObsoletoAPublicado_debeReactivar() {
+        Documento documento = documentoPersistidoDePrueba();
+        documento.cambiarEstado(DocumentoEstado.OBSOLETO);
+        VersionDocumento versionVigente = versionVigenteDePrueba(documento);
+        stubCambioEstadoExitoso(documento, versionVigente);
+
+        documentoServiceImpl.cambiarEstado(
+                DOCUMENTO_ID,
+                new DocumentoEstadoActualizacionRequest(DocumentoEstado.PUBLICADO),
+                usuarioAdministrador()
+        );
+
+        assertThat(documento.getEstado()).isEqualTo(DocumentoEstado.PUBLICADO);
+    }
+
+    @Test
+    void cambiarEstado_deObsoletoAInactivo_debeRechazarTransicion() {
+        Documento documento = documentoPersistidoDePrueba();
+        documento.cambiarEstado(DocumentoEstado.OBSOLETO);
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+
+        assertThatThrownBy(() -> documentoServiceImpl.cambiarEstado(
+                DOCUMENTO_ID,
+                new DocumentoEstadoActualizacionRequest(DocumentoEstado.INACTIVO),
+                usuarioAdministrador()
+        )).isInstanceOf(BusinessException.class);
+
+        verify(documentoRepository, never()).save(any(Documento.class));
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void cambiarEstado_conMismoEstado_debeSerIdempotente() {
+        Documento documento = documentoPersistidoDePrueba();
+        VersionDocumento versionVigente = versionVigenteDePrueba(documento);
+        stubCambioEstadoExitoso(documento, versionVigente);
+
+        documentoServiceImpl.cambiarEstado(
+                DOCUMENTO_ID,
+                new DocumentoEstadoActualizacionRequest(DocumentoEstado.PUBLICADO),
+                usuarioAdministrador()
+        );
+
+        verify(documentoRepository, never()).save(any(Documento.class));
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void cambiarEstado_debeRechazarUsuarioNoAdministrador() {
+        assertThatThrownBy(() -> documentoServiceImpl.cambiarEstado(
+                DOCUMENTO_ID,
+                new DocumentoEstadoActualizacionRequest(DocumentoEstado.INACTIVO),
+                new AuthenticatedUser(USUARIO_ID, "jefe", RolEnum.JEFE_AREA)
+        )).isInstanceOf(UnauthorizedException.class);
+
+        verifyNoInteractions(documentoRepository);
+    }
+
+    @Test
+    void cambiarEstado_noDebeModificarArchivoDeVersionVigente() {
+        Documento documento = documentoPersistidoDePrueba();
+        VersionDocumento versionVigente = versionVigenteDePrueba(documento);
+        String rutaOriginal = versionVigente.getRutaArchivo();
+        String nombreOriginal = versionVigente.getNombreArchivoOriginal();
+        stubCambioEstadoExitoso(documento, versionVigente);
+
+        documentoServiceImpl.cambiarEstado(
+                DOCUMENTO_ID,
+                new DocumentoEstadoActualizacionRequest(DocumentoEstado.INACTIVO),
+                usuarioAdministrador()
+        );
+
+        assertThat(versionVigente.getRutaArchivo()).isEqualTo(rutaOriginal);
+        assertThat(versionVigente.getNombreArchivoOriginal()).isEqualTo(nombreOriginal);
+        verifyNoInteractions(storageService);
     }
 }

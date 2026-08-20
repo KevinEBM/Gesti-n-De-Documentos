@@ -3,6 +3,7 @@ package com.plantarsas.gestiondocumental.documentos.service;
 import com.plantarsas.gestiondocumental.areas.entity.Area;
 import com.plantarsas.gestiondocumental.areas.service.AreaLookupService;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoActualizacionRequest;
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoEstadoActualizacionRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoPublicacionInicialRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.NuevaVersionDocumentoRequest;
@@ -185,10 +186,10 @@ public class DocumentoServiceImpl implements DocumentoService {
                         "No existe un documento con id " + documentoId
                 ));
 
-        if (documento.getEstado() != DocumentoEstado.PUBLICADO) {
+        if (!documento.getEstado().permitePublicarNuevaVersion()) {
             throw new BusinessException(
                     "El documento '" + documento.getCodigo()
-                            + "' no permite publicar nuevas versiones en su estado actual"
+                            + "' no permite publicar nuevas versiones mientras esté obsoleto"
             );
         }
 
@@ -202,7 +203,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         VersionDocumento vigenteActual = versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(documentoId)
                 .orElseThrow(() -> new IllegalStateException(
                         "Inconsistencia de datos: el documento con id " + documentoId
-                                + " está en estado PUBLICADO pero no tiene una versión vigente registrada"
+                                + " no tiene una versión vigente registrada"
                 ));
 
         Usuario usuario = usuarioRepository.findById(usuarioAutenticado.id())
@@ -330,6 +331,69 @@ public class DocumentoServiceImpl implements DocumentoService {
         documentoRepository.save(documento);
 
         sincronizarAsociacionesArea(documento, area, areasAdicionales);
+
+        DocumentoArea principal = documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(documentoId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No existe un área principal asignada para el documento con id " + documentoId
+                ));
+
+        List<DocumentoArea> asociacionesAdicionales =
+                documentoAreaRepository.findAllByDocumento_IdAndEsPrincipalFalse(documentoId);
+
+        VersionDocumento versionVigente = versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(documentoId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Inconsistencia de datos: el documento con id " + documentoId
+                                + " no tiene una versión vigente registrada"
+                ));
+
+        documentoRepository.flush();
+
+        return documentoMapper.toResponse(documento, principal, asociacionesAdicionales, versionVigente);
+    }
+
+    @Override
+    @Transactional
+    public DocumentoResponse cambiarEstado(
+            Long documentoId,
+            DocumentoEstadoActualizacionRequest request,
+            AuthenticatedUser usuarioAutenticado
+    ) {
+        if (usuarioAutenticado == null) {
+            throw new UnauthorizedException(
+                    "Se requiere un usuario autenticado para cambiar el estado de un documento"
+            );
+        }
+        if (usuarioAutenticado.rol() != RolEnum.ADMINISTRADOR) {
+            throw new UnauthorizedException(
+                    "Solo el administrador puede cambiar el estado de los documentos"
+            );
+        }
+        if (documentoId == null || documentoId <= 0) {
+            throw new BusinessException(
+                    "El identificador del documento debe ser un valor válido",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        Documento documento = documentoRepository.findById(documentoId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No existe un documento con id " + documentoId
+                ));
+
+        DocumentoEstado estadoActual = documento.getEstado();
+        DocumentoEstado estadoSolicitado = request.estado();
+
+        if (!estadoActual.permiteTransicionA(estadoSolicitado)) {
+            throw new BusinessException(
+                    "No es posible cambiar el estado de '"
+                            + estadoActual + "' a '" + estadoSolicitado + "'"
+            );
+        }
+
+        if (estadoActual != estadoSolicitado) {
+            documento.cambiarEstado(estadoSolicitado);
+            documentoRepository.save(documento);
+        }
 
         DocumentoArea principal = documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(documentoId)
                 .orElseThrow(() -> new ResourceNotFoundException(

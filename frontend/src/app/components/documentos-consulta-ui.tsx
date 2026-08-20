@@ -18,6 +18,7 @@ import {
     SELECT_TRIGGER_CLASS,
     TODOS,
     estilosEstado,
+    estilosEstadoAdminSelect,
     etiquetasEstado,
 } from "@/lib/documentos-consulta-shared";
 import { obtenerIconoArea } from "@/lib/iconos-areas";
@@ -159,5 +160,81 @@ export function DocumentoFiltroSelect({
                 </SelectContent>
             </Select>
         </div>
+    );
+}
+
+type AccionEstadoDocumento = {
+    destino: DocumentoEstado;
+    etiqueta: string;
+    requiereConfirmacion: boolean;
+};
+
+function accionesEstadoDocumento(estado: DocumentoEstado): AccionEstadoDocumento[] {
+    switch (estado) {
+        case "PUBLICADO":
+            return [
+                { destino: "INACTIVO", etiqueta: "Desactivar", requiereConfirmacion: true },
+                { destino: "OBSOLETO", etiqueta: "Obsoleto", requiereConfirmacion: true },
+            ];
+        case "INACTIVO":
+            return [
+                { destino: "PUBLICADO", etiqueta: "Activar", requiereConfirmacion: false },
+                { destino: "OBSOLETO", etiqueta: "Obsoleto", requiereConfirmacion: true },
+            ];
+        case "OBSOLETO":
+            return [{ destino: "PUBLICADO", etiqueta: "Activar", requiereConfirmacion: false }];
+    }
+}
+
+export function DocumentoEstadoAdminSelect({
+    estado,
+    deshabilitado = false,
+    onSolicitarCambio,
+}: {
+    estado: DocumentoEstado;
+    deshabilitado?: boolean;
+    onSolicitarCambio: (destino: DocumentoEstado, requiereConfirmacion: boolean) => void;
+}) {
+    const acciones = accionesEstadoDocumento(estado);
+
+    return (
+        <Select
+            value={estado}
+            disabled={deshabilitado}
+            onValueChange={(valor) => {
+                if (valor === estado) return;
+                const accion = acciones.find((item) => item.destino === valor);
+                if (accion) {
+                    onSolicitarCambio(accion.destino, accion.requiereConfirmacion);
+                }
+            }}
+        >
+            <SelectTrigger
+                className={cn(
+                    SELECT_TRIGGER_CLASS,
+                    estilosEstadoAdminSelect[estado],
+                    "h-8 w-[11.5rem] border text-sm font-medium",
+                )}
+            >
+                <SelectValue>{etiquetasEstado[estado]}</SelectValue>
+            </SelectTrigger>
+            <SelectContent className={SELECT_CONTENT_CLASS}>
+                <SelectItem
+                    value={estado}
+                    className={cn(SELECT_ITEM_CLASS, estilosEstadoAdminSelect[estado])}
+                >
+                    {etiquetasEstado[estado]}
+                </SelectItem>
+                {acciones.map((accion) => (
+                    <SelectItem
+                        key={accion.destino}
+                        value={accion.destino}
+                        className={SELECT_ITEM_CLASS}
+                    >
+                        {accion.etiqueta}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
     );
 }

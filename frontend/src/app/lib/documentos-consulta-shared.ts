@@ -64,6 +64,29 @@ export const estilosEstado: Record<DocumentoEstado, string> = {
     OBSOLETO: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
 };
 
+/** Selector de estado en Gestión: tema claro forzado, sin depender del modo oscuro global. */
+export const estilosEstadoAdminSelect: Record<DocumentoEstado, string> = {
+    PUBLICADO: "!bg-emerald-50 !text-emerald-800 border-emerald-300 hover:!bg-emerald-100",
+    INACTIVO: "!bg-red-50 !text-red-800 border-red-300 hover:!bg-red-100",
+    OBSOLETO: "!bg-amber-50 !text-amber-800 border-amber-300 hover:!bg-amber-100",
+};
+
+export const ALERT_DIALOG_CONTENT_CLASS =
+    "!bg-white !text-slate-900 border border-slate-200 shadow-2xl";
+
+export const ALERT_DIALOG_TITLE_CLASS = "!text-slate-900";
+
+export const ALERT_DIALOG_TITLE_DESACTIVAR_CLASS = "!text-red-600";
+
+export const ALERT_DIALOG_DESCRIPTION_CLASS = "!text-slate-600";
+
+export const ALERT_DIALOG_CANCEL_CLASS =
+    "!bg-white !text-slate-900 border border-slate-200 hover:!bg-slate-100";
+
+/** Mismo verde primario que Button default (#289248). */
+export const ALERT_DIALOG_ACTION_CLASS =
+    "!bg-[#289248] !text-white hover:!bg-[#289248]/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#289248]/40 disabled:opacity-50";
+
 export function formatFechaDocumento(fecha: string): string {
     try {
         return new Intl.DateTimeFormat("es-CO", {
