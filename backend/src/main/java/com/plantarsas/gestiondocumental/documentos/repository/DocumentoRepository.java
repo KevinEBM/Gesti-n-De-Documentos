@@ -15,6 +15,8 @@ public interface DocumentoRepository extends JpaRepository<Documento, Long>, Jpa
 
     boolean existsByCodigoIgnoreCase(String codigo);
 
+    boolean existsByCodigoIgnoreCaseAndIdNot(String codigo, Long id);
+
     Optional<Documento> findByCodigoIgnoreCase(String codigo);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -47,6 +47,7 @@ package com.plantarsas.gestiondocumental.documentos.controller;
  */
 
 import com.plantarsas.gestiondocumental.config.SecurityConfig;
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoActualizacionRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoArchivoDescarga;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoFiltroRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
@@ -119,6 +120,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -158,7 +160,14 @@ class DocumentoControllerSecurityTest {
                     + "\"descripcionVersionInicial\":\"Publicacion inicial\","
                     + "\"alcance\":\"AREA_RESPONSABLE\"}";
 
+    private static final String METADATA_ACTUALIZACION_VALIDA_JSON =
+            "{\"codigo\":\"PROC-001\",\"titulo\":\"Titulo actualizado\",\"descripcion\":\"Descripcion actualizada\","
+                    + "\"areaId\":1,\"subprogramaId\":2,\"tipoDocumentoId\":3,"
+                    + "\"alcance\":\"AREA_RESPONSABLE\",\"areasAdicionalesIds\":[]}";
+
     private static final Long DOCUMENTO_ID = 10L;
+
+    private static final String URL_ACTUALIZACION = "/api/documentos/" + DOCUMENTO_ID;
 
     private static final String URL_NUEVA_VERSION = "/api/documentos/" + DOCUMENTO_ID + "/versiones";
 
@@ -1138,6 +1147,52 @@ class DocumentoControllerSecurityTest {
 
         mockMvc.perform(get(URL_DESCARGA_HISTORICA).with(administradorAutenticado()))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void actualizarMetadatos_sinAutenticacion_debeResponder401() throws Exception {
+        mockMvc.perform(put(URL_ACTUALIZACION)
+                        .contentType("application/json")
+                        .content(METADATA_ACTUALIZACION_VALIDA_JSON))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    @WithMockUser(roles = "JEFE_AREA")
+    void actualizarMetadatos_conJefeArea_debeResponder403() throws Exception {
+        mockMvc.perform(put(URL_ACTUALIZACION)
+                        .contentType("application/json")
+                        .content(METADATA_ACTUALIZACION_VALIDA_JSON))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMINISTRATIVO")
+    void actualizarMetadatos_conAdministrativo_debeResponder403() throws Exception {
+        mockMvc.perform(put(URL_ACTUALIZACION)
+                        .contentType("application/json")
+                        .content(METADATA_ACTUALIZACION_VALIDA_JSON))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    void actualizarMetadatos_conAdministradorYSolicitudValida_debeResponder200() throws Exception {
+        when(documentoService.actualizarMetadatos(eq(DOCUMENTO_ID), any(), any()))
+                .thenReturn(respuestaDePrueba());
+
+        mockMvc.perform(put(URL_ACTUALIZACION)
+                        .contentType("application/json")
+                        .content(METADATA_ACTUALIZACION_VALIDA_JSON)
+                        .with(administradorAutenticado()))
+                .andExpect(status().isOk());
+
+        verify(documentoService).actualizarMetadatos(eq(DOCUMENTO_ID), any(), any());
     }
 
     @Configuration

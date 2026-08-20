@@ -20,6 +20,7 @@ import { Route as AppInicioRouteImport } from './routes/app.inicio'
 import { Route as AppGestionDocumentosRouteImport } from './routes/app.gestion-documentos'
 import { Route as AppDocumentosRouteImport } from './routes/app.documentos'
 import { Route as AppDocumentoIdRouteImport } from './routes/app.documento.$id'
+import { Route as AppDocumentoIdEditarRouteImport } from './routes/app.documento.$id.editar'
 
 
 const AppRoute = AppRouteImport.update({
@@ -77,6 +78,11 @@ const AppDocumentoIdRoute = AppDocumentoIdRouteImport.update({
     path: '/documento/$id',
     getParentRoute: () => AppRoute,
 } as any)
+const AppDocumentoIdEditarRoute = AppDocumentoIdEditarRouteImport.update({
+    id: '/documento/$id/editar',
+    path: '/documento/$id/editar',
+    getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
     '/': typeof IndexRoute
@@ -90,6 +96,7 @@ export interface FileRoutesByFullPath {
     '/app/publicar': typeof AppPublicarRoute
     '/app/usuarios': typeof AppUsuariosRoute
     '/app/documento/$id': typeof AppDocumentoIdRoute
+    '/app/documento/$id/editar': typeof AppDocumentoIdEditarRoute
 }
 export interface FileRoutesByTo {
     '/': typeof IndexRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
     '/app/publicar': typeof AppPublicarRoute
     '/app/usuarios': typeof AppUsuariosRoute
     '/app/documento/$id': typeof AppDocumentoIdRoute
+    '/app/documento/$id/editar': typeof AppDocumentoIdEditarRoute
 }
 export interface FileRoutesById {
     __root__: typeof rootRouteImport
@@ -117,6 +125,7 @@ export interface FileRoutesById {
     '/app/publicar': typeof AppPublicarRoute
     '/app/usuarios': typeof AppUsuariosRoute
     '/app/documento/$id': typeof AppDocumentoIdRoute
+    '/app/documento/$id/editar': typeof AppDocumentoIdEditarRoute
 }
 export interface FileRouteTypes {
     fileRoutesByFullPath: FileRoutesByFullPath
@@ -132,6 +141,7 @@ export interface FileRouteTypes {
         | '/app/publicar'
         | '/app/usuarios'
         | '/app/documento/$id'
+        | '/app/documento/$id/editar'
     fileRoutesByTo: FileRoutesByTo
     to:
         | '/'
@@ -145,6 +155,7 @@ export interface FileRouteTypes {
         | '/app/publicar'
         | '/app/usuarios'
         | '/app/documento/$id'
+        | '/app/documento/$id/editar'
     id:
         | '__root__'
         | '/'
@@ -158,6 +169,7 @@ export interface FileRouteTypes {
         | '/app/publicar'
         | '/app/usuarios'
         | '/app/documento/$id'
+        | '/app/documento/$id/editar'
     fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -244,6 +256,13 @@ declare module '@tanstack/react-router' {
             preLoaderRoute: typeof AppDocumentoIdRouteImport
             parentRoute: typeof AppRoute
         }
+        '/app/documento/$id/editar': {
+            id: '/app/documento/$id/editar'
+            path: '/documento/$id/editar'
+            fullPath: '/app/documento/$id/editar'
+            preLoaderRoute: typeof AppDocumentoIdEditarRouteImport
+            parentRoute: typeof AppRoute
+        }
     }
 }
 
@@ -257,6 +276,7 @@ interface AppRouteChildren {
     AppPublicarRoute: typeof AppPublicarRoute
     AppUsuariosRoute: typeof AppUsuariosRoute
     AppDocumentoIdRoute: typeof AppDocumentoIdRoute
+    AppDocumentoIdEditarRoute: typeof AppDocumentoIdEditarRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -269,6 +289,7 @@ const AppRouteChildren: AppRouteChildren = {
     AppPublicarRoute: AppPublicarRoute,
     AppUsuariosRoute: AppUsuariosRoute,
     AppDocumentoIdRoute: AppDocumentoIdRoute,
+    AppDocumentoIdEditarRoute: AppDocumentoIdEditarRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

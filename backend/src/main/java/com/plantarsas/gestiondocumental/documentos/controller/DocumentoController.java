@@ -1,5 +1,6 @@
 package com.plantarsas.gestiondocumental.documentos.controller;
 
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoActualizacionRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoArchivoDescarga;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoFiltroRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoPublicacionInicialRequest;
@@ -33,6 +34,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -116,6 +119,18 @@ public class DocumentoController {
         }
 
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.exitosa(actualizado));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ApiResponse<DocumentoResponse> actualizarMetadatos(
+            @PathVariable Long id,
+            @Valid @RequestBody DocumentoActualizacionRequest request,
+            @AuthenticationPrincipal AuthenticatedUser usuarioAutenticado
+    ) {
+        return ApiResponse.exitosa(
+                documentoService.actualizarMetadatos(id, request, usuarioAutenticado)
+        );
     }
 
     @GetMapping

@@ -91,8 +91,14 @@ public class TipoDocumentoServiceImpl implements TipoDocumentoService, TipoDocum
 
     @Override
     @Transactional(readOnly = true)
+    public TipoDocumento obtenerEntidadPorId(Long id) {
+        return buscarTipoDocumentoPorId(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public TipoDocumento obtenerActivoPorId(Long id) {
-        TipoDocumento tipoDocumento = obtenerEntidadPorId(id);
+        TipoDocumento tipoDocumento = buscarTipoDocumentoPorId(id);
         if (!tipoDocumento.isActivo()) {
             throw new BusinessException(
                     "El tipo de documento '" + tipoDocumento.getNombre() + "' está inactivo y no puede utilizarse"
@@ -101,7 +107,7 @@ public class TipoDocumentoServiceImpl implements TipoDocumentoService, TipoDocum
         return tipoDocumento;
     }
 
-    private TipoDocumento obtenerEntidadPorId(Long id) {
+    private TipoDocumento buscarTipoDocumentoPorId(Long id) {
         return tipoDocumentoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "No existe un tipo de documento con id " + id

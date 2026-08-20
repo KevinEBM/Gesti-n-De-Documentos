@@ -26,6 +26,17 @@ export interface DocumentoPublicacionInicialRequestDto {
     areasAdicionalesIds: number[];
 }
 
+export interface DocumentoActualizacionRequestDto {
+    codigo: string;
+    titulo: string;
+    descripcion?: string | null;
+    areaId: number;
+    subprogramaId: number;
+    tipoDocumentoId: number;
+    alcance: DocumentoAlcance;
+    areasAdicionalesIds: number[];
+}
+
 export interface DocumentoResumenResponseDto {
     id: number;
     codigo: string;
@@ -250,6 +261,17 @@ export async function listarDocumentos(
 
 export async function obtenerDocumento(id: string): Promise<DocumentoDetalle> {
     const dto = await apiFetch<DocumentoResponseDto>(`/api/documentos/${id}`);
+    return mapDocumentoResponseDto(dto);
+}
+
+export async function actualizarDocumento(
+    id: string,
+    metadata: DocumentoActualizacionRequestDto,
+): Promise<DocumentoDetalle> {
+    const dto = await apiFetch<DocumentoResponseDto>(`/api/documentos/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(metadata),
+    });
     return mapDocumentoResponseDto(dto);
 }
 

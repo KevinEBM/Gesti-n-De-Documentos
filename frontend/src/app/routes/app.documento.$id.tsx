@@ -1,5 +1,5 @@
 import { Link, createFileRoute, useParams } from "@tanstack/react-router";
-import { ArrowLeft, Download, FileText } from "lucide-react";
+import { ArrowLeft, Download, FileText, Pencil } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -20,6 +20,7 @@ import {
     obtenerDocumento,
     type DocumentoDetalle,
 } from "@/lib/documentos-api";
+import { useIntranet } from "@/lib/store";
 
 export const Route = createFileRoute("/app/documento/$id")({
     head: () => ({
@@ -41,6 +42,7 @@ export const Route = createFileRoute("/app/documento/$id")({
 
 function DetalleDocumento() {
     const { id } = useParams({ from: "/app/documento/$id" });
+    const { permisos } = useIntranet();
 
     const [documento, setDocumento] = useState<DocumentoDetalle | null>(null);
     const [cargando, setCargando] = useState(true);
@@ -190,6 +192,14 @@ function DetalleDocumento() {
                         <dl className="grid gap-4 sm:grid-cols-2">
                             <Campo k="Código" v={documento.codigo} mono />
                             <Campo k="Área responsable" v={documento.areaNombre} />
+                            <Campo
+                                k="Descripción de la publicación"
+                                v={
+                                    documento.descripcionVersionActual?.trim()
+                                        ? documento.descripcionVersionActual
+                                        : "Sin descripción"
+                                }
+                            />
                             <Campo k="Subprograma" v={documento.subprogramaNombre} />
                             <Campo k="Tipo de documento" v={documento.tipoDocumentoNombre} />
                             <Campo k="Alcance" v={etiquetasAlcance[documento.alcance]} />
@@ -216,6 +226,14 @@ function DetalleDocumento() {
                         <CardTitle className="text-base">Acciones</CardTitle>
                     </CardHeader>
                     <CardContent>
+                        {permisos.actualizarDocumentos ? (
+                            <Button asChild variant="outline" className="mb-2 w-full justify-between">
+                                <Link to="/app/documento/$id/editar" params={{ id }}>
+                                    Editar publicación
+                                    <Pencil className="size-4" />
+                                </Link>
+                            </Button>
+                        ) : null}
                         <Button
                             variant="outline"
                             className="w-full justify-between"

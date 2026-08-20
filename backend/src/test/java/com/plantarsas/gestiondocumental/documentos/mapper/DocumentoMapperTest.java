@@ -155,6 +155,36 @@ class DocumentoMapperTest {
     }
 
     @Test
+    void toResponse_debeExponerAreaResponsableYDescripcionDeVersionVigente() {
+        Area area = mock(Area.class);
+        when(area.getId()).thenReturn(10L);
+        when(area.getNombre()).thenReturn("Área responsable");
+
+        Documento documento = mock(Documento.class);
+        when(documento.getSubprograma()).thenReturn(mock(Subprograma.class));
+        when(documento.getTipoDocumento()).thenReturn(mock(TipoDocumento.class));
+        when(documento.getCreadoPor()).thenReturn(mock(Usuario.class));
+        when(documento.getAlcance()).thenReturn(DocumentoAlcance.AREA_RESPONSABLE);
+
+        DocumentoArea documentoArea = mock(DocumentoArea.class);
+        when(documentoArea.getArea()).thenReturn(area);
+
+        VersionDocumento version = mock(VersionDocumento.class);
+        when(version.getPublicadoPor()).thenReturn(mock(Usuario.class));
+        when(version.getDescripcionCambio()).thenReturn("Motivo de la versión vigente");
+
+        DocumentoResponse resultado = documentoMapper.toResponse(
+                documento,
+                documentoArea,
+                List.of(),
+                version
+        );
+
+        assertThat(resultado.areaNombre()).isEqualTo("Área responsable");
+        assertThat(resultado.descripcionVersionActual()).isEqualTo("Motivo de la versión vigente");
+    }
+
+    @Test
     void toResumen_debeMapearLosOchoCamposCorrectamente() {
         Subprograma subprograma = mock(Subprograma.class);
         when(subprograma.getNombre()).thenReturn("Subprograma de prueba");

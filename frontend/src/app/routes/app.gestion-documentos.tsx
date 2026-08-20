@@ -253,6 +253,13 @@ function GestionDocumentos() {
         [navigate],
     );
 
+    const editarDocumento = useCallback(
+        (documento: DocumentoResumen) => {
+            navigate({ to: "/app/documento/$id/editar", params: { id: documento.id } });
+        },
+        [navigate],
+    );
+
     if (!permisos.actualizarDocumentos) {
         return (
             <AppShell titulo="Gestión de documentos">
@@ -366,6 +373,7 @@ function GestionDocumentos() {
                                             descargandoId={descargandoId}
                                             onDescargar={descargarDocumento}
                                             onVer={verDocumento}
+                                            onEditar={editarDocumento}
                                         />
                                     </TableCell>
                                 </TableRow>

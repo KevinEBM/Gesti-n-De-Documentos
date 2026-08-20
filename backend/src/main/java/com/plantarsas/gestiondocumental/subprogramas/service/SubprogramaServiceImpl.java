@@ -119,8 +119,14 @@ public class SubprogramaServiceImpl implements SubprogramaService, SubprogramaLo
 
     @Override
     @Transactional(readOnly = true)
+    public Subprograma obtenerEntidadPorId(Long id) {
+        return buscarSubprogramaPorId(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Subprograma obtenerActivoPorId(Long id) {
-        Subprograma subprograma = obtenerEntidadPorId(id);
+        Subprograma subprograma = buscarSubprogramaPorId(id);
         if (!subprograma.isActivo()) {
             throw new BusinessException(
                     "El subprograma '" + subprograma.getNombre() + "' está inactivo y no puede utilizarse"
@@ -129,7 +135,7 @@ public class SubprogramaServiceImpl implements SubprogramaService, SubprogramaLo
         return subprograma;
     }
 
-    private Subprograma obtenerEntidadPorId(Long id) {
+    private Subprograma buscarSubprogramaPorId(Long id) {
         return subprogramaRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "No existe un subprograma con id " + id

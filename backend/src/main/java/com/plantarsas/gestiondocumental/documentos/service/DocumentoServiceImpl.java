@@ -2,6 +2,7 @@ package com.plantarsas.gestiondocumental.documentos.service;
 
 import com.plantarsas.gestiondocumental.areas.entity.Area;
 import com.plantarsas.gestiondocumental.areas.service.AreaLookupService;
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoActualizacionRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoPublicacionInicialRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.NuevaVersionDocumentoRequest;
@@ -38,8 +39,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -78,12 +83,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         }
 
         String codigoNormalizado = request.codigo().trim();
-        if (documentoRepository.existsByCodigoIgnoreCase(codigoNormalizado)) {
-            throw new BusinessException(
-                    "Ya existe un documento con el código '" + codigoNormalizado + "'",
-                    HttpStatus.CONFLICT
-            );
-        }
+        validarCodigoDocumentoUnico(codigoNormalizado, null);
 
         Area area = areaLookupService.obtenerActivaPorId(request.areaId());
         Subprograma subprograma = subprogramaLookupService.obtenerActivoPorId(request.subprogramaId());
@@ -249,19 +249,229 @@ public class DocumentoServiceImpl implements DocumentoService {
         }
     }
 
+    @Override
+    @Transactional
+    public DocumentoResponse actualizarMetadatos(
+            Long documentoId,
+            DocumentoActualizacionRequest request,
+            AuthenticatedUser usuarioAutenticado
+    ) {
+        if (usuarioAutenticado == null) {
+            throw new UnauthorizedException(
+                    "Se requiere un usuario autenticado para actualizar un documento"
+            );
+        }
+        if (usuarioAutenticado.rol() != RolEnum.ADMINISTRADOR) {
+            throw new UnauthorizedException(
+                    "Solo el administrador puede actualizar la publicación de documentos"
+            );
+        }
+        if (documentoId == null || documentoId <= 0) {
+            throw new BusinessException(
+                    "El identificador del documento debe ser un valor válido",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        Documento documento = documentoRepository.findById(documentoId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No existe un documento con id " + documentoId
+                ));
+
+        String codigoNormalizado = request.codigo().trim();
+        validarCodigoDocumentoUnico(codigoNormalizado, documentoId);
+
+        DocumentoArea principalActual = documentoAreaRepository
+                .findByDocumento_IdAndEsPrincipalTrue(documentoId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No existe un área principal asignada para el documento con id " + documentoId
+                ));
+
+        Area area = resolverAreaParaActualizacion(
+                request.areaId(),
+                principalActual.getArea().getId()
+        );
+        Subprograma subprograma = resolverSubprogramaParaActualizacion(
+                request.subprogramaId(),
+                documento.getSubprograma().getId()
+        );
+        if (!subprograma.getArea().getId().equals(area.getId())) {
+            throw new BusinessException(
+                    "El subprograma '" + subprograma.getNombre() + "' no pertenece al área seleccionada"
+            );
+        }
+
+        TipoDocumento tipoDocumento = resolverTipoDocumentoParaActualizacion(
+                request.tipoDocumentoId(),
+                documento.getTipoDocumento().getId()
+        );
+
+        Set<Long> idsAdicionalesActuales = documentoAreaRepository
+                .findAllByDocumento_IdAndEsPrincipalFalse(documentoId)
+                .stream()
+                .map(documentoArea -> documentoArea.getArea().getId())
+                .collect(Collectors.toSet());
+
+        List<Area> areasAdicionales = resolverAreasAdicionalesParaActualizacion(
+                request.alcance(),
+                request.areasAdicionalesIds(),
+                area,
+                idsAdicionalesActuales
+        );
+
+        documento.actualizarMetadatos(
+                codigoNormalizado,
+                request.titulo(),
+                request.descripcion(),
+                subprograma,
+                tipoDocumento,
+                request.alcance()
+        );
+        documentoRepository.save(documento);
+
+        sincronizarAsociacionesArea(documento, area, areasAdicionales);
+
+        DocumentoArea principal = documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(documentoId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No existe un área principal asignada para el documento con id " + documentoId
+                ));
+
+        List<DocumentoArea> asociacionesAdicionales =
+                documentoAreaRepository.findAllByDocumento_IdAndEsPrincipalFalse(documentoId);
+
+        VersionDocumento versionVigente = versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(documentoId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Inconsistencia de datos: el documento con id " + documentoId
+                                + " no tiene una versión vigente registrada"
+                ));
+
+        documentoRepository.flush();
+
+        return documentoMapper.toResponse(documento, principal, asociacionesAdicionales, versionVigente);
+    }
+
+    private void validarCodigoDocumentoUnico(String codigoNormalizado, Long documentoIdExcluir) {
+        boolean codigoEnUso = documentoIdExcluir == null
+                ? documentoRepository.existsByCodigoIgnoreCase(codigoNormalizado)
+                : documentoRepository.existsByCodigoIgnoreCaseAndIdNot(codigoNormalizado, documentoIdExcluir);
+        if (codigoEnUso) {
+            throw new BusinessException(
+                    "Ya existe un documento con el código '" + codigoNormalizado + "'",
+                    HttpStatus.CONFLICT
+            );
+        }
+    }
+
+    private Area resolverAreaParaActualizacion(Long areaId, Long areaActualId) {
+        if (areaId.equals(areaActualId)) {
+            return areaLookupService.obtenerEntidadPorId(areaId);
+        }
+        return areaLookupService.obtenerActivaPorId(areaId);
+    }
+
+    private Subprograma resolverSubprogramaParaActualizacion(Long subprogramaId, Long subprogramaActualId) {
+        if (subprogramaId.equals(subprogramaActualId)) {
+            return subprogramaLookupService.obtenerEntidadPorId(subprogramaId);
+        }
+        return subprogramaLookupService.obtenerActivoPorId(subprogramaId);
+    }
+
+    private TipoDocumento resolverTipoDocumentoParaActualizacion(Long tipoDocumentoId, Long tipoDocumentoActualId) {
+        if (tipoDocumentoId.equals(tipoDocumentoActualId)) {
+            return tipoDocumentoLookupService.obtenerEntidadPorId(tipoDocumentoId);
+        }
+        return tipoDocumentoLookupService.obtenerActivoPorId(tipoDocumentoId);
+    }
+
+    private void sincronizarAsociacionesArea(
+            Documento documento,
+            Area areaPrincipal,
+            List<Area> areasAdicionales
+    ) {
+        Long documentoId = documento.getId();
+
+        DocumentoArea principalActual = documentoAreaRepository
+                .findByDocumento_IdAndEsPrincipalTrue(documentoId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No existe un área principal asignada para el documento con id " + documentoId
+                ));
+
+        if (!principalActual.getArea().getId().equals(areaPrincipal.getId())) {
+            documentoAreaRepository.deleteByDocumento_IdAndEsPrincipalTrue(documentoId);
+            documentoAreaRepository.flush();
+            documentoAreaRepository.save(DocumentoArea.principal(documento, areaPrincipal));
+        }
+
+        documentoAreaRepository.deleteAllByDocumento_IdAndEsPrincipalFalse(documentoId);
+        documentoAreaRepository.flush();
+        crearAreasAdicionales(documento, areasAdicionales);
+    }
+
     private List<Area> resolverAreasAdicionales(
             DocumentoPublicacionInicialRequest request,
             Area areaPrincipal
     ) {
-        List<Long> idsAdicionales = request.areasAdicionalesIds();
+        return resolverAreasAdicionales(request.alcance(), request.areasAdicionalesIds(), areaPrincipal);
+    }
 
-        if (request.alcance() != DocumentoAlcance.AREAS_ESPECIFICAS) {
+    private List<Area> resolverAreasAdicionales(
+            DocumentoAlcance alcance,
+            List<Long> areasAdicionalesIds,
+            Area areaPrincipal
+    ) {
+        validarAreasAdicionalesParaAlcance(alcance, areasAdicionalesIds, areaPrincipal);
+        if (alcance != DocumentoAlcance.AREAS_ESPECIFICAS) {
+            return List.of();
+        }
+        return areaLookupService.obtenerActivasPorIds(areasAdicionalesIds);
+    }
+
+    private List<Area> resolverAreasAdicionalesParaActualizacion(
+            DocumentoAlcance alcance,
+            List<Long> areasAdicionalesIds,
+            Area areaPrincipal,
+            Set<Long> idsAdicionalesActuales
+    ) {
+        validarAreasAdicionalesParaAlcance(alcance, areasAdicionalesIds, areaPrincipal);
+        if (alcance != DocumentoAlcance.AREAS_ESPECIFICAS) {
+            return List.of();
+        }
+
+        List<Long> idsConservados = areasAdicionalesIds.stream()
+                .filter(idsAdicionalesActuales::contains)
+                .toList();
+        List<Long> idsNuevos = areasAdicionalesIds.stream()
+                .filter(id -> !idsAdicionalesActuales.contains(id))
+                .toList();
+
+        Map<Long, Area> areasPorId = new HashMap<>();
+        for (Long idConservado : idsConservados) {
+            areasPorId.put(idConservado, areaLookupService.obtenerEntidadPorId(idConservado));
+        }
+        if (!idsNuevos.isEmpty()) {
+            areaLookupService.obtenerActivasPorIds(idsNuevos)
+                    .forEach(area -> areasPorId.put(area.getId(), area));
+        }
+
+        return areasAdicionalesIds.stream()
+                .map(areasPorId::get)
+                .toList();
+    }
+
+    private void validarAreasAdicionalesParaAlcance(
+            DocumentoAlcance alcance,
+            List<Long> areasAdicionalesIds,
+            Area areaPrincipal
+    ) {
+        List<Long> idsAdicionales = areasAdicionalesIds;
+
+        if (alcance != DocumentoAlcance.AREAS_ESPECIFICAS) {
             if (!idsAdicionales.isEmpty()) {
                 throw new BusinessException(
-                        "El alcance '" + request.alcance() + "' no admite áreas adicionales"
+                        "El alcance '" + alcance + "' no admite áreas adicionales"
                 );
             }
-            return List.of();
+            return;
         }
 
         if (idsAdicionales.isEmpty()) {
@@ -281,8 +491,6 @@ public class DocumentoServiceImpl implements DocumentoService {
                     "El área responsable no puede repetirse como área adicional"
             );
         }
-
-        return areaLookupService.obtenerActivasPorIds(idsAdicionales);
     }
 
     private List<DocumentoArea> crearAreasAdicionales(Documento documento, List<Area> areasAdicionales) {

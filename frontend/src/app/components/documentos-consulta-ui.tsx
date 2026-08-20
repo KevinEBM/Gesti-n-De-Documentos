@@ -1,4 +1,4 @@
-import { Download, Eye } from "lucide-react";
+import { Download, Eye, Pencil } from "lucide-react";
 import type { ComponentType } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +39,7 @@ export function DocumentoAcciones({
     descargandoId,
     onDescargar,
     onVer,
+    onEditar,
     apilado = false,
     verDeshabilitado = false,
     tituloVer,
@@ -47,6 +48,7 @@ export function DocumentoAcciones({
     descargandoId: string | null;
     onDescargar: (documento: DocumentoResumen) => void;
     onVer?: (documento: DocumentoResumen) => void;
+    onEditar?: (documento: DocumentoResumen) => void;
     apilado?: boolean;
     verDeshabilitado?: boolean;
     tituloVer?: string;
@@ -61,6 +63,17 @@ export function DocumentoAcciones({
                 apilado ? "flex-col sm:flex-row" : "flex-wrap items-center justify-end",
             )}
         >
+            {onEditar ? (
+                <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={() => onEditar(documento)}
+                >
+                    <Pencil className="size-4" />
+                    Editar publicación
+                </Button>
+            ) : null}
             <Button
                 size="sm"
                 variant="outline"

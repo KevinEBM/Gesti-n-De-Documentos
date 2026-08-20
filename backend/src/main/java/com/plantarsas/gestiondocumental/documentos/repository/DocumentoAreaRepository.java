@@ -12,5 +12,9 @@ public interface DocumentoAreaRepository extends JpaRepository<DocumentoArea, Lo
 
     List<DocumentoArea> findAllByDocumento_IdAndEsPrincipalFalse(Long documentoId);
 
+    void deleteAllByDocumento_IdAndEsPrincipalFalse(Long documentoId);
+
+    void deleteByDocumento_IdAndEsPrincipalTrue(Long documentoId);
+
     List<DocumentoArea> findByArea_Id(Long areaId);
 }

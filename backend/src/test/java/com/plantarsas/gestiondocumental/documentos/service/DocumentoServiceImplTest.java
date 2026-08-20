@@ -2,6 +2,7 @@ package com.plantarsas.gestiondocumental.documentos.service;
 
 import com.plantarsas.gestiondocumental.areas.entity.Area;
 import com.plantarsas.gestiondocumental.areas.service.AreaLookupService;
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoActualizacionRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoPublicacionInicialRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.NuevaVersionDocumentoRequest;
 import com.plantarsas.gestiondocumental.documentos.entity.Documento;
@@ -33,6 +34,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -53,6 +55,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -75,6 +78,7 @@ class DocumentoServiceImplTest {
 
     private static final Long AREA_ADICIONAL_1_ID = 101L;
     private static final Long AREA_ADICIONAL_2_ID = 102L;
+    private static final Long AREA_ADICIONAL_3_ID = 103L;
 
     @Mock
     private DocumentoRepository documentoRepository;
@@ -1559,5 +1563,794 @@ class DocumentoServiceImplTest {
         );
 
         assertThat(adicionalesCaptor.getValue()).containsExactlyInAnyOrder(adicional1, adicional2);
+    }
+
+    private DocumentoActualizacionRequest requestActualizacionValido() {
+        return new DocumentoActualizacionRequest(
+                "PROC-001",
+                "Título actualizado",
+                "Descripción actualizada",
+                AREA_ID,
+                SUBPROGRAMA_ID,
+                TIPO_DOCUMENTO_ID,
+                DocumentoAlcance.AREA_RESPONSABLE,
+                List.of()
+        );
+    }
+
+    private DocumentoActualizacionRequest requestActualizacionConAlcance(
+            DocumentoAlcance alcance, List<Long> areasAdicionalesIds
+    ) {
+        return new DocumentoActualizacionRequest(
+                "PROC-001",
+                "Título actualizado",
+                "Descripción actualizada",
+                AREA_ID,
+                SUBPROGRAMA_ID,
+                TIPO_DOCUMENTO_ID,
+                alcance,
+                areasAdicionalesIds
+        );
+    }
+
+    private DocumentoActualizacionRequest requestActualizacionConCodigo(String codigo) {
+        return new DocumentoActualizacionRequest(
+                codigo,
+                "Título actualizado",
+                "Descripción actualizada",
+                AREA_ID,
+                SUBPROGRAMA_ID,
+                TIPO_DOCUMENTO_ID,
+                DocumentoAlcance.AREA_RESPONSABLE,
+                List.of()
+        );
+    }
+
+    private Documento documentoPersistidoDePrueba() {
+        Documento documento = documentoPublicadoDePrueba();
+        ReflectionTestUtils.setField(documento, "id", DOCUMENTO_ID);
+        Subprograma subprogramaAsignado = mock(Subprograma.class);
+        lenient().when(subprogramaAsignado.getId()).thenReturn(SUBPROGRAMA_ID);
+        TipoDocumento tipoAsignado = mock(TipoDocumento.class);
+        lenient().when(tipoAsignado.getId()).thenReturn(TIPO_DOCUMENTO_ID);
+        ReflectionTestUtils.setField(documento, "subprograma", subprogramaAsignado);
+        ReflectionTestUtils.setField(documento, "tipoDocumento", tipoAsignado);
+        return documento;
+    }
+
+    private DocumentoArea documentoAreaPrincipalDePrueba(Documento documento, Area area) {
+        return DocumentoArea.principal(documento, area);
+    }
+
+    private DocumentoArea documentoAreaAdicionalDePrueba(Documento documento, Area area) {
+        return DocumentoArea.adicional(documento, area);
+    }
+
+    private Area areaAdicionalMock(Long id) {
+        Area area = mock(Area.class);
+        when(area.getId()).thenReturn(id);
+        return area;
+    }
+
+    private void stubAdicionalesActuales(Documento documento, List<DocumentoArea> adicionales) {
+        when(documentoAreaRepository.findAllByDocumento_IdAndEsPrincipalFalse(DOCUMENTO_ID))
+                .thenReturn(adicionales);
+    }
+
+    private void stubActualizacionMetadatosExitosa(
+            Documento documento,
+            Area area,
+            Subprograma subprograma,
+            TipoDocumento tipoDocumento,
+            DocumentoArea principal
+    ) {
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(documentoRepository.existsByCodigoIgnoreCaseAndIdNot(anyString(), eq(DOCUMENTO_ID)))
+                .thenReturn(false);
+        when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID))
+                .thenReturn(Optional.of(principal));
+        when(areaLookupService.obtenerEntidadPorId(AREA_ID)).thenReturn(area);
+        when(subprogramaLookupService.obtenerEntidadPorId(SUBPROGRAMA_ID)).thenReturn(subprograma);
+        when(tipoDocumentoLookupService.obtenerEntidadPorId(TIPO_DOCUMENTO_ID)).thenReturn(tipoDocumento);
+        when(documentoRepository.save(documento)).thenReturn(documento);
+        when(documentoAreaRepository.findAllByDocumento_IdAndEsPrincipalFalse(DOCUMENTO_ID))
+                .thenReturn(List.of());
+        when(versionDocumentoRepository.findByDocumento_IdAndVigenteTrue(DOCUMENTO_ID))
+                .thenReturn(Optional.of(versionVigenteDePrueba(documento)));
+    }
+
+    @Test
+    void actualizarMetadatos_debeRechazarUsuarioConRolJefeArea() {
+        assertThatThrownBy(() -> documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID,
+                requestActualizacionValido(),
+                new AuthenticatedUser(USUARIO_ID, "jefe@plantarsas.com", RolEnum.JEFE_AREA)
+        )).isInstanceOf(UnauthorizedException.class);
+
+        verifyNoInteractions(documentoRepository);
+    }
+
+    @Test
+    void actualizarMetadatos_debeRechazarUsuarioConRolAdministrativo() {
+        assertThatThrownBy(() -> documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID,
+                requestActualizacionValido(),
+                new AuthenticatedUser(USUARIO_ID, "admin@plantarsas.com", RolEnum.ADMINISTRATIVO)
+        )).isInstanceOf(UnauthorizedException.class);
+
+        verifyNoInteractions(documentoRepository);
+    }
+
+    @Test
+    void actualizarMetadatos_debeLanzarNotFoundSiDocumentoNoExiste() {
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID, requestActualizacionValido(), usuarioAdministrador()
+        )).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void actualizarMetadatos_debeLanzarBusinessExceptionSiSubprogramaNoPerteneceAlArea() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Subprograma subprograma = mock(Subprograma.class);
+        when(subprograma.getNombre()).thenReturn("Sub A");
+        when(subprograma.getArea()).thenReturn(mock(Area.class));
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(documentoRepository.existsByCodigoIgnoreCaseAndIdNot(anyString(), eq(DOCUMENTO_ID)))
+                .thenReturn(false);
+        when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID))
+                .thenReturn(Optional.of(principal));
+        when(areaLookupService.obtenerEntidadPorId(AREA_ID)).thenReturn(area);
+        when(subprogramaLookupService.obtenerEntidadPorId(SUBPROGRAMA_ID)).thenReturn(subprograma);
+
+        assertThatThrownBy(() -> documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID, requestActualizacionValido(), usuarioAdministrador()
+        )).isInstanceOf(BusinessException.class);
+
+        verify(documentoRepository, never()).save(any(Documento.class));
+    }
+
+    @Test
+    void actualizarMetadatos_debeActualizarMetadatosSinCrearNuevaVersion() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        stubActualizacionMetadatosExitosa(documento, area, subprograma, tipoDocumento, principal);
+
+        documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID, requestActualizacionValido(), usuarioAdministrador()
+        );
+
+        assertThat(documento.getTitulo()).isEqualTo("Título actualizado");
+        verify(documentoRepository).save(documento);
+        verify(documentoAreaRepository).deleteAllByDocumento_IdAndEsPrincipalFalse(DOCUMENTO_ID);
+        verify(versionDocumentoRepository, never()).save(any(VersionDocumento.class));
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void actualizarMetadatos_conGlobal_debeLimpiarAreasAdicionales() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        stubActualizacionMetadatosExitosa(documento, area, subprograma, tipoDocumento, principal);
+
+        documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID,
+                requestActualizacionConAlcance(DocumentoAlcance.GLOBAL, List.of()),
+                usuarioAdministrador()
+        );
+
+        assertThat(documento.getAlcance()).isEqualTo(DocumentoAlcance.GLOBAL);
+        verify(documentoAreaRepository).deleteAllByDocumento_IdAndEsPrincipalFalse(DOCUMENTO_ID);
+        verify(documentoAreaRepository, never()).save(any(DocumentoArea.class));
+    }
+
+    @Test
+    void actualizarMetadatos_conAreasEspecificas_debeSincronizarAdicionales() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Area adicional = mock(Area.class);
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        stubActualizacionMetadatosExitosa(documento, area, subprograma, tipoDocumento, principal);
+        when(areaLookupService.obtenerActivasPorIds(List.of(AREA_ADICIONAL_1_ID))).thenReturn(List.of(adicional));
+        when(documentoAreaRepository.save(any(DocumentoArea.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID,
+                requestActualizacionConAlcance(
+                        DocumentoAlcance.AREAS_ESPECIFICAS,
+                        List.of(AREA_ADICIONAL_1_ID)
+                ),
+                usuarioAdministrador()
+        );
+
+        verify(documentoAreaRepository).deleteAllByDocumento_IdAndEsPrincipalFalse(DOCUMENTO_ID);
+        verify(documentoAreaRepository).save(any(DocumentoArea.class));
+    }
+
+    @Test
+    void actualizarMetadatos_debeActualizarCodigoValido() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        stubActualizacionMetadatosExitosa(documento, area, subprograma, tipoDocumento, principal);
+
+        documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID,
+                requestActualizacionConCodigo("DOC-002"),
+                usuarioAdministrador()
+        );
+
+        assertThat(documento.getCodigo()).isEqualTo("DOC-002");
+        verify(documentoRepository).existsByCodigoIgnoreCaseAndIdNot("DOC-002", DOCUMENTO_ID);
+    }
+
+    @Test
+    void actualizarMetadatos_debePermitirGuardarMismoCodigo() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        stubActualizacionMetadatosExitosa(documento, area, subprograma, tipoDocumento, principal);
+
+        documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID, requestActualizacionValido(), usuarioAdministrador()
+        );
+
+        assertThat(documento.getCodigo()).isEqualTo("PROC-001");
+        verify(documentoRepository).existsByCodigoIgnoreCaseAndIdNot("PROC-001", DOCUMENTO_ID);
+    }
+
+    @Test
+    void actualizarMetadatos_debeNormalizarCodigoConEspacios() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        stubActualizacionMetadatosExitosa(documento, area, subprograma, tipoDocumento, principal);
+
+        documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID,
+                requestActualizacionConCodigo("  DOC-002  "),
+                usuarioAdministrador()
+        );
+
+        assertThat(documento.getCodigo()).isEqualTo("DOC-002");
+        verify(documentoRepository).existsByCodigoIgnoreCaseAndIdNot("DOC-002", DOCUMENTO_ID);
+    }
+
+    @Test
+    void actualizarMetadatos_debeRechazarCodigoDuplicadoDeOtroDocumento() {
+        Documento documento = documentoPersistidoDePrueba();
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(documentoRepository.existsByCodigoIgnoreCaseAndIdNot("DOC-001", DOCUMENTO_ID))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID,
+                requestActualizacionConCodigo("DOC-001"),
+                usuarioAdministrador()
+        )).isInstanceOf(BusinessException.class);
+
+        verify(documentoRepository, never()).save(any(Documento.class));
+    }
+
+    @Test
+    void actualizarMetadatos_debeRechazarCodigoDuplicadoCaseInsensitive() {
+        Documento documento = documentoPersistidoDePrueba();
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(documentoRepository.existsByCodigoIgnoreCaseAndIdNot("doc-001", DOCUMENTO_ID))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID,
+                requestActualizacionConCodigo("doc-001"),
+                usuarioAdministrador()
+        )).isInstanceOf(BusinessException.class);
+
+        verify(documentoRepository, never()).save(any(Documento.class));
+    }
+
+    @Test
+    void actualizarMetadatos_debeActualizarCodigoYMetadatosEnMismaTransaccion() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        stubActualizacionMetadatosExitosa(documento, area, subprograma, tipoDocumento, principal);
+
+        DocumentoActualizacionRequest request = new DocumentoActualizacionRequest(
+                "DOC-002",
+                "Nuevo título",
+                "Nueva descripción",
+                AREA_ID,
+                SUBPROGRAMA_ID,
+                TIPO_DOCUMENTO_ID,
+                DocumentoAlcance.AREA_RESPONSABLE,
+                List.of()
+        );
+
+        documentoServiceImpl.actualizarMetadatos(DOCUMENTO_ID, request, usuarioAdministrador());
+
+        assertThat(documento.getCodigo()).isEqualTo("DOC-002");
+        assertThat(documento.getTitulo()).isEqualTo("Nuevo título");
+        assertThat(documento.getDescripcion()).isEqualTo("Nueva descripción");
+        verify(documentoRepository).save(documento);
+    }
+
+    @Test
+    void actualizarMetadatos_debeRevertirCodigoSiFallaValidacionSubprograma() {
+        Documento documento = documentoPersistidoDePrueba();
+        String codigoOriginal = documento.getCodigo();
+        Area area = areaActivaMock();
+        Subprograma subprograma = mock(Subprograma.class);
+        when(subprograma.getNombre()).thenReturn("Sub A");
+        when(subprograma.getArea()).thenReturn(mock(Area.class));
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(documentoRepository.existsByCodigoIgnoreCaseAndIdNot("DOC-002", DOCUMENTO_ID))
+                .thenReturn(false);
+        when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID))
+                .thenReturn(Optional.of(principal));
+        when(areaLookupService.obtenerEntidadPorId(AREA_ID)).thenReturn(area);
+        when(subprogramaLookupService.obtenerEntidadPorId(SUBPROGRAMA_ID)).thenReturn(subprograma);
+
+        assertThatThrownBy(() -> documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID,
+                requestActualizacionConCodigo("DOC-002"),
+                usuarioAdministrador()
+        )).isInstanceOf(BusinessException.class);
+
+        assertThat(documento.getCodigo()).isEqualTo(codigoOriginal);
+        verify(documentoRepository, never()).save(any(Documento.class));
+    }
+
+    @Test
+    void actualizarMetadatos_debeConservarNumeroVersionAlCambiarCodigo() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        stubActualizacionMetadatosExitosa(documento, area, subprograma, tipoDocumento, principal);
+
+        documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID,
+                requestActualizacionConCodigo("DOC-002"),
+                usuarioAdministrador()
+        );
+
+        verify(versionDocumentoRepository, never()).save(any(VersionDocumento.class));
+    }
+
+    @Test
+    void actualizarMetadatos_debePermitirConservarTipoInactivoYaAsignado() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoInactivo = mock(TipoDocumento.class);
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        stubActualizacionMetadatosExitosa(documento, area, subprograma, tipoInactivo, principal);
+
+        documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID, requestActualizacionValido(), usuarioAdministrador()
+        );
+
+        verify(tipoDocumentoLookupService).obtenerEntidadPorId(TIPO_DOCUMENTO_ID);
+        verify(tipoDocumentoLookupService, never()).obtenerActivoPorId(any());
+    }
+
+    @Test
+    void actualizarMetadatos_debePermitirConservarSubprogramaInactivoYaAsignado() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Subprograma subprogramaInactivo = mock(Subprograma.class);
+        when(subprogramaInactivo.getArea()).thenReturn(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        stubActualizacionMetadatosExitosa(documento, area, subprogramaInactivo, tipoDocumento, principal);
+
+        documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID, requestActualizacionValido(), usuarioAdministrador()
+        );
+
+        verify(subprogramaLookupService).obtenerEntidadPorId(SUBPROGRAMA_ID);
+        verify(subprogramaLookupService, never()).obtenerActivoPorId(any());
+    }
+
+    @Test
+    void actualizarMetadatos_debePermitirConservarAreaResponsableInactivaYaAsignada() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area areaInactiva = mock(Area.class);
+        when(areaInactiva.getId()).thenReturn(AREA_ID);
+        Subprograma subprograma = subprogramaActivoMock(areaInactiva);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, areaInactiva);
+        stubActualizacionMetadatosExitosa(documento, areaInactiva, subprograma, tipoDocumento, principal);
+
+        documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID, requestActualizacionValido(), usuarioAdministrador()
+        );
+
+        verify(areaLookupService).obtenerEntidadPorId(AREA_ID);
+        verify(areaLookupService, never()).obtenerActivaPorId(any());
+    }
+
+    @Test
+    void actualizarMetadatos_debeRechazarCambioATipoInactivo() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(documentoRepository.existsByCodigoIgnoreCaseAndIdNot(anyString(), eq(DOCUMENTO_ID)))
+                .thenReturn(false);
+        when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID))
+                .thenReturn(Optional.of(principal));
+        when(areaLookupService.obtenerEntidadPorId(AREA_ID)).thenReturn(area);
+        when(subprogramaLookupService.obtenerEntidadPorId(SUBPROGRAMA_ID)).thenReturn(subprograma);
+        when(tipoDocumentoLookupService.obtenerActivoPorId(99L))
+                .thenThrow(new BusinessException("El tipo de documento 'X' está inactivo y no puede utilizarse"));
+
+        DocumentoActualizacionRequest request = new DocumentoActualizacionRequest(
+                "PROC-001",
+                "Título actualizado",
+                "Descripción actualizada",
+                AREA_ID,
+                SUBPROGRAMA_ID,
+                99L,
+                DocumentoAlcance.AREA_RESPONSABLE,
+                List.of()
+        );
+
+        assertThatThrownBy(() -> documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID, request, usuarioAdministrador()
+        )).isInstanceOf(BusinessException.class);
+
+        verify(documentoRepository, never()).save(any(Documento.class));
+    }
+
+    @Test
+    void actualizarMetadatos_debeRechazarCambioASubprogramaInactivo() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(documentoRepository.existsByCodigoIgnoreCaseAndIdNot(anyString(), eq(DOCUMENTO_ID)))
+                .thenReturn(false);
+        when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID))
+                .thenReturn(Optional.of(principal));
+        when(areaLookupService.obtenerEntidadPorId(AREA_ID)).thenReturn(area);
+        when(subprogramaLookupService.obtenerActivoPorId(99L))
+                .thenThrow(new BusinessException("El subprograma 'X' está inactivo y no puede utilizarse"));
+
+        DocumentoActualizacionRequest request = new DocumentoActualizacionRequest(
+                "PROC-001",
+                "Título actualizado",
+                "Descripción actualizada",
+                AREA_ID,
+                99L,
+                TIPO_DOCUMENTO_ID,
+                DocumentoAlcance.AREA_RESPONSABLE,
+                List.of()
+        );
+
+        assertThatThrownBy(() -> documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID, request, usuarioAdministrador()
+        )).isInstanceOf(BusinessException.class);
+
+        verify(documentoRepository, never()).save(any(Documento.class));
+    }
+
+    @Test
+    void actualizarMetadatos_debeRechazarCambioAAreaInactiva() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area areaActual = areaActivaMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, areaActual);
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(documentoRepository.existsByCodigoIgnoreCaseAndIdNot(anyString(), eq(DOCUMENTO_ID)))
+                .thenReturn(false);
+        when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID))
+                .thenReturn(Optional.of(principal));
+        when(areaLookupService.obtenerActivaPorId(99L))
+                .thenThrow(new BusinessException("El área 'X' está inactiva y no puede utilizarse"));
+
+        DocumentoActualizacionRequest request = new DocumentoActualizacionRequest(
+                "PROC-001",
+                "Título actualizado",
+                "Descripción actualizada",
+                99L,
+                SUBPROGRAMA_ID,
+                TIPO_DOCUMENTO_ID,
+                DocumentoAlcance.AREA_RESPONSABLE,
+                List.of()
+        );
+
+        assertThatThrownBy(() -> documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID, request, usuarioAdministrador()
+        )).isInstanceOf(BusinessException.class);
+
+        verify(documentoRepository, never()).save(any(Documento.class));
+        verify(areaLookupService, never()).obtenerEntidadPorId(99L);
+    }
+
+    @Test
+    void actualizarMetadatos_debeConservarAreaAdicionalInactivaYaAsociada() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Area calidadInactiva = areaAdicionalMock(AREA_ADICIONAL_1_ID);
+        Area produccion = areaAdicionalMock(AREA_ADICIONAL_2_ID);
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        stubActualizacionMetadatosExitosa(documento, area, subprograma, tipoDocumento, principal);
+        stubAdicionalesActuales(documento, List.of(
+                documentoAreaAdicionalDePrueba(documento, calidadInactiva),
+                documentoAreaAdicionalDePrueba(documento, produccion)
+        ));
+        when(areaLookupService.obtenerEntidadPorId(AREA_ADICIONAL_1_ID)).thenReturn(calidadInactiva);
+        when(areaLookupService.obtenerEntidadPorId(AREA_ADICIONAL_2_ID)).thenReturn(produccion);
+        when(documentoAreaRepository.save(any(DocumentoArea.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID,
+                requestActualizacionConAlcance(
+                        DocumentoAlcance.AREAS_ESPECIFICAS,
+                        List.of(AREA_ADICIONAL_1_ID, AREA_ADICIONAL_2_ID)
+                ),
+                usuarioAdministrador()
+        );
+
+        verify(areaLookupService).obtenerEntidadPorId(AREA_ADICIONAL_1_ID);
+        verify(areaLookupService).obtenerEntidadPorId(AREA_ADICIONAL_2_ID);
+        verify(areaLookupService, never()).obtenerActivasPorIds(any());
+    }
+
+    @Test
+    void actualizarMetadatos_debePermitirEditarTituloConservandoAreaAdicionalInactiva() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Area calidadInactiva = areaAdicionalMock(AREA_ADICIONAL_1_ID);
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        stubActualizacionMetadatosExitosa(documento, area, subprograma, tipoDocumento, principal);
+        stubAdicionalesActuales(documento, List.of(
+                documentoAreaAdicionalDePrueba(documento, calidadInactiva)
+        ));
+        when(areaLookupService.obtenerEntidadPorId(AREA_ADICIONAL_1_ID)).thenReturn(calidadInactiva);
+        when(documentoAreaRepository.save(any(DocumentoArea.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        DocumentoActualizacionRequest request = new DocumentoActualizacionRequest(
+                "PROC-001",
+                "Solo cambia el título",
+                "Descripción actualizada",
+                AREA_ID,
+                SUBPROGRAMA_ID,
+                TIPO_DOCUMENTO_ID,
+                DocumentoAlcance.AREAS_ESPECIFICAS,
+                List.of(AREA_ADICIONAL_1_ID)
+        );
+
+        documentoServiceImpl.actualizarMetadatos(DOCUMENTO_ID, request, usuarioAdministrador());
+
+        assertThat(documento.getTitulo()).isEqualTo("Solo cambia el título");
+        verify(areaLookupService).obtenerEntidadPorId(AREA_ADICIONAL_1_ID);
+        verify(areaLookupService, never()).obtenerActivasPorIds(any());
+    }
+
+    @Test
+    void actualizarMetadatos_debePermitirEliminarAreaAdicionalInactiva() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Area calidadInactiva = areaAdicionalMock(AREA_ADICIONAL_1_ID);
+        Area produccion = areaAdicionalMock(AREA_ADICIONAL_2_ID);
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        stubActualizacionMetadatosExitosa(documento, area, subprograma, tipoDocumento, principal);
+        stubAdicionalesActuales(documento, List.of(
+                documentoAreaAdicionalDePrueba(documento, calidadInactiva),
+                documentoAreaAdicionalDePrueba(documento, produccion)
+        ));
+        when(areaLookupService.obtenerEntidadPorId(AREA_ADICIONAL_2_ID)).thenReturn(produccion);
+        when(documentoAreaRepository.save(any(DocumentoArea.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID,
+                requestActualizacionConAlcance(
+                        DocumentoAlcance.AREAS_ESPECIFICAS,
+                        List.of(AREA_ADICIONAL_2_ID)
+                ),
+                usuarioAdministrador()
+        );
+
+        verify(areaLookupService).obtenerEntidadPorId(AREA_ADICIONAL_2_ID);
+        verify(areaLookupService, never()).obtenerEntidadPorId(AREA_ADICIONAL_1_ID);
+        verify(documentoAreaRepository).deleteAllByDocumento_IdAndEsPrincipalFalse(DOCUMENTO_ID);
+        verify(documentoAreaRepository).save(any(DocumentoArea.class));
+    }
+
+    @Test
+    void actualizarMetadatos_debeRechazarReagregarAreaAdicionalInactivaEliminada() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Area produccion = areaAdicionalMock(AREA_ADICIONAL_2_ID);
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(documentoRepository.existsByCodigoIgnoreCaseAndIdNot(anyString(), eq(DOCUMENTO_ID)))
+                .thenReturn(false);
+        when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID))
+                .thenReturn(Optional.of(principal));
+        stubAdicionalesActuales(documento, List.of(
+                documentoAreaAdicionalDePrueba(documento, produccion)
+        ));
+        when(areaLookupService.obtenerEntidadPorId(AREA_ID)).thenReturn(area);
+        when(subprogramaLookupService.obtenerEntidadPorId(SUBPROGRAMA_ID)).thenReturn(subprograma);
+        when(tipoDocumentoLookupService.obtenerEntidadPorId(TIPO_DOCUMENTO_ID)).thenReturn(tipoDocumento);
+        when(areaLookupService.obtenerEntidadPorId(AREA_ADICIONAL_2_ID)).thenReturn(produccion);
+        when(areaLookupService.obtenerActivasPorIds(List.of(AREA_ADICIONAL_1_ID)))
+                .thenThrow(new BusinessException(
+                        "Las siguientes áreas están inactivas y no pueden utilizarse: Calidad"
+                ));
+
+        assertThatThrownBy(() -> documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID,
+                requestActualizacionConAlcance(
+                        DocumentoAlcance.AREAS_ESPECIFICAS,
+                        List.of(AREA_ADICIONAL_2_ID, AREA_ADICIONAL_1_ID)
+                ),
+                usuarioAdministrador()
+        )).isInstanceOf(BusinessException.class);
+
+        verify(documentoRepository, never()).save(any(Documento.class));
+    }
+
+    @Test
+    void actualizarMetadatos_debeConservarInactivaExistenteYAgregarActiva() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Area calidadInactiva = areaAdicionalMock(AREA_ADICIONAL_1_ID);
+        Area produccion = areaAdicionalMock(AREA_ADICIONAL_2_ID);
+        Area administracion = areaAdicionalMock(AREA_ADICIONAL_3_ID);
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        stubActualizacionMetadatosExitosa(documento, area, subprograma, tipoDocumento, principal);
+        stubAdicionalesActuales(documento, List.of(
+                documentoAreaAdicionalDePrueba(documento, calidadInactiva),
+                documentoAreaAdicionalDePrueba(documento, produccion)
+        ));
+        when(areaLookupService.obtenerEntidadPorId(AREA_ADICIONAL_1_ID)).thenReturn(calidadInactiva);
+        when(areaLookupService.obtenerEntidadPorId(AREA_ADICIONAL_2_ID)).thenReturn(produccion);
+        when(areaLookupService.obtenerActivasPorIds(List.of(AREA_ADICIONAL_3_ID)))
+                .thenReturn(List.of(administracion));
+        when(documentoAreaRepository.save(any(DocumentoArea.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID,
+                requestActualizacionConAlcance(
+                        DocumentoAlcance.AREAS_ESPECIFICAS,
+                        List.of(AREA_ADICIONAL_1_ID, AREA_ADICIONAL_2_ID, AREA_ADICIONAL_3_ID)
+                ),
+                usuarioAdministrador()
+        );
+
+        verify(areaLookupService).obtenerActivasPorIds(List.of(AREA_ADICIONAL_3_ID));
+        verify(documentoAreaRepository, times(3)).save(any(DocumentoArea.class));
+    }
+
+    @Test
+    void actualizarMetadatos_debeRechazarAgregarNuevaAreaAdicionalInactiva() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Area calidadInactiva = areaAdicionalMock(AREA_ADICIONAL_1_ID);
+        Area produccion = areaAdicionalMock(AREA_ADICIONAL_2_ID);
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(documentoRepository.existsByCodigoIgnoreCaseAndIdNot(anyString(), eq(DOCUMENTO_ID)))
+                .thenReturn(false);
+        when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID))
+                .thenReturn(Optional.of(principal));
+        stubAdicionalesActuales(documento, List.of(
+                documentoAreaAdicionalDePrueba(documento, calidadInactiva),
+                documentoAreaAdicionalDePrueba(documento, produccion)
+        ));
+        when(areaLookupService.obtenerEntidadPorId(AREA_ID)).thenReturn(area);
+        when(subprogramaLookupService.obtenerEntidadPorId(SUBPROGRAMA_ID)).thenReturn(subprograma);
+        when(tipoDocumentoLookupService.obtenerEntidadPorId(TIPO_DOCUMENTO_ID)).thenReturn(tipoDocumento);
+        when(areaLookupService.obtenerEntidadPorId(AREA_ADICIONAL_1_ID)).thenReturn(calidadInactiva);
+        when(areaLookupService.obtenerEntidadPorId(AREA_ADICIONAL_2_ID)).thenReturn(produccion);
+        when(areaLookupService.obtenerActivasPorIds(List.of(AREA_ADICIONAL_3_ID)))
+                .thenThrow(new BusinessException(
+                        "Las siguientes áreas están inactivas y no pueden utilizarse: Bodega"
+                ));
+
+        assertThatThrownBy(() -> documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID,
+                requestActualizacionConAlcance(
+                        DocumentoAlcance.AREAS_ESPECIFICAS,
+                        List.of(AREA_ADICIONAL_1_ID, AREA_ADICIONAL_2_ID, AREA_ADICIONAL_3_ID)
+                ),
+                usuarioAdministrador()
+        )).isInstanceOf(BusinessException.class);
+
+        verify(documentoRepository, never()).save(any(Documento.class));
+    }
+
+    @Test
+    void actualizarMetadatos_conAdicionalInactiva_debePermitirCambioAGlobal() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Area calidadInactiva = areaAdicionalMock(AREA_ADICIONAL_1_ID);
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        stubActualizacionMetadatosExitosa(documento, area, subprograma, tipoDocumento, principal);
+        stubAdicionalesActuales(documento, List.of(
+                documentoAreaAdicionalDePrueba(documento, calidadInactiva)
+        ));
+
+        documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID,
+                requestActualizacionConAlcance(DocumentoAlcance.GLOBAL, List.of()),
+                usuarioAdministrador()
+        );
+
+        assertThat(documento.getAlcance()).isEqualTo(DocumentoAlcance.GLOBAL);
+        verify(areaLookupService, never()).obtenerActivasPorIds(any());
+        verify(documentoAreaRepository).deleteAllByDocumento_IdAndEsPrincipalFalse(DOCUMENTO_ID);
+    }
+
+    @Test
+    void actualizarMetadatos_debeRechazarCambioAAreasEspecificasConInactivaNueva() {
+        Documento documento = documentoPersistidoDePrueba();
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        DocumentoArea principal = documentoAreaPrincipalDePrueba(documento, area);
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(documentoRepository.existsByCodigoIgnoreCaseAndIdNot(anyString(), eq(DOCUMENTO_ID)))
+                .thenReturn(false);
+        when(documentoAreaRepository.findByDocumento_IdAndEsPrincipalTrue(DOCUMENTO_ID))
+                .thenReturn(Optional.of(principal));
+        stubAdicionalesActuales(documento, List.of());
+        when(areaLookupService.obtenerEntidadPorId(AREA_ID)).thenReturn(area);
+        when(subprogramaLookupService.obtenerEntidadPorId(SUBPROGRAMA_ID)).thenReturn(subprograma);
+        when(tipoDocumentoLookupService.obtenerEntidadPorId(TIPO_DOCUMENTO_ID)).thenReturn(tipoDocumento);
+        when(areaLookupService.obtenerActivasPorIds(List.of(AREA_ADICIONAL_1_ID)))
+                .thenThrow(new BusinessException(
+                        "Las siguientes áreas están inactivas y no pueden utilizarse: Calidad"
+                ));
+
+        assertThatThrownBy(() -> documentoServiceImpl.actualizarMetadatos(
+                DOCUMENTO_ID,
+                requestActualizacionConAlcance(
+                        DocumentoAlcance.AREAS_ESPECIFICAS,
+                        List.of(AREA_ADICIONAL_1_ID)
+                ),
+                usuarioAdministrador()
+        )).isInstanceOf(BusinessException.class);
+
+        verify(documentoRepository, never()).save(any(Documento.class));
     }
 }

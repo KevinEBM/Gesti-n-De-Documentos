@@ -103,6 +103,22 @@ public class Documento {
         this.estado = nuevoEstado;
     }
 
+    public void actualizarMetadatos(
+            String codigo,
+            String titulo,
+            String descripcion,
+            Subprograma subprograma,
+            TipoDocumento tipoDocumento,
+            DocumentoAlcance alcance
+    ) {
+        this.codigo = normalizarTexto(codigo);
+        this.titulo = normalizarTexto(titulo);
+        this.descripcion = normalizarTextoOpcional(descripcion);
+        this.subprograma = subprograma;
+        this.tipoDocumento = tipoDocumento;
+        this.alcance = alcance;
+    }
+
     private String normalizarTexto(String valor) {
         return valor == null ? null : valor.trim();
     }

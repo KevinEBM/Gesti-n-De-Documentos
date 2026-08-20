@@ -99,8 +99,14 @@ public class AreaServiceImpl implements AreaService, AreaLookupService {
 
     @Override
     @Transactional(readOnly = true)
+    public Area obtenerEntidadPorId(Long id) {
+        return buscarAreaPorId(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Area obtenerActivaPorId(Long id) {
-        Area area = obtenerEntidadPorId(id);
+        Area area = buscarAreaPorId(id);
         if (!area.isActivo()) {
             throw new BusinessException("El área '" + area.getNombre() + "' está inactiva y no puede utilizarse");
         }
@@ -140,7 +146,7 @@ public class AreaServiceImpl implements AreaService, AreaLookupService {
                 .toList();
     }
 
-    private Area obtenerEntidadPorId(Long id) {
+    private Area buscarAreaPorId(Long id) {
         return areaRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "No existe un área con id " + id

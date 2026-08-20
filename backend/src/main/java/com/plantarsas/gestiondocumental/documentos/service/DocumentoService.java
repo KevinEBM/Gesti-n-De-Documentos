@@ -1,5 +1,6 @@
 package com.plantarsas.gestiondocumental.documentos.service;
 
+import com.plantarsas.gestiondocumental.documentos.dto.DocumentoActualizacionRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoPublicacionInicialRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoResponse;
 import com.plantarsas.gestiondocumental.documentos.dto.NuevaVersionDocumentoRequest;
@@ -26,5 +27,11 @@ public interface DocumentoService {
             InputStream contenidoArchivo,
             String tipoMimeArchivo,
             long tamanoBytesArchivo
+    );
+
+    DocumentoResponse actualizarMetadatos(
+            Long documentoId,
+            DocumentoActualizacionRequest request,
+            AuthenticatedUser usuarioAutenticado
     );
 }
