@@ -57,6 +57,7 @@ export interface Usuario {
     nombre: string;
     correo: string;
     areaId?: string;
+    areaPrincipalNombre?: string | null;
     rol: Rol;
     activo: boolean;
 }

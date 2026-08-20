@@ -19,6 +19,8 @@ export interface LoginResponseDto {
     nombres: string;
     apellidos: string;
     rol: string;
+    areaPrincipalId: number | null;
+    areaPrincipalNombre: string | null;
 }
 
 export class ApiError extends Error {

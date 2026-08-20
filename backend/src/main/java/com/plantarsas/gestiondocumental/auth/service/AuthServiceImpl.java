@@ -7,6 +7,8 @@ import com.plantarsas.gestiondocumental.security.JwtService;
 import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
 import com.plantarsas.gestiondocumental.usuarios.entity.EstadoUsuario;
 import com.plantarsas.gestiondocumental.usuarios.entity.Usuario;
+import com.plantarsas.gestiondocumental.usuarios.entity.UsuarioArea;
+import com.plantarsas.gestiondocumental.usuarios.repository.UsuarioAreaRepository;
 import com.plantarsas.gestiondocumental.usuarios.repository.UsuarioRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -19,14 +21,17 @@ import java.util.Locale;
 public class AuthServiceImpl implements AuthService {
 
     private final UsuarioRepository usuarioRepository;
+    private final UsuarioAreaRepository usuarioAreaRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
     public AuthServiceImpl(
             UsuarioRepository usuarioRepository,
+            UsuarioAreaRepository usuarioAreaRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService) {
         this.usuarioRepository = usuarioRepository;
+        this.usuarioAreaRepository = usuarioAreaRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
@@ -78,6 +83,16 @@ public class AuthServiceImpl implements AuthService {
                 rol
         );
 
+        Long areaPrincipalId = null;
+        String areaPrincipalNombre = null;
+        var areaPrincipal = usuarioAreaRepository
+                .findFirstByUsuario_IdAndEsPrincipalTrue(usuario.getId());
+        if (areaPrincipal.isPresent()) {
+            UsuarioArea asignacion = areaPrincipal.get();
+            areaPrincipalId = asignacion.getArea().getId();
+            areaPrincipalNombre = asignacion.getArea().getNombre();
+        }
+
         return new LoginResponse(
                 token,
                 "Bearer",
@@ -85,7 +100,9 @@ public class AuthServiceImpl implements AuthService {
                 usuario.getCorreo(),
                 usuario.getNombres(),
                 usuario.getApellidos(),
-                rol
+                rol,
+                areaPrincipalId,
+                areaPrincipalNombre
         );
     }
 }

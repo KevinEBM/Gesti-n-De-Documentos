@@ -34,7 +34,16 @@ export function loginResponseToUsuario(datos: LoginResponseDto): Usuario {
         correo: datos.correo,
         rol: mapRolBackend(datos.rol),
         activo: true,
+        areaId: datos.areaPrincipalId != null ? String(datos.areaPrincipalId) : undefined,
+        areaPrincipalNombre: datos.areaPrincipalNombre,
     };
+}
+
+export function etiquetaAreaPrincipal(usuario: Usuario): string {
+    const nombre = usuario.areaPrincipalNombre?.trim();
+    if (nombre) return nombre;
+    if (usuario.rol === "administrador") return "No aplica";
+    return "Área no disponible";
 }
 
 export function saveSession(session: AuthSession): void {

@@ -3,11 +3,14 @@ package com.plantarsas.gestiondocumental.auth.service;
 import com.plantarsas.gestiondocumental.auth.dto.LoginRequest;
 import com.plantarsas.gestiondocumental.auth.dto.LoginResponse;
 import com.plantarsas.gestiondocumental.exception.AuthenticationFailedException;
+import com.plantarsas.gestiondocumental.areas.entity.Area;
 import com.plantarsas.gestiondocumental.roles.entity.Rol;
 import com.plantarsas.gestiondocumental.security.JwtService;
 import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
 import com.plantarsas.gestiondocumental.usuarios.entity.EstadoUsuario;
 import com.plantarsas.gestiondocumental.usuarios.entity.Usuario;
+import com.plantarsas.gestiondocumental.usuarios.entity.UsuarioArea;
+import com.plantarsas.gestiondocumental.usuarios.repository.UsuarioAreaRepository;
 import com.plantarsas.gestiondocumental.usuarios.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +39,9 @@ class AuthServiceImplTest {
     private UsuarioRepository usuarioRepository;
 
     @Mock
+    private UsuarioAreaRepository usuarioAreaRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
@@ -45,7 +51,12 @@ class AuthServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        authService = new AuthServiceImpl(usuarioRepository, passwordEncoder, jwtService);
+        authService = new AuthServiceImpl(
+                usuarioRepository,
+                usuarioAreaRepository,
+                passwordEncoder,
+                jwtService
+        );
     }
 
     private Rol mockRolConNombre(RolEnum nombre) {
@@ -77,6 +88,8 @@ class AuthServiceImplTest {
                 .thenReturn(true);
         when(jwtService.generarToken(1L, "correo@ejemplo.com", RolEnum.ADMINISTRADOR))
                 .thenReturn("token-generado");
+        when(usuarioAreaRepository.findFirstByUsuario_IdAndEsPrincipalTrue(1L))
+                .thenReturn(Optional.empty());
 
         LoginResponse respuesta = authService.login(request);
 
@@ -87,6 +100,8 @@ class AuthServiceImplTest {
         assertThat(respuesta.nombres()).isEqualTo("Nombres");
         assertThat(respuesta.apellidos()).isEqualTo("Apellidos");
         assertThat(respuesta.rol()).isEqualTo(RolEnum.ADMINISTRADOR);
+        assertThat(respuesta.areaPrincipalId()).isNull();
+        assertThat(respuesta.areaPrincipalNombre()).isNull();
 
         verify(usuarioRepository).findByCorreoIgnoreCase("correo@ejemplo.com");
     }
@@ -103,6 +118,8 @@ class AuthServiceImplTest {
                 .thenReturn(true);
         when(jwtService.generarToken(1L, "correo@ejemplo.com", RolEnum.ADMINISTRADOR))
                 .thenReturn("token-generado");
+        when(usuarioAreaRepository.findFirstByUsuario_IdAndEsPrincipalTrue(1L))
+                .thenReturn(Optional.empty());
 
         authService.login(request);
 
@@ -406,5 +423,59 @@ class AuthServiceImplTest {
                 passwordEncoder
         );
         verifyNoInteractions(jwtService);
+    }
+
+    @Test
+    void login_conAreaPrincipal_debeIncluirDatosDePresentacionDelArea() {
+        Usuario usuario = mock(Usuario.class);
+        when(usuario.getId()).thenReturn(1L);
+        when(usuario.getCorreo()).thenReturn("correo@ejemplo.com");
+        when(usuario.getNombres()).thenReturn("Test");
+        when(usuario.getApellidos()).thenReturn("Prueba");
+        when(usuario.getEstado()).thenReturn(EstadoUsuario.ACTIVO);
+        Rol rolJefe = mockRolConNombre(RolEnum.JEFE_AREA);
+        when(usuario.getRol()).thenReturn(rolJefe);
+
+        LoginRequest request = new LoginRequest("correo@ejemplo.com", "miPassword123");
+
+        when(usuarioRepository.findByCorreoIgnoreCase("correo@ejemplo.com"))
+                .thenReturn(Optional.of(usuario));
+        when(usuario.coincideConPassword(eq("miPassword123"), eq(passwordEncoder)))
+                .thenReturn(true);
+        when(jwtService.generarToken(1L, "correo@ejemplo.com", RolEnum.JEFE_AREA))
+                .thenReturn("token-generado");
+
+        UsuarioArea asignacion = mock(UsuarioArea.class);
+        Area area = mock(Area.class);
+        when(asignacion.getArea()).thenReturn(area);
+        when(area.getId()).thenReturn(5L);
+        when(area.getNombre()).thenReturn("Aseo");
+        when(usuarioAreaRepository.findFirstByUsuario_IdAndEsPrincipalTrue(1L))
+                .thenReturn(Optional.of(asignacion));
+
+        LoginResponse respuesta = authService.login(request);
+
+        assertThat(respuesta.areaPrincipalId()).isEqualTo(5L);
+        assertThat(respuesta.areaPrincipalNombre()).isEqualTo("Aseo");
+    }
+
+    @Test
+    void login_sinAreaPrincipal_debeDejarAreaNula() {
+        Usuario usuario = mockUsuarioValido();
+        LoginRequest request = new LoginRequest("correo@ejemplo.com", "miPassword123");
+
+        when(usuarioRepository.findByCorreoIgnoreCase("correo@ejemplo.com"))
+                .thenReturn(Optional.of(usuario));
+        when(usuario.coincideConPassword(eq("miPassword123"), eq(passwordEncoder)))
+                .thenReturn(true);
+        when(jwtService.generarToken(1L, "correo@ejemplo.com", RolEnum.ADMINISTRADOR))
+                .thenReturn("token-generado");
+        when(usuarioAreaRepository.findFirstByUsuario_IdAndEsPrincipalTrue(1L))
+                .thenReturn(Optional.empty());
+
+        LoginResponse respuesta = authService.login(request);
+
+        assertThat(respuesta.areaPrincipalId()).isNull();
+        assertThat(respuesta.areaPrincipalNombre()).isNull();
     }
 }

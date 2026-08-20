@@ -9,6 +9,8 @@ public record LoginResponse(
         String correo,
         String nombres,
         String apellidos,
-        RolEnum rol
+        RolEnum rol,
+        Long areaPrincipalId,
+        String areaPrincipalNombre
 ) {
 }
