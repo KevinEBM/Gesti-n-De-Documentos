@@ -516,6 +516,14 @@ export const subProcesosIniciales: SubProceso[] = [
         areaId: "a11",
         activo: true,
     },
+    {
+        id: "c40",
+        nombre: "Programa de Peticiones Quejas y Reclamos",
+        descripcion:
+            "Lorem imput solem",
+        areaId: "a3",
+        activo: true,
+    }
 ];
 
 /* =======================================================
@@ -545,99 +553,93 @@ export const areaVisual = {
   ======================================================= */
 
 export const tiposIniciales: TipoDocumento[] = [
+
     {
         id: "t1",
-        nombre: "Plantilla",
-        descripcion:
-            "Formato base reutilizable para la elaboración de documentos.",
-        activo: true,
-    },
-    {
-        id: "t2",
         nombre: "Manual",
         descripcion:
             "Documento que describe de manera detallada las instrucciones, lineamientos y pautas para realizar determinadas actividades.",
         activo: true,
     },
     {
+        id: "t2",
+        nombre: "Programa",
+        descripcion:
+            "Documento que describe de manera general las actividades, responsables, entradas y salidas que conforman un proceso.",
+        activo: true,
+    },
+    {
         id: "t3",
         nombre: "Proceso",
         descripcion:
-            "Documento que describe de manera general las actividades, responsables, entradas y salidas que conforman un proceso.",
+            "Documento que establece los pasos, responsables y condiciones necesarias para ejecutar una actividad o proceso.",
         activo: true,
     },
     {
         id: "t4",
         nombre: "Procedimiento",
         descripcion:
-            "Documento que establece los pasos, responsables y condiciones necesarias para ejecutar una actividad o proceso.",
+            "Secuencia formal y detallada de acciones para realizar un proceso.",
         activo: true,
     },
     {
         id: "t5",
-        nombre: "Política",
+        nombre: "Politica",
         descripcion:
-            "Documento que establece los principios, compromisos y lineamientos generales que orientan la actuación de la organización.",
+            "Principios, compromisos y lineamientos generales que orientan la actuación. ",
         activo: true,
     },
     {
         id: "t6",
         nombre: "Reglamento",
         descripcion:
-            "Documento que establece las normas, reglas y disposiciones que deben cumplirse dentro de la organización.",
+            "Normas, reglas y disposiciones que deben cumplirse en la organización.",
         activo: true,
     },
     {
         id: "t7",
         nombre: "Caracterización",
         descripcion:
-            "Documento que identifica y describe los elementos principales de un proceso, incluyendo entradas, actividades, salidas, responsables y recursos.",
+            "Documento que identifica y describe elementos principales de un proceso (entradas, actividades, salidas, responsables, recursos).",
         activo: true,
     },
     {
         id: "t8",
         nombre: "Instructivo",
         descripcion:
-            "Documento que proporciona instrucciones específicas y detalladas para realizar correctamente una actividad determinada.",
+            "Instrucciones específicas y detalladas para realizar correctamente una actividad.",
         activo: true,
     },
     {
         id: "t9",
         nombre: "Protocolo",
         descripcion:
-            "Documento que establece una secuencia formal de acciones y criterios de actuación ante una situación o actividad específica.",
+            "Secuencia formal de acciones y criterios de actuación ante una situación específica.",
         activo: true,
     },
     {
         id: "t10",
         nombre: "Formato",
         descripcion:
-            "Documento estructurado destinado al registro y recopilación de información durante la ejecución de una actividad o proceso.",
+            "Documento estructurado para registrar y recopilar información durante la ejecución de una actividad.",
         activo: true,
     },
     {
         id: "t11",
-        nombre: "Programa",
+        nombre: "Ficha Técnica",
         descripcion:
-            "Documento que establece un conjunto organizado de actividades planificadas para alcanzar objetivos específicos.",
+            "Información técnica, características y especificaciones de un producto, equipo o proceso.",
         activo: true,
     },
     {
         id: "t12",
-        nombre: "Ficha Técnica",
+        nombre: "Diagrama",
         descripcion:
-            "Documento que contiene información técnica, características, especificaciones y datos relevantes de un producto, equipo, proceso o elemento.",
+            "Representación gráfica de un proceso, flujo o estructura.",
         activo: true,
     },
     {
         id: "t13",
-        nombre: "Diagrama",
-        descripcion:
-            "Representación gráfica de un proceso, flujo, estructura o relación entre diferentes elementos.",
-        activo: true,
-    },
-    {
-        id: "t14",
         nombre: "Otros Documentos",
         descripcion:
             "No se acomoda a la clasificación presentada",

@@ -2,7 +2,6 @@ import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
     ArrowLeft,
     Save,
-    FileText,
 } from "lucide-react";
 import React, { useState } from "react";
 import { toast } from "sonner";
@@ -32,6 +31,7 @@ import { Separator } from "@/components/ui/separator";
 
 import { obtenerIconoArea } from "@/lib/iconos-areas";
 import { obtenerIconoSubProceso } from "@/lib/iconos-subprocesos";
+import { obtenerIconoFormato } from "@/lib/iconos-formatos";
 import type { Estado } from "@/lib/data";
 import { useIntranet } from "@/lib/store";
 import { extraerInformacionDocumento } from "@/lib/extraer-info-doc";
@@ -1041,32 +1041,36 @@ function NuevoDocumentoPage() {
                                         <SelectContent>
 
                                             {tipos.map(
-                                                (t) => (
+                                                (t) => {
+                                                    const { icono: Icono, color } = obtenerIconoFormato(t.nombre);
 
-                                                    <SelectItem
-                                                        key={
-                                                            t.id
-                                                        }
-                                                        value={
-                                                            t.id
-                                                        }
-                                                    >
+                                                    return (
 
-                                                        <div className="flex items-center gap-2">
+                                                        <SelectItem
+                                                            key={
+                                                                t.id
+                                                            }
+                                                            value={
+                                                                t.id
+                                                            }
+                                                        >
 
-                                                            <FileText className="size-4 text-slate-500" />
+                                                            <div className="flex items-center gap-2">
 
-                                                            <span>
-                                                                {
-                                                                    t.nombre
-                                                                }
-                                                            </span>
+                                                                <Icono className={`size-4 ${color}`} />
 
-                                                        </div>
+                                                                <span>
+                                                                    {
+                                                                        t.nombre
+                                                                    }
+                                                                </span>
 
-                                                    </SelectItem>
+                                                            </div>
 
-                                                ),
+                                                        </SelectItem>
+
+                                                    );
+                                                }
                                             )}
 
                                         </SelectContent>
@@ -1153,142 +1157,10 @@ function NuevoDocumentoPage() {
                                         id="version"
                                         value={version}
                                         onChange={(e) =>
-                                            setVersion(
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="1.0"
-                                    />
-
-
-                                    <p className="text-xs text-muted-foreground">
-
-                                        Se sugiere 1.0 para la primera publicación.
-
-                                    </p>
-
-                                </div>
-
-
-                                {/* Fecha */}
-
-                                <div className="space-y-1.5">
-
-                                    <Label htmlFor="fecha">
-
-                                        Fecha de publicación
-
-                                    </Label>
-
-
-                                    <Input
-                                        id="fecha"
-                                        type="date"
-                                        value={
-                                            fechaPublicacion
-                                        }
-                                        onChange={(e) =>
-                                            setFechaPublicacion(
-                                                e.target.value,
-                                            )
+                                            setVersion(e.target.value)
                                         }
                                     />
-
                                 </div>
-
-
-                                {/* Estado */}
-
-                                <div className="space-y-1.5">
-
-                                    <Label>
-
-                                        Estado
-
-                                    </Label>
-
-
-                                    <Select
-                                        value={estado}
-                                        onValueChange={(v) =>
-                                            setEstado(
-                                                v as Estado,
-                                            )
-                                        }
-                                    >
-
-                                        <SelectTrigger>
-
-                                            <SelectValue />
-
-                                        </SelectTrigger>
-
-
-                                        <SelectContent>
-
-                                            <SelectItem value="publicado">
-                                                Publicado
-                                            </SelectItem>
-
-                                            <SelectItem value="borrador">
-                                                Borrador
-                                            </SelectItem>
-
-                                            <SelectItem value="inactivo">
-                                                Inactivo
-                                            </SelectItem>
-
-                                        </SelectContent>
-
-                                    </Select>
-
-                                </div>
-
-                            </div>
-
-
-                            {/* =================================================
-                             * BOTONES
-                             * ================================================= */}
-
-                            <div className="flex justify-end gap-3 pt-4 border-t">
-
-                                <Button
-                                    asChild
-                                    variant="outline"
-                                    type="button"
-                                    disabled={subiendo}
-                                >
-
-                                    <Link to="/app/gestion-documentos">
-                                        Cancelar
-                                    </Link>
-
-                                </Button>
-
-
-                                <Button
-                                    type="submit"
-                                    disabled={subiendo}
-                                    className="gap-2"
-                                >
-
-                                    {subiendo ? (
-
-                                        "Guardando..."
-
-                                    ) : (
-
-                                        <>
-
-                                            <Save className="size-4 mr-2" />
-
-                                            Guardar Documento
-
-                                        </>
-
-                                    )}
-                                </Button>
                             </div>
                         </CardContent>
                     </Card>

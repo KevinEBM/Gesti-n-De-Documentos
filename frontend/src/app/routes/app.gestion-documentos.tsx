@@ -761,7 +761,29 @@ function GestionDocumentos() {
                                         </TableCell>
 
                                         <TableCell className="w-[170px]">
-                                            {nombreTipo(d.tipoId)}
+
+                                            {(() => {
+
+                                                const nombre = nombreTipo(d.tipoId);
+
+                                                const {
+                                                    icono: Icono,
+                                                    color,
+                                                } = obtenerIconoFormato(nombre);
+
+                                                return (
+
+                                                    <div className="flex items-center gap-2">
+                                                        <Icono
+                                                            className={`size-4 ${color}`}
+                                                        />
+                                                        <span>{nombre}</span>
+                                                    </div>
+
+                                                );
+
+                                            })()}
+
                                         </TableCell>
 
                                         <TableCell className="font-mono">

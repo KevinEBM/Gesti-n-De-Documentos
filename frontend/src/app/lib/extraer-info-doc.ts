@@ -51,6 +51,7 @@ const ABREVIATURAS_SUBPROCESOS: Record<
     PNC: { subProcesoId: "c22", areaId: "a3" },
     DEI: { subProcesoId: "c23", areaId: "a3" },
     MCO: { subProcesoId: "c24", areaId: "a3" },
+    PQR: { subProcesoId: "c40" ,areaId: "a3" },
 
     // Área a4: Gestión Logística
     ABT: { subProcesoId: "c25", areaId: "a4" },

@@ -1,11 +1,10 @@
+import type { LucideIcon } from "lucide-react";
+
 import {
-
     HardHat, Leaf,
-    LucideIcon,
     ClipboardList,
-
     Cog,
-    Search,
+    MessageCircleQuestionMark
 } from "lucide-react";
 
 import {IconBuildingWarehouse,
@@ -15,9 +14,9 @@ import {IconBuildingWarehouse,
         IconAutomation,
         IconTopologyStarRing3,
         IconDeviceImacCode,
-        IconBuildingBank,
+        IconBuildingStore,
         IconUserShield,
-        IconHomeSearch,
+        IconSearch,
         IconBusinessplan,
         IconPasswordFingerprint,
         IconHeartHandshake,
@@ -43,6 +42,20 @@ import {IconBuildingWarehouse,
         IconBan,
         IconBulb,
         IconArrowUpRightCircle,
+        IconPackageExport,
+        IconMap,
+        IconTruck,
+        IconCurrencyDollar,
+        IconTools,
+        IconTool,
+        IconBuilding,
+        IconBuildingFactory2,
+        IconShield,
+        IconDeviceDesktopAnalytics,
+        IconBriefcase,
+        IconCalculator,
+        Icon
+
 } from "@tabler/icons-react"
     
 export interface IconoSubProceso {
@@ -61,8 +74,32 @@ const color = {
     gris: "text-slate-600",
     cian: "text-cyan-600",
     cafe: "text-amber-900",
-    negro: "text-black-600",
+    negro: "text-black",
     amarillo: "text-yellow-600",
+    rosa: "text-pink-500",
+    lima: "text-lime-500",
+    indigio: "text-indigo-600",
+    teal: "text-teal-500",
+    fucsia: "text-fuchsia-500",
+    azulClaro: "text-blue-400",
+    oliva: "text-lime-700",
+    marron: "text-rose-700",
+    celeste: "text-sky-400",
+    bordó: "text-red-900",
+    piel: "text-orange-300",
+    verdeClaro: "text-lime-500",
+    metalico: "text-slate-500",
+    grisOscuro: "text-gray-700",
+    grisClaro: "text-gray-300",
+    rosado: "text-pink-500",
+    rosadoClaro: "text-pink-300",
+    turquesa: "text-teal-500",
+    cyan: "text-cyan-500",
+    azulOscuro: "text-indigo-700",
+    violeta: "text-violet-600",
+    verdeMar: "text-teal-700",
+    plateado: "text-zinc-400",
+
 };
 
 const ICONOS_SUBPROCESO = {
@@ -76,12 +113,12 @@ const ICONOS_SUBPROCESO = {
 
     "gestion humana": {
         icono: IconUsersGroup,
-        color: color.azul,
+        color: color.piel,
     },
 
     "salud y seguridad en el trabajo": {
         icono: IconFirstAidKit,
-        color: color.rojo,
+        color: color.azulClaro,
     },
 
     "sustancias quimicas": {
@@ -118,7 +155,7 @@ const ICONOS_SUBPROCESO = {
 
     "limpieza y desinfeccion": {
         icono: IconSpray,
-        color: color.azul,
+        color: color.celeste,
     },
 
     "gestion ambiental": {
@@ -154,16 +191,16 @@ const ICONOS_SUBPROCESO = {
 
     "gestion de la calidad": {
         icono: IconShieldCheck,
-        color: color.rojo,
+        color: color.verdeClaro,
     },
-/*
-    "material extraño": {
-        icono: IconMapSearch,
-        color: color.naranja,
-    },*/
 
     "plan de muestreo": {
         icono: IconTestPipe2,
+        color: color.verdeOscuro,
+    },
+
+    "material extrano": {
+        icono: IconSearch,
         color: color.rojo,
     },
 
@@ -174,44 +211,123 @@ const ICONOS_SUBPROCESO = {
 
     "sistemas integrados de gestion": {
         icono: IconSettings,
-        color: color.rojo,
+        color: color.naranja,
     },
 
     trazabilidad: {
         icono: IconSTurnRight,
-        color: color.verde,
+        color: color.verdeMar,
     },
 
     "programa de producto no conforme": {
         icono: IconBan,
-        color: color.azul,
+        color: color.azulOscuro,
     },
 
     "desarrollo e innovacion": {
         icono: IconBulb,
-        color: color.rojo,
+        color: color.celeste,
     },
     "proceso de mejora continua": {
         icono: IconArrowUpRightCircle,
         color: color.azul,
     },
-
-
-    cyberseguridad: {
-      icono: IconPasswordFingerprint,
-        color:color.verde,
+    "programa de peticiones quejas y reclamos": {
+        icono: MessageCircleQuestionMark,
+        color: color.rojo,
     },
-    tesoreria: {
-        icono: IconBuildingBank,
+
+/* Gestión Logística */
+    "almacen y abastecimiento de insumos": {
+      icono: IconBuildingWarehouse,
+        color:color.marron,
+    },
+    logistica: {
+        icono: IconMap,
         color: color.azul,
     },
 
-    "seguridad fisica": {
-        icono: IconUserShield,
+    transporte: {
+        icono: IconTruckDelivery,
         color: color.verde
-    }
+    },
 
+     "programa de almacenamiento": {
+        icono: IconPackageExport,
+        color: color.rojo,
+    },
+
+    /* Gestión Comercial */
+
+    "gestion comercial y ventas": {
+        icono:IconCurrencyDollar,
+        color: color.verde,
+    },
+
+    /* Gestión de Producción */
+
+    "gestion de la produccion" : {
+        icono: IconBuildingFactory2,
+        color: color.verdeOscuro,
+    },
+
+    /* Gestión de Mantenimiento */
+
+    "calibracion y verificacion de equipos de medicion": {
+        icono: IconTools,
+        color: color.azul,
+    },
+
+    "mantenimiento de maquinaria y equipos": {
+        icono: IconTool,
+        color: color.verde,
+    },
+
+    "mantenimiento de edificios e instalaciones": {
+        icono: IconBuilding,
+        color: color.gris,
+    },
+
+    /* Gestión de Seguridad Física */
+
+    "seguridad y vigilancia": {
+        icono: IconShield,
+        color: color.verde,
+    },
+
+    /* Gestión TICs */
+
+    "tecnologia informatica y de comunicaciones": {
+        icono: IconDeviceDesktopAnalytics,
+        color: color.rojo,
+    },
+
+    /* Gestión Financiera */
+
+    "gestion administrativa": {
+        icono: IconBriefcase,
+        color: color.marron,
+    },
+
+    "gestion contable y financiera": {
+        icono: IconCalculator,
+        color: color.gris,
+    },
+
+    /* Gestión de Compras */
+
+    "control de proveedores": {
+        icono: IconBuildingStore,
+        color: color.verde,
+    },
+
+    "gestion de compras": {
+        icono: IconShoppingCart,
+        color: color.rojo,
+    }
 };
+
+
 
 export function obtenerIconoSubProceso(nombre: string): IconoSubProceso {
     const clave = nombre

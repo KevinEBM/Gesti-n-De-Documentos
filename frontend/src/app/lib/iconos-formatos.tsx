@@ -11,6 +11,7 @@ import {
     FileText,
     BookOpen,
     GitBranch,
+    Workflow
 } from "lucide-react";
 
 import {
@@ -21,8 +22,11 @@ import {
     IconMapRoute,
     IconFileDescription,
     IconBook,
-    IconRoute,
-    IconFileCheck,
+    IconListCheck,
+    IconInfoCircle,
+    IconFileSettings,
+    IconFileChart,
+    IconFileX,
 } from "@tabler/icons-react";
 
 export interface IconosFormatos {
@@ -41,8 +45,22 @@ const color = {
     verde: "text-emerald-600",
     dorado: "text-amber-500",
     cafe: "text-amber-700",
-    blanco: "text-gray-100",
     morado: "text-purple-500",
+    amarillo: "text-yellow-500",
+    grisOscuro: "text-gray-700",
+    grisClaro: "text-gray-300",
+    rosado: "text-pink-500",
+    rosadoClaro: "text-pink-300",
+    turquesa: "text-teal-500",
+    cyan: "text-cyan-500",
+    celeste: "text-sky-400",
+    azulOscuro: "text-indigo-700",
+    violeta: "text-violet-600",
+    fucsia: "text-fuchsia-500",
+    verdeMar: "text-teal-700",
+    plateado: "text-zinc-400",
+    naranja: "text-orange-500",
+
 };
 
 const ICONOS_FORMATOS: Record<string, IconosFormatos> = {
@@ -59,6 +77,11 @@ const ICONOS_FORMATOS: Record<string, IconosFormatos> = {
         color: color.dorado,
     },
 
+    proceso: {
+        icono: Workflow,
+        color: color.verdeClaro,
+    },
+
     // 📋 Programa
     programa: {
         icono: IconClipboardList,
@@ -68,7 +91,17 @@ const ICONOS_FORMATOS: Record<string, IconosFormatos> = {
     // 📘 Manual
     manual: {
         icono: Notebook,
-        color: color.azul,
+        color: color.celeste,
+    },
+
+    reglamento: {
+        icono: IconListCheck,
+        color: color.naranja,
+    },
+
+    caracterizacion: {
+        icono: IconInfoCircle,
+        color: color.amarillo,
     },
 
     // 🏛️ Política
@@ -89,23 +122,31 @@ const ICONOS_FORMATOS: Record<string, IconosFormatos> = {
         color: color.piel,
     },
 
+
     // 📑 Instructivo
     instructivo: {
         icono: IconFileDescription,
-        color: color.rojo,
+        color: color.verdeMar,
+    },
+
+    "ficha tecnica": {
+        icono: IconFileSettings,
+        color:color.metalico,
     },
 
     // 📖 Guía
-    guia: {
-        icono: IconBook,
+    diagrama: {
+        icono: IconFileChart,
         color: color.cafe,
     },
 
     // 🔀 Flujograma
-    flujograma: {
-        icono: GitBranch,
-        color: color.morado,
+    "otros documentos": {
+        icono: IconFileX,
+        color: color.rojo,
     },
+
+
 };
 
 export function obtenerIconoFormato(nombre: string): IconosFormatos {
