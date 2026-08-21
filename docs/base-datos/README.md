@@ -46,6 +46,7 @@ Ubicación: `backend/src/main/resources/db/migration/`
 | V3 | **Renombra** `categorias` → `subprogramas` (histórico; el modelo actual usa subprogramas) |
 | V4 | Ajuste modelo área–documento (una fila principal en `documento_area`) |
 | V5 | Columna `alcance` en documentos |
+| V6 | Precarga idempotente de catálogos institucionales (11 áreas, 40 subprogramas, 13 tipos). Ver [catalogos-institucionales.md](./catalogos-institucionales.md) |
 
 Flyway se ejecuta al arrancar el backend (`spring.flyway.enabled=true`). Hibernate valida el esquema (`ddl-auto=validate`).
 
