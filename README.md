@@ -97,15 +97,17 @@ Propiedades reales en `backend/src/main/resources/application.properties`. **No 
 | `DB_URL` | Sí | JDBC PostgreSQL |
 | `DB_USERNAME` | Sí | Usuario BD |
 | `DB_PASSWORD` | Sí | Contraseña BD |
-| `JWT_SECRET` | Sí | Secreto JWT (Base64, ≥ 32 bytes decodificados) → `jwt.secret` |
-| `JWT_EXPIRATION_MS` | Sí | Expiración token en ms → `jwt.expiration-ms` |
+| `JWT_SECRET` | Sí | Secreto JWT (Base64, ≥ 32 bytes decodificados) → propiedad `jwt.secret` |
+| `JWT_EXPIRATION_MS` | Sí | Expiración token en ms → propiedad `jwt.expiration-ms` |
 | `CORS_ALLOWED_ORIGINS` | No | Orígenes CORS (default `http://localhost:5173`) |
 | `STORAGE_LOCATION` | No | Directorio de archivos (default `uploads`) |
 | `STORAGE_MAX_FILE_SIZE` | No | Tamaño máximo bytes (default `15728640` = 15 MB) |
 | `MAX_UPLOAD_FILE_SIZE` | No | Multipart Spring (default `15MB`) |
 | `MAX_UPLOAD_REQUEST_SIZE` | No | Multipart request (default `16MB`) |
 
-En desarrollo local los archivos suelen quedar en `backend/uploads/` si se ejecuta desde esa carpeta.
+En desarrollo local los archivos suelen quedar en `backend/uploads/` si se ejecuta desde esa carpeta. Ver `backend/.env.example` (Spring Boot **no** carga `.env` automáticamente; exportar variables al entorno).
+
+**Producción:** activar perfil `prod` con `SPRING_PROFILES_ACTIVE=prod`. Requiere `CORS_ALLOWED_ORIGINS` y `STORAGE_LOCATION` (ruta absoluta persistente). Detalle en [docs/despliegue/README.md](docs/despliegue/README.md).
 
 ### Variables de entorno (frontend)
 
@@ -141,6 +143,7 @@ Login en `http://localhost:5173/`. Tras autenticación, ADMIN va a panel adminis
 ```powershell
 cd backend
 .\mvnw.cmd test          # 554 tests (1 skipped: contextLoads)
+.\mvnw.cmd package       # genera JAR en target/ (no versionar)
 .\mvnw.cmd compile
 .\mvnw.cmd spring-boot:run
 ```
@@ -182,11 +185,23 @@ No existe ruta `/app/notificaciones`.
 - `GET /api/roles` restringido a **ADMINISTRADOR**
 - Archivos: máximo **15 MB**, extensión **.apk** bloqueada, hash **SHA-256** al guardar
 
-## Despliegue — pendiente
+## Preparación para producción (A6)
 
-La siguiente fase contemplará servidor, variables de producción, HTTPS, subdominio, proceso backend/frontend y storage persistente. **No está implementado** en este repositorio.
+El proyecto está **preparado** para ejecutarse en servidor con variables de entorno y perfil `prod`. **No incluye despliegue** (servidor, DNS, HTTPS, Nginx → fase A7).
+
+- Backend: JAR ejecutable + `application-prod.properties`
+- Frontend: `npm run build` → `frontend/dist/` (servir estático; no `npm run dev`)
+- Secretos: solo en entorno del servidor; ver `backend/.env.example` y `frontend/.env.example`
+- Respaldo: PostgreSQL **y** directorio `STORAGE_LOCATION` juntos
+
+Guía completa: [docs/despliegue/README.md](docs/despliegue/README.md).
+
+## Despliegue — pendiente (A7)
+
+La fase A7 contemplará servidor, variables de producción reales, HTTPS, subdominio, reverse proxy, proceso backend/frontend y storage persistente. **No está implementado** en este repositorio.
 
 ## Documentación adicional
 
+- [docs/despliegue/README.md](docs/despliegue/README.md) — preparación A6 y pendientes A7
 - [docs/arquitectura/README.md](docs/arquitectura/README.md) — módulos, endpoints, reglas documentales
 - [docs/base-datos/README.md](docs/base-datos/README.md) — modelo de datos y migraciones
