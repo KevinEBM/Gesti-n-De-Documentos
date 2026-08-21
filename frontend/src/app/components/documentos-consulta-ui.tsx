@@ -1,8 +1,14 @@
-import { Download, Eye, Pencil, Upload } from "lucide-react";
-import type { ComponentType } from "react";
+import { Download, Eye, Loader2, Pencil, Upload } from "lucide-react";
+import type { ComponentType, ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Label } from "@/components/ui/label";
 import {
     Select,
@@ -43,6 +49,7 @@ export function DocumentoAcciones({
     onEditar,
     onActualizar,
     apilado = false,
+    compacto = false,
     verDeshabilitado = false,
     tituloVer,
 }: {
@@ -53,6 +60,7 @@ export function DocumentoAcciones({
     onEditar?: (documento: DocumentoResumen) => void;
     onActualizar?: (documento: DocumentoResumen) => void;
     apilado?: boolean;
+    compacto?: boolean;
     verDeshabilitado?: boolean;
     tituloVer?: string;
 }) {
@@ -61,6 +69,50 @@ export function DocumentoAcciones({
     const contenidoEditable = documento.estado !== "OBSOLETO";
     const puedeEditar = onEditar && contenidoEditable;
     const puedeActualizar = onActualizar && contenidoEditable;
+    const etiquetaVer = tituloVer ?? "Ver documento";
+
+    if (compacto) {
+        return (
+            <TooltipProvider delayDuration={300}>
+                <div className="flex items-center justify-end gap-1">
+                    {puedeEditar ? (
+                        <AccionIconoCompacta
+                            etiqueta="Editar publicación"
+                            onClick={() => onEditar(documento)}
+                        >
+                            <Pencil className="size-4" />
+                        </AccionIconoCompacta>
+                    ) : null}
+                    {puedeActualizar ? (
+                        <AccionIconoCompacta
+                            etiqueta="Publicar nueva versión"
+                            onClick={() => onActualizar(documento)}
+                        >
+                            <Upload className="size-4" />
+                        </AccionIconoCompacta>
+                    ) : null}
+                    <AccionIconoCompacta
+                        etiqueta={etiquetaVer}
+                        disabled={verInhabilitado}
+                        onClick={() => onVer?.(documento)}
+                    >
+                        <Eye className="size-4" />
+                    </AccionIconoCompacta>
+                    <AccionIconoCompacta
+                        etiqueta={descargando ? "Descargando documento" : "Descargar documento"}
+                        disabled={descargando}
+                        onClick={() => onDescargar(documento)}
+                    >
+                        {descargando ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Download className="size-4" />
+                        )}
+                    </AccionIconoCompacta>
+                </div>
+            </TooltipProvider>
+        );
+    }
 
     return (
         <div
@@ -113,6 +165,38 @@ export function DocumentoAcciones({
                 {descargando ? "Descargando..." : "Descargar"}
             </Button>
         </div>
+    );
+}
+
+function AccionIconoCompacta({
+    etiqueta,
+    disabled = false,
+    onClick,
+    children,
+}: {
+    etiqueta: string;
+    disabled?: boolean;
+    onClick: () => void;
+    children: ReactNode;
+}) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    className="size-8 shrink-0"
+                    aria-label={etiqueta}
+                    title={etiqueta}
+                    disabled={disabled}
+                    onClick={onClick}
+                >
+                    {children}
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{etiqueta}</TooltipContent>
+        </Tooltip>
     );
 }
 

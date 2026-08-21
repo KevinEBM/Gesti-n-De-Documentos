@@ -493,6 +493,7 @@ function GestionDocumentos() {
                                         <DocumentoAcciones
                                             documento={documento}
                                             descargandoId={descargandoId}
+                                            compacto
                                             onDescargar={descargarDocumento}
                                             onVer={verDocumento}
                                             onEditar={editarDocumento}
