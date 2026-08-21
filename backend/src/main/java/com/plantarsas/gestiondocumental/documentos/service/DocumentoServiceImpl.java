@@ -133,7 +133,7 @@ public class DocumentoServiceImpl implements DocumentoService {
 
             VersionDocumento version = new VersionDocumento(
                     documento,
-                    1,
+                    request.numeroVersionInicial(),
                     archivoGuardado.nombreOriginal(),
                     archivoGuardado.ruta(),
                     archivoGuardado.ruta(),

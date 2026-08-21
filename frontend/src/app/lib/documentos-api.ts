@@ -22,6 +22,7 @@ export interface DocumentoPublicacionInicialRequestDto {
     subprogramaId: number;
     tipoDocumentoId: number;
     descripcionVersionInicial: string;
+    numeroVersionInicial: number;
     alcance: DocumentoAlcance;
     areasAdicionalesIds: number[];
 }

@@ -134,6 +134,7 @@ class DocumentoServiceImplTest {
                 SUBPROGRAMA_ID,
                 TIPO_DOCUMENTO_ID,
                 "Publicación inicial",
+                1,
                 DocumentoAlcance.AREA_RESPONSABLE,
                 List.of()
         );
@@ -150,8 +151,24 @@ class DocumentoServiceImplTest {
                 SUBPROGRAMA_ID,
                 TIPO_DOCUMENTO_ID,
                 "Publicación inicial",
+                1,
                 alcance,
                 areasAdicionalesIds
+        );
+    }
+
+    private DocumentoPublicacionInicialRequest requestConNumeroVersionInicial(int numeroVersionInicial) {
+        return new DocumentoPublicacionInicialRequest(
+                "PROC-001",
+                "Título de prueba",
+                "Descripción de prueba",
+                AREA_ID,
+                SUBPROGRAMA_ID,
+                TIPO_DOCUMENTO_ID,
+                "Publicación inicial",
+                numeroVersionInicial,
+                DocumentoAlcance.AREA_RESPONSABLE,
+                List.of()
         );
     }
 
@@ -282,7 +299,7 @@ class DocumentoServiceImplTest {
     void publicarInicial_debeLanzarConflictoSiCodigoYaExisteConEspaciosYDistintoCasing() {
         DocumentoPublicacionInicialRequest request = new DocumentoPublicacionInicialRequest(
                 "  proc-001  ", "Título", "Descripción", AREA_ID, SUBPROGRAMA_ID, TIPO_DOCUMENTO_ID,
-                "Publicación inicial", DocumentoAlcance.AREA_RESPONSABLE, List.of()
+                "Publicación inicial", 1, DocumentoAlcance.AREA_RESPONSABLE, List.of()
         );
         when(documentoRepository.existsByCodigoIgnoreCase("proc-001")).thenReturn(true);
 
@@ -666,6 +683,46 @@ class DocumentoServiceImplTest {
         ArgumentCaptor<DocumentoArea> documentoAreaCaptor = ArgumentCaptor.forClass(DocumentoArea.class);
         verify(documentoAreaRepository).save(documentoAreaCaptor.capture());
         assertThat(documentoAreaCaptor.getValue().isEsPrincipal()).isTrue();
+
+        ArgumentCaptor<VersionDocumento> versionCaptor = ArgumentCaptor.forClass(VersionDocumento.class);
+        verify(versionDocumentoRepository).save(versionCaptor.capture());
+        assertThat(versionCaptor.getValue().getNumeroVersion()).isEqualTo(1);
+        assertThat(versionCaptor.getValue().isVigente()).isTrue();
+    }
+
+    @Test
+    void publicarInicial_conNumeroVersionInicialSiete_debeCrearVersionSieteVigente() throws IOException {
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        Usuario usuario = usuarioPersistidoMock();
+        stubValidacionesPrevias(area, subprograma, tipoDocumento, usuario);
+        stubGuardarYPersistenciaExitosos();
+
+        documentoServiceImpl.publicarInicial(
+                requestConNumeroVersionInicial(7), usuarioAdministrador(),
+                "documento.pdf", contenidoDePrueba(), "application/pdf", 9L
+        );
+
+        ArgumentCaptor<VersionDocumento> versionCaptor = ArgumentCaptor.forClass(VersionDocumento.class);
+        verify(versionDocumentoRepository).save(versionCaptor.capture());
+        assertThat(versionCaptor.getValue().getNumeroVersion()).isEqualTo(7);
+        assertThat(versionCaptor.getValue().isVigente()).isTrue();
+    }
+
+    @Test
+    void publicarInicial_conNumeroVersionInicialUno_debeCrearVersionUnoVigente() throws IOException {
+        Area area = areaActivaMock();
+        Subprograma subprograma = subprogramaActivoMock(area);
+        TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
+        Usuario usuario = usuarioPersistidoMock();
+        stubValidacionesPrevias(area, subprograma, tipoDocumento, usuario);
+        stubGuardarYPersistenciaExitosos();
+
+        documentoServiceImpl.publicarInicial(
+                requestValido(), usuarioAdministrador(),
+                "documento.pdf", contenidoDePrueba(), "application/pdf", 9L
+        );
 
         ArgumentCaptor<VersionDocumento> versionCaptor = ArgumentCaptor.forClass(VersionDocumento.class);
         verify(versionDocumentoRepository).save(versionCaptor.capture());

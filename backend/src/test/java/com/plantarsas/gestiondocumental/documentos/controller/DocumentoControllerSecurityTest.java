@@ -140,12 +140,34 @@ class DocumentoControllerSecurityTest {
             "{\"codigo\":\"PROC-001\",\"titulo\":\"Titulo\",\"descripcion\":\"Descripcion\","
                     + "\"areaId\":1,\"subprogramaId\":2,\"tipoDocumentoId\":3,"
                     + "\"descripcionVersionInicial\":\"Publicacion inicial\","
+                    + "\"numeroVersionInicial\":1,"
                     + "\"alcance\":\"AREA_RESPONSABLE\",\"areasAdicionalesIds\":[]}";
 
     private static final String METADATA_INVALIDA_JSON =
             "{\"codigo\":\"\",\"titulo\":\"Titulo\",\"descripcion\":\"Descripcion\","
                     + "\"areaId\":1,\"subprogramaId\":2,\"tipoDocumentoId\":3,"
-                    + "\"descripcionVersionInicial\":\"Publicacion inicial\"}";
+                    + "\"descripcionVersionInicial\":\"Publicacion inicial\","
+                    + "\"numeroVersionInicial\":1}";
+
+    private static final String METADATA_NUMERO_VERSION_INICIAL_CERO_JSON =
+            "{\"codigo\":\"PROC-001\",\"titulo\":\"Titulo\",\"descripcion\":\"Descripcion\","
+                    + "\"areaId\":1,\"subprogramaId\":2,\"tipoDocumentoId\":3,"
+                    + "\"descripcionVersionInicial\":\"Publicacion inicial\","
+                    + "\"numeroVersionInicial\":0,"
+                    + "\"alcance\":\"AREA_RESPONSABLE\",\"areasAdicionalesIds\":[]}";
+
+    private static final String METADATA_NUMERO_VERSION_INICIAL_NEGATIVA_JSON =
+            "{\"codigo\":\"PROC-001\",\"titulo\":\"Titulo\",\"descripcion\":\"Descripcion\","
+                    + "\"areaId\":1,\"subprogramaId\":2,\"tipoDocumentoId\":3,"
+                    + "\"descripcionVersionInicial\":\"Publicacion inicial\","
+                    + "\"numeroVersionInicial\":-1,"
+                    + "\"alcance\":\"AREA_RESPONSABLE\",\"areasAdicionalesIds\":[]}";
+
+    private static final String METADATA_SIN_NUMERO_VERSION_INICIAL_JSON =
+            "{\"codigo\":\"PROC-001\",\"titulo\":\"Titulo\",\"descripcion\":\"Descripcion\","
+                    + "\"areaId\":1,\"subprogramaId\":2,\"tipoDocumentoId\":3,"
+                    + "\"descripcionVersionInicial\":\"Publicacion inicial\","
+                    + "\"alcance\":\"AREA_RESPONSABLE\",\"areasAdicionalesIds\":[]}";
 
     private static final String METADATA_JSON_MALFORMADO =
             "{\"codigo\":\"PROC-001\", \"titulo\": ";
@@ -154,12 +176,14 @@ class DocumentoControllerSecurityTest {
             "{\"codigo\":\"PROC-001\",\"titulo\":\"Titulo\",\"descripcion\":\"Descripcion\","
                     + "\"areaId\":1,\"subprogramaId\":2,\"tipoDocumentoId\":3,"
                     + "\"descripcionVersionInicial\":\"Publicacion inicial\","
+                    + "\"numeroVersionInicial\":1,"
                     + "\"areasAdicionalesIds\":[]}";
 
     private static final String METADATA_SIN_AREAS_ADICIONALES_IDS_JSON =
             "{\"codigo\":\"PROC-001\",\"titulo\":\"Titulo\",\"descripcion\":\"Descripcion\","
                     + "\"areaId\":1,\"subprogramaId\":2,\"tipoDocumentoId\":3,"
                     + "\"descripcionVersionInicial\":\"Publicacion inicial\","
+                    + "\"numeroVersionInicial\":1,"
                     + "\"alcance\":\"AREA_RESPONSABLE\"}";
 
     private static final String METADATA_ACTUALIZACION_VALIDA_JSON =
@@ -249,6 +273,24 @@ class DocumentoControllerSecurityTest {
     private MockMultipartFile metadataSinAreasAdicionalesIds() {
         return new MockMultipartFile(
                 "metadata", "", "application/json", METADATA_SIN_AREAS_ADICIONALES_IDS_JSON.getBytes()
+        );
+    }
+
+    private MockMultipartFile metadataNumeroVersionInicialCero() {
+        return new MockMultipartFile(
+                "metadata", "", "application/json", METADATA_NUMERO_VERSION_INICIAL_CERO_JSON.getBytes()
+        );
+    }
+
+    private MockMultipartFile metadataNumeroVersionInicialNegativa() {
+        return new MockMultipartFile(
+                "metadata", "", "application/json", METADATA_NUMERO_VERSION_INICIAL_NEGATIVA_JSON.getBytes()
+        );
+    }
+
+    private MockMultipartFile metadataSinNumeroVersionInicial() {
+        return new MockMultipartFile(
+                "metadata", "", "application/json", METADATA_SIN_NUMERO_VERSION_INICIAL_JSON.getBytes()
         );
     }
 
@@ -420,6 +462,39 @@ class DocumentoControllerSecurityTest {
     void publicarInicial_sinAreasAdicionalesIds_debeResponderBadRequest() throws Exception {
         mockMvc.perform(multipart(URL_PUBLICACION_INICIAL)
                         .file(metadataSinAreasAdicionalesIds())
+                        .file(archivoValido())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    void publicarInicial_conNumeroVersionInicialCero_debeResponderBadRequest() throws Exception {
+        mockMvc.perform(multipart(URL_PUBLICACION_INICIAL)
+                        .file(metadataNumeroVersionInicialCero())
+                        .file(archivoValido())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    void publicarInicial_conNumeroVersionInicialNegativa_debeResponderBadRequest() throws Exception {
+        mockMvc.perform(multipart(URL_PUBLICACION_INICIAL)
+                        .file(metadataNumeroVersionInicialNegativa())
+                        .file(archivoValido())
+                        .with(administradorAutenticado()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(documentoService);
+    }
+
+    @Test
+    void publicarInicial_sinNumeroVersionInicial_debeResponderBadRequest() throws Exception {
+        mockMvc.perform(multipart(URL_PUBLICACION_INICIAL)
+                        .file(metadataSinNumeroVersionInicial())
                         .file(archivoValido())
                         .with(administradorAutenticado()))
                 .andExpect(status().isBadRequest());

@@ -1,6 +1,7 @@
 package com.plantarsas.gestiondocumental.documentos.dto;
 
 import com.plantarsas.gestiondocumental.shared.enums.DocumentoAlcance;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -36,6 +37,10 @@ public record DocumentoPublicacionInicialRequest(
         @NotBlank(message = "La descripción de la versión inicial es obligatoria")
         @Size(max = 500, message = "La descripción de la versión no puede superar 500 caracteres")
         String descripcionVersionInicial,
+
+        @NotNull(message = "La versión inicial es obligatoria")
+        @Min(value = 1, message = "La versión inicial debe ser un entero mayor o igual a 1")
+        Integer numeroVersionInicial,
 
         @NotNull(message = "El alcance es obligatorio")
         DocumentoAlcance alcance,

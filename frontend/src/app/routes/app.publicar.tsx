@@ -98,6 +98,7 @@ interface FormularioPublicacion {
     alcance: DocumentoAlcance | "";
     areasAdicionalesIds: string[];
     descripcionVersionInicial: string;
+    numeroVersionInicial: string;
 }
 
 const formularioVacio: FormularioPublicacion = {
@@ -110,6 +111,7 @@ const formularioVacio: FormularioPublicacion = {
     alcance: "",
     areasAdicionalesIds: [],
     descripcionVersionInicial: "",
+    numeroVersionInicial: "1",
 };
 
 function validarFormulario(
@@ -187,6 +189,17 @@ function validarFormulario(
             "La descripción de la versión no puede superar los 500 caracteres.";
     }
 
+    const versionStr = form.numeroVersionInicial.trim();
+    if (!versionStr) {
+        errores.numeroVersionInicial = "La versión inicial es obligatoria.";
+    } else {
+        const versionNum = Number(versionStr);
+        if (!Number.isInteger(versionNum) || versionNum < 1) {
+            errores.numeroVersionInicial =
+                "La versión inicial debe ser un entero mayor o igual a 1.";
+        }
+    }
+
     return errores;
 }
 
@@ -207,6 +220,7 @@ function construirMetadata(form: FormularioPublicacion): DocumentoPublicacionIni
         subprogramaId: Number(form.subprogramaId),
         tipoDocumentoId: Number(form.tipoDocumentoId),
         descripcionVersionInicial: form.descripcionVersionInicial.trim(),
+        numeroVersionInicial: Number(form.numeroVersionInicial.trim()),
         alcance,
         areasAdicionalesIds,
     };
@@ -873,17 +887,28 @@ function NuevoDocumentoPage() {
                                 </div>
                             </Campo>
 
-                            <Campo label="Versión inicial">
+                            <Campo
+                                id="numeroVersionInicial"
+                                label="Versión inicial"
+                                obligatorio
+                                error={errores.numeroVersionInicial}
+                            >
                                 <Input
-                                    id="versionInicial"
-                                    value="1"
-                                    readOnly
-                                    disabled
-                                    className="bg-muted/40 text-slate-900"
+                                    id="numeroVersionInicial"
+                                    type="number"
+                                    min={1}
+                                    step={1}
+                                    value={form.numeroVersionInicial}
+                                    onChange={(e) =>
+                                        setForm((prev) => ({
+                                            ...prev,
+                                            numeroVersionInicial: e.target.value,
+                                        }))
+                                    }
+                                    disabled={formularioDeshabilitado}
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    La primera publicación se registra automáticamente como versión
-                                    1.
+                                    Indica la versión actual del documento.
                                 </p>
                             </Campo>
 
