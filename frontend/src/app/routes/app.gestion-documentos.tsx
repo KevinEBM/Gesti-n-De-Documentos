@@ -63,7 +63,7 @@ export const Route = createFileRoute("/app/gestion-documentos")({
             {
                 name: "description",
                 content:
-                    "Consulta y administra documentos internos: filtra por área, subprograma, tipo, estado y fechas.",
+                    "Consulta y administra documentos internos: filtra por área, subproceso, tipo, estado y fechas.",
             },
             {
                 property: "og:title",
@@ -429,7 +429,7 @@ function GestionDocumentos() {
                         <TableRow className="bg-secondary/60">
                             <TableHead>Código</TableHead>
                             <TableHead>Título</TableHead>
-                            <TableHead>Subprograma</TableHead>
+                            <TableHead>Subproceso</TableHead>
                             <TableHead>Tipo</TableHead>
                             <TableHead>Alcance</TableHead>
                             <TableHead>Estado</TableHead>
@@ -577,7 +577,7 @@ function GestionDocumentos() {
                             disabled={cargandoCatalogos || !!errorCatalogos}
                         />
                         <DocumentoFiltroSelect
-                            label="Subprograma"
+                            label="Subproceso"
                             value={filtrosFormulario.subprograma}
                             onChange={(subprograma) =>
                                 setFiltrosFormulario((prev) => ({ ...prev, subprograma }))

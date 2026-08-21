@@ -100,7 +100,7 @@ function Login() {
                         Consulta manuales, políticas, protocolos y procedimientos vigentes de su área, con control de versiones.
                     </p>
                     <ul className="space-y-2 text-sm opacity-90">
-                        <li>· Documentos organizados por área, subprograma y tipo</li>
+                        <li>· Documentos organizados por área, subproceso y tipo</li>
                         <li>· Historial de versiones siempre disponible</li>
                         <li>· Acceso restringido a personal autorizado</li>
                     </ul>

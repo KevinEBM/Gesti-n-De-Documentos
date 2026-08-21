@@ -200,7 +200,7 @@ function DetalleDocumento() {
                                         : "Sin descripción"
                                 }
                             />
-                            <Campo k="Subprograma" v={documento.subprogramaNombre} />
+                            <Campo k="Subproceso" v={documento.subprogramaNombre} />
                             <Campo k="Tipo de documento" v={documento.tipoDocumentoNombre} />
                             <Campo k="Alcance" v={etiquetasAlcance[documento.alcance]} />
                             <Campo

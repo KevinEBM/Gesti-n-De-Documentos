@@ -349,7 +349,7 @@ function Biblioteca() {
                             <TableRow className="bg-secondary/60">
                                 <TableHead>Código</TableHead>
                                 <TableHead>Título</TableHead>
-                                <TableHead>Subprograma</TableHead>
+                                <TableHead>Subproceso</TableHead>
                                 <TableHead>Tipo</TableHead>
                                 <TableHead>Alcance</TableHead>
                                 <TableHead>Estado</TableHead>
@@ -442,7 +442,7 @@ function Biblioteca() {
                                         color={colorTipo}
                                     />
                                     <Dato
-                                        k="Subprograma"
+                                        k="Subproceso"
                                         v={documento.subprogramaNombre}
                                         icon={IconoSub}
                                         color={colorSub}
@@ -552,7 +552,7 @@ function Biblioteca() {
                             }
                         />
                         <DocumentoFiltroSelect
-                            label="Subprograma"
+                            label="Subproceso"
                             value={filtrosFormulario.subprograma}
                             onChange={(subprograma) =>
                                 setFiltrosFormulario((prev) => ({ ...prev, subprograma }))
