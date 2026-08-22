@@ -75,19 +75,20 @@ function Inicio() {
 
                 <Card>
                     <CardHeader className="pb-3">
-                        <CardTitle className="text-base">Acerca de SIG Plantar S.A.S.</CardTitle>
+                        <CardTitle className="text-base">Acerca de SID Plantar S.A.S.</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="grid gap-5 sm:grid-cols-2 sm:gap-6">
                             <div className="space-y-1.5">
                                 <div className="flex items-center gap-2">
                                     <Info className="size-4 shrink-0 text-muted-foreground" />
-                                    <h3 className="text-sm font-semibold">¿Qué es SIG Plantar S.A.S.?</h3>
+                                    <h3 className="text-sm font-semibold">¿Qué es SID Plantar S.A.S.?</h3>
                                 </div>
                                 <p className="text-sm leading-relaxed text-muted-foreground">
-                                    Plataforma interna para consultar, organizar y mantener actualizada la
-                                    documentación de Plantar S.A.S., facilitando el acceso según el rol y el
-                                    área del usuario.
+                                    SID (Sistema Integrado Documental) es la plataforma interna de
+                                    Plantar S.A.S. para consultar, organizar y mantener actualizada la
+                                    documentación, facilitando el acceso según el rol y el área del
+                                    usuario.
                                 </p>
                             </div>
                             <div className="space-y-1.5">
