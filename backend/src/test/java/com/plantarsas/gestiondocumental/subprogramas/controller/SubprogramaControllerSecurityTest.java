@@ -65,7 +65,7 @@ class SubprogramaControllerSecurityTest {
             "{\"nombre\":\"Subprograma A\",\"descripcion\":\"Descripcion\",\"areaId\":1}";
 
     private static final String SUBPROGRAMA_UPDATE_REQUEST_JSON =
-            "{\"nombre\":\"Subprograma A\",\"descripcion\":\"Descripcion\"}";
+            "{\"nombre\":\"Subprograma A\",\"descripcion\":\"Descripcion\",\"areaId\":1}";
 
     private static final String SUBPROGRAMA_ESTADO_REQUEST_JSON =
             "{\"activo\":false}";

@@ -24,4 +24,6 @@ public interface DocumentoRepository extends JpaRepository<Documento, Long>, Jpa
     Optional<Documento> buscarPorIdConBloqueoPesimista(@Param("id") Long id);
 
     long countByEstado(DocumentoEstado estado);
+
+    boolean existsBySubprograma_Id(Long subprogramaId);
 }

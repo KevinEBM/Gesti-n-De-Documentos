@@ -20,6 +20,7 @@ export interface SubprogramaRequestDto {
 export interface SubprogramaUpdateRequestDto {
     nombre: string;
     descripcion: string;
+    areaId: number;
 }
 
 export interface SubprogramaEstadoRequestDto {

@@ -2,6 +2,7 @@ package com.plantarsas.gestiondocumental.subprogramas.service;
 
 import com.plantarsas.gestiondocumental.areas.entity.Area;
 import com.plantarsas.gestiondocumental.areas.service.AreaLookupService;
+import com.plantarsas.gestiondocumental.documentos.repository.DocumentoRepository;
 import com.plantarsas.gestiondocumental.exception.BusinessException;
 import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
 import com.plantarsas.gestiondocumental.exception.UnauthorizedException;
@@ -44,6 +45,9 @@ class SubprogramaServiceImplTest {
     private SubprogramaRepository subprogramaRepository;
 
     @Mock
+    private DocumentoRepository documentoRepository;
+
+    @Mock
     private AreaLookupService areaLookupService;
 
     @Mock
@@ -66,6 +70,7 @@ class SubprogramaServiceImplTest {
     void inicializar() {
         subprogramaServiceImpl = new SubprogramaServiceImpl(
                 subprogramaRepository,
+                documentoRepository,
                 areaLookupService,
                 subprogramaMapper,
                 usuarioAreaAutorizacionService
@@ -182,7 +187,7 @@ class SubprogramaServiceImplTest {
         Subprograma subprograma = mock(Subprograma.class);
         Area area = areaMock(1L);
         when(subprograma.getArea()).thenReturn(area);
-        SubprogramaUpdateRequest request = new SubprogramaUpdateRequest("Nuevo nombre", "Nueva descripcion");
+        SubprogramaUpdateRequest request = new SubprogramaUpdateRequest("Nuevo nombre", "Nueva descripcion", 1L);
         SubprogramaResponse respuestaEsperada = respuestaDePrueba(id);
 
         when(subprogramaRepository.findById(id)).thenReturn(Optional.of(subprograma));
@@ -191,8 +196,52 @@ class SubprogramaServiceImplTest {
 
         SubprogramaResponse resultado = subprogramaServiceImpl.actualizar(id, request);
 
-        verify(subprograma).actualizarDatos("Nuevo nombre", "Nueva descripcion");
+        verify(subprograma).actualizarDatos("Nuevo nombre", "Nueva descripcion", area);
+        verify(documentoRepository, never()).existsBySubprograma_Id(any());
         assertThat(resultado).isEqualTo(respuestaEsperada);
+    }
+
+    @Test
+    void actualizar_conCambioDeAreaSinDocumentos_debeActualizarArea() {
+        Long id = 1L;
+        Subprograma subprograma = mock(Subprograma.class);
+        Area areaActual = areaMock(1L);
+        Area areaNueva = areaMock(2L);
+        when(subprograma.getArea()).thenReturn(areaActual);
+        SubprogramaUpdateRequest request = new SubprogramaUpdateRequest("Nuevo nombre", "Nueva descripcion", 2L);
+        SubprogramaResponse respuestaEsperada = respuestaDePrueba(id);
+
+        when(subprogramaRepository.findById(id)).thenReturn(Optional.of(subprograma));
+        when(documentoRepository.existsBySubprograma_Id(id)).thenReturn(false);
+        when(areaLookupService.obtenerActivaPorId(2L)).thenReturn(areaNueva);
+        when(subprogramaRepository.existsByAreaIdAndNombreIgnoreCaseAndIdNot(2L, "Nuevo nombre", id)).thenReturn(false);
+        when(subprogramaMapper.toResponse(subprograma)).thenReturn(respuestaEsperada);
+
+        SubprogramaResponse resultado = subprogramaServiceImpl.actualizar(id, request);
+
+        verify(subprograma).actualizarDatos("Nuevo nombre", "Nueva descripcion", areaNueva);
+        assertThat(resultado).isEqualTo(respuestaEsperada);
+    }
+
+    @Test
+    void actualizar_conCambioDeAreaConDocumentos_debeRechazar() {
+        Long id = 1L;
+        Subprograma subprograma = mock(Subprograma.class);
+        Area areaActual = areaMock(1L);
+        when(subprograma.getArea()).thenReturn(areaActual);
+        SubprogramaUpdateRequest request = new SubprogramaUpdateRequest("Nuevo nombre", "Nueva descripcion", 2L);
+
+        when(subprogramaRepository.findById(id)).thenReturn(Optional.of(subprograma));
+        when(documentoRepository.existsBySubprograma_Id(id)).thenReturn(true);
+
+        assertThatThrownBy(() -> subprogramaServiceImpl.actualizar(id, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(
+                        "No se puede cambiar el área responsable porque el subproceso ya está asociado a documentos."
+                );
+
+        verify(subprograma, never()).actualizarDatos(any(), any(), any());
+        verify(areaLookupService, never()).obtenerActivaPorId(any());
     }
 
     @Test
@@ -201,7 +250,7 @@ class SubprogramaServiceImplTest {
         Subprograma subprograma = mock(Subprograma.class);
         Area area = areaMock(1L);
         when(subprograma.getArea()).thenReturn(area);
-        SubprogramaUpdateRequest request = new SubprogramaUpdateRequest("Nombre repetido", "Descripcion");
+        SubprogramaUpdateRequest request = new SubprogramaUpdateRequest("Nombre repetido", "Descripcion", 1L);
 
         when(subprogramaRepository.findById(id)).thenReturn(Optional.of(subprograma));
         when(subprogramaRepository.existsByAreaIdAndNombreIgnoreCaseAndIdNot(1L, "Nombre repetido", id)).thenReturn(true);
@@ -210,7 +259,7 @@ class SubprogramaServiceImplTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Nombre repetido");
 
-        verify(subprograma, never()).actualizarDatos(any(), any());
+        verify(subprograma, never()).actualizarDatos(any(), any(), any());
     }
 
     @Test

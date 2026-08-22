@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { ComponentType } from "react";
 import { Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/AppShell";
@@ -91,11 +91,15 @@ export const Route = createFileRoute("/app/parametrizacion")({
     component: Parametrizacion,
 });
 
+function etiquetaConteoTab(total: number | null): string {
+    return total === null ? "…" : String(total);
+}
+
 function Parametrizacion() {
     const { permisos } = useIntranet();
-    const [totalAreas, setTotalAreas] = useState(0);
-    const [totalSubprogramas, setTotalSubprogramas] = useState(0);
-    const [totalTiposDocumento, setTotalTiposDocumento] = useState(0);
+    const [totalAreas, setTotalAreas] = useState<number | null>(null);
+    const [totalSubprogramas, setTotalSubprogramas] = useState<number | null>(null);
+    const [totalTiposDocumento, setTotalTiposDocumento] = useState<number | null>(null);
 
     if (!permisos.gestionarParametros) {
         return (
@@ -120,33 +124,45 @@ function Parametrizacion() {
                         value="areas"
                         className="flex items-center gap-2 border border-input bg-background text-black shadow-sm hover:bg-[#289248] hover:text-white hover:border-[#289248] hover:shadow data-[state=active]:bg-[#289248] data-[state=active]:text-white"
                     >
-                        Áreas ({totalAreas})
+                        Áreas ({etiquetaConteoTab(totalAreas)})
                     </TabsTrigger>
 
                     <TabsTrigger
                         value="subprogramas"
                         className="flex items-center gap-2 border border-input bg-background text-black shadow-sm hover:bg-[#289248] hover:text-white hover:border-[#289248] hover:shadow data-[state=active]:bg-[#289248] data-[state=active]:text-white"
                     >
-                        Subprocesos ({totalSubprogramas})
+                        Subprocesos ({etiquetaConteoTab(totalSubprogramas)})
                     </TabsTrigger>
 
                     <TabsTrigger
                         value="tipos"
                         className="flex items-center gap-2 border border-input bg-background text-black shadow-sm hover:bg-[#289248] hover:text-white hover:border-[#289248] hover:shadow data-[state=active]:bg-[#289248] data-[state=active]:text-white"
                     >
-                        Tipos de documento ({totalTiposDocumento})
+                        Tipos de documento ({etiquetaConteoTab(totalTiposDocumento)})
                     </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="areas">
+                <TabsContent
+                    value="areas"
+                    forceMount
+                    className="data-[state=inactive]:hidden"
+                >
                     <SeccionAreas onTotalChange={setTotalAreas} />
                 </TabsContent>
 
-                <TabsContent value="subprogramas">
+                <TabsContent
+                    value="subprogramas"
+                    forceMount
+                    className="data-[state=inactive]:hidden"
+                >
                     <SeccionSubprogramas onTotalChange={setTotalSubprogramas} />
                 </TabsContent>
 
-                <TabsContent value="tipos">
+                <TabsContent
+                    value="tipos"
+                    forceMount
+                    className="data-[state=inactive]:hidden"
+                >
                     <SeccionTiposDocumento
                         onTotalChange={setTotalTiposDocumento}
                     />
@@ -527,6 +543,14 @@ function SeccionSubprogramas({
 
     const areasActivas = areasReales.filter((area) => area.activo);
 
+    const areasParaSelector = useMemo(() => {
+        if (!form.areaId || areasActivas.some((area) => area.id === form.areaId)) {
+            return areasActivas;
+        }
+        const areaActual = areasReales.find((area) => area.id === form.areaId);
+        return areaActual ? [...areasActivas, areaActual] : areasActivas;
+    }, [areasActivas, areasReales, form.areaId]);
+
     const notificarTotal = (lista: SubprogramaCatalogo[]) => {
         onTotalChange?.(lista.length);
     };
@@ -610,12 +634,37 @@ function SeccionSubprogramas({
             return;
         }
 
+        if (!form.areaId) {
+            setErrorForm("Debe seleccionar un área responsable.");
+            setErroresCampo({ areaId: "Seleccione un área." });
+            return;
+        }
+
+        const areaSeleccionada = areasReales.find((area) => area.id === form.areaId);
+        if (!areaSeleccionada) {
+            setErrorForm("Debe seleccionar un área válida.");
+            setErroresCampo({ areaId: "Seleccione un área válida." });
+            return;
+        }
+
+        const areaOriginalId = form.id
+            ? subprogramas.find((sp) => sp.id === form.id)?.areaId
+            : undefined;
+        const cambiaArea = !!form.id && areaOriginalId !== form.areaId;
+
+        if ((!form.id || cambiaArea) && !areaSeleccionada.activo) {
+            setErrorForm("Debe seleccionar un área activa válida.");
+            setErroresCampo({ areaId: "Seleccione un área activa válida." });
+            return;
+        }
+
         setGuardando(true);
         try {
             if (form.id) {
                 const actualizado = await actualizarSubprograma(form.id, {
                     nombre,
                     descripcion,
+                    areaId: Number(form.areaId),
                 });
                 setSubprogramas((prev) =>
                     prev.map((sp) =>
@@ -624,24 +673,6 @@ function SeccionSubprogramas({
                 );
                 toast.success("Registro actualizado");
             } else {
-                if (!form.areaId) {
-                    setErrorForm("Debe seleccionar un área responsable.");
-                    setGuardando(false);
-                    return;
-                }
-
-                const areaSeleccionada = areasActivas.find(
-                    (a) => a.id === form.areaId,
-                );
-                if (!areaSeleccionada) {
-                    setErrorForm("Debe seleccionar un área activa válida.");
-                    setErroresCampo({
-                        areaId: "Seleccione un área activa válida.",
-                    });
-                    setGuardando(false);
-                    return;
-                }
-
                 const creado = await crearSubprograma({
                     nombre,
                     descripcion,
@@ -661,7 +692,7 @@ function SeccionSubprogramas({
                     setErroresCampo({
                         nombre: err.errores.nombre,
                         descripcion: err.errores.descripcion,
-                        areaId: form.id ? undefined : err.errores.areaId,
+                        areaId: err.errores.areaId,
                     });
                 }
                 setErrorForm(err.message);
@@ -713,10 +744,6 @@ function SeccionSubprogramas({
         !!errorCarga ||
         !!errorAreas ||
         areasActivas.length === 0;
-
-    const subprogramaEditando = form.id
-        ? subprogramas.find((sp) => sp.id === form.id)
-        : undefined;
 
     return (
         <Card>
@@ -859,7 +886,7 @@ function SeccionSubprogramas({
                         </DialogTitle>
                         <DialogDescription>
                             {form.id
-                                ? "Actualice el nombre y la descripción del subproceso."
+                                ? "Actualice el área responsable, el nombre y la descripción del subproceso."
                                 : "Seleccione el área responsable y complete la información."}
                         </DialogDescription>
                     </DialogHeader>
@@ -867,34 +894,19 @@ function SeccionSubprogramas({
                     <div className="space-y-4">
                         <div className="space-y-1.5">
                             <Label>Área responsable *</Label>
-
-                            {form.id ? (
-                                <p className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                                    {subprogramaEditando
-                                        ? `${subprogramaEditando.areaCodigo} - ${subprogramaEditando.areaNombre}${
-                                              subprogramaEditando.areaActiva
-                                                  ? ""
-                                                  : " (inactiva)"
-                                          }`
-                                        : "—"}
+                            <SelectorAreaResponsable
+                                areas={areasParaSelector}
+                                value={form.areaId}
+                                onValueChange={(areaId) =>
+                                    setForm({ ...form, areaId })
+                                }
+                                placeholder="Seleccione un área"
+                                disabled={cargandoAreas || !!errorAreas}
+                            />
+                            {erroresCampo.areaId && (
+                                <p className="text-xs text-destructive">
+                                    {erroresCampo.areaId}
                                 </p>
-                            ) : (
-                                <>
-                                    <SelectorAreaResponsable
-                                        areas={areasActivas}
-                                        value={form.areaId}
-                                        onValueChange={(areaId) =>
-                                            setForm({ ...form, areaId })
-                                        }
-                                        placeholder="Seleccione un área"
-                                    />
-
-                                    {erroresCampo.areaId && (
-                                        <p className="text-xs text-destructive">
-                                            {erroresCampo.areaId}
-                                        </p>
-                                    )}
-                                </>
                             )}
                         </div>
 
