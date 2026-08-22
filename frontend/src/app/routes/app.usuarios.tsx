@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Search, UserPlus, Pencil, Power, Mail } from "lucide-react";
+import { Search, UserPlus, Pencil, Power, Mail, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -22,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ApiError } from "@/lib/api";
 import { listarAreas, type AreaCatalogo } from "@/lib/areas-api";
 import { mapRolBackend } from "@/lib/auth-storage";
+import { etiquetaRol, type Rol } from "@/lib/data";
 import { obtenerIconoArea } from "@/lib/iconos-areas";
 import { obtenerIconoRol } from "@/lib/iconos-roles";
 import { useIntranet } from "@/lib/store";
@@ -53,6 +54,22 @@ export const Route = createFileRoute("/app/usuarios")({
 });
 
 const TODOS = "todos";
+
+const FILTRO_ROL_SELECT_CONTENT_CLASS =
+    "!bg-white !text-slate-900 border border-slate-200 shadow-2xl z-[99999]";
+
+const FILTRO_ROL_SELECT_TRIGGER_CLASS = "!bg-white !text-slate-900";
+
+const FILTRO_ROL_SELECT_ITEM_CLASS =
+    "!text-slate-900 focus:!bg-slate-100 focus:!text-slate-900 data-[highlighted]:!bg-slate-100 data-[highlighted]:!text-slate-900";
+
+const OPCIONES_FILTRO_ROL: { value: string; etiqueta: string }[] = [
+    { value: TODOS, etiqueta: "Todos los roles" },
+    ...(Object.entries(etiquetaRol) as [Rol, string][]).map(([value, etiqueta]) => ({
+        value,
+        etiqueta,
+    })),
+];
 
 const formCrearVacio = {
     nombres: "",
@@ -544,14 +561,31 @@ function GestionUsuarios() {
                         />
                     </div>
                     <Select value={rol} onValueChange={setRol} disabled={cargando || !!errorCarga}>
-                        <SelectTrigger className="bg-background/50">
+                        <SelectTrigger
+                            className={cn("bg-background/50", FILTRO_ROL_SELECT_TRIGGER_CLASS)}
+                        >
                             <SelectValue placeholder="Filtrar por rol" />
                         </SelectTrigger>
-                        <SelectContent className="bg-white text-slate-900 dark:bg-zinc-900 dark:text-zinc-50 shadow-2xl border border-slate-200 dark:border-zinc-800 z-[99999]">
-                            <SelectItem value={TODOS}>Todos los roles</SelectItem>
-                            <SelectItem value="administrador">Administrador</SelectItem>
-                            <SelectItem value="jefe_area">Jefe de área</SelectItem>
-                            <SelectItem value="administrativo">Administrativo</SelectItem>
+                        <SelectContent className={FILTRO_ROL_SELECT_CONTENT_CLASS}>
+                            {OPCIONES_FILTRO_ROL.map(({ value, etiqueta }) => {
+                                const esTodos = value === TODOS;
+                                const { icono: Icono, color } = esTodos
+                                    ? { icono: Users, color: "text-muted-foreground" }
+                                    : obtenerIconoRol(etiqueta);
+
+                                return (
+                                    <SelectItem
+                                        key={value}
+                                        value={value}
+                                        className={FILTRO_ROL_SELECT_ITEM_CLASS}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <Icono className={`size-4 shrink-0 ${color}`} />
+                                            <span>{etiqueta}</span>
+                                        </div>
+                                    </SelectItem>
+                                );
+                            })}
                         </SelectContent>
                     </Select>
                 </CardContent>
