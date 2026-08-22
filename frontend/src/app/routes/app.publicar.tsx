@@ -35,6 +35,7 @@ import {
     type DocumentoAlcance,
     type DocumentoPublicacionInicialRequestDto,
 } from "@/lib/documentos-api";
+import { aplicarMetadatosDesdeArchivo } from "@/lib/resolver-metadatos-publicacion";
 import { obtenerIconoArea } from "@/lib/iconos-areas";
 import { obtenerIconoFormato } from "@/lib/iconos-formatos";
 import { obtenerIconoSubProceso } from "@/lib/iconos-subprocesos";
@@ -398,6 +399,24 @@ function NuevoDocumentoPage() {
             const { archivo: _, ...resto } = prev;
             return resto;
         });
+
+        const resultadoMetadatos = aplicarMetadatosDesdeArchivo(
+            file.name,
+            subprogramasCatalogo,
+            tiposCatalogo,
+        );
+
+        if (resultadoMetadatos.detectado) {
+            setForm((prev) => ({
+                ...prev,
+                ...resultadoMetadatos.actualizaciones,
+            }));
+            toast.success("Metadatos detectados desde el nombre del archivo.");
+        }
+
+        for (const aviso of resultadoMetadatos.avisos) {
+            toast.info(aviso);
+        }
     };
 
     const handleSubmit = async (evento: FormEvent<HTMLFormElement>) => {
