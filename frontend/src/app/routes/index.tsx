@@ -41,7 +41,7 @@ function Login() {
 
     useEffect(() => {
         if (sesion) {
-            navigate({ to: sesion.rol === "administrador" ? "/app/panel-admin" : "/app/inicio" });
+            navigate({ to: "/app/inicio" });
         }
     }, [sesion, navigate]);
 
