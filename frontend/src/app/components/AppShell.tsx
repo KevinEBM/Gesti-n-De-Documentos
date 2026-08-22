@@ -136,37 +136,37 @@ export function AppShell({
 
             <div className="flex min-w-0 flex-1 flex-col lg:ml-72">
                 <header
-                    className="fixed top-0 z-30 flex h-16 items-center gap-3 border-b border-[#B57F22] bg-[#e5e8d3] px-4  lg:left-72 lg:right-0 lg:px-8">
-                    <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setAbierto(true)}
-                            aria-label="Abrir menú">
-                        <Menu className="size-5"/>
+                    className="fixed top-0 z-30 flex h-16 min-w-0 items-center gap-2 border-b border-[#B57F22] bg-[#e5e8d3] left-0 right-0 px-3 sm:px-4 lg:left-72 lg:px-8">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 lg:hidden"
+                        onClick={() => setAbierto(true)}
+                        aria-label="Abrir menú"
+                    >
+                        <Menu className="size-5" />
                     </Button>
 
-                    <div className="ml-auto flex items-center gap-3">
-
-                        <Separator orientation="vertical" className="h-8"/>
-
-                        <div className="hidden text-right sm:block">
-                            <p className="text-sm font-medium leading-tight">
-                                {sesion?.nombre}
-                            </p>
-
-                            <p className="text-xs text-muted-foreground">
+                    <div className="ml-auto flex min-w-0 items-center justify-end gap-2 sm:gap-3">
+                        <div className="min-w-0 text-right">
+                            <p className="truncate text-sm font-medium leading-tight">{sesion?.nombre}</p>
+                            <p className="truncate text-xs text-muted-foreground">
                                 {sesion ? etiquetaRol[sesion.rol] : ""}
                             </p>
                         </div>
+
+                        <Separator orientation="vertical" className="hidden h-8 shrink-0 sm:block" />
 
                         <Button
                             variant="outline"
                             size="sm"
                             onClick={salir}
-                            className=" gap-2 bg-white text-black border-gray-300 shadow hover:bg-[#289248] hover:text-white hover:border-[#289248] hover:shadow-md transition-all">
+                            className="shrink-0 gap-2 bg-white text-black border-gray-300 shadow hover:bg-[#289248] hover:text-white hover:border-[#289248] hover:shadow-md transition-all"
+                            aria-label="Cerrar sesión"
+                        >
                             <LogOut className="size-4" />
-                            <span className="hidden sm:inline">
-                                Cerrar sesión
-                            </span>
+                            <span className="hidden sm:inline">Cerrar sesión</span>
                         </Button>
-
                     </div>
                 </header>
                 <main className="flex-1 px-4 pt-20 pb-7 lg:px-10 lg:pb-9">

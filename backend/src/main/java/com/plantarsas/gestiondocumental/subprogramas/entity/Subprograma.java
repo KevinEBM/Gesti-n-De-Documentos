@@ -55,8 +55,15 @@ public class Subprograma {
     }
 
     public void actualizarDatos(String nombre, String descripcion) {
+        actualizarDatos(nombre, descripcion, null);
+    }
+
+    public void actualizarDatos(String nombre, String descripcion, Area area) {
         this.nombre = normalizarTexto(nombre);
         this.descripcion = normalizarTextoOpcional(descripcion);
+        if (area != null) {
+            this.area = area;
+        }
     }
 
     public void activar() {

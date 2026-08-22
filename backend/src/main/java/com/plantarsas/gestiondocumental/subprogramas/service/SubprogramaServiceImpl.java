@@ -2,6 +2,7 @@ package com.plantarsas.gestiondocumental.subprogramas.service;
 
 import com.plantarsas.gestiondocumental.areas.entity.Area;
 import com.plantarsas.gestiondocumental.areas.service.AreaLookupService;
+import com.plantarsas.gestiondocumental.documentos.repository.DocumentoRepository;
 import com.plantarsas.gestiondocumental.exception.BusinessException;
 import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
@@ -25,6 +26,7 @@ import java.util.List;
 public class SubprogramaServiceImpl implements SubprogramaService, SubprogramaLookupService {
 
     private final SubprogramaRepository subprogramaRepository;
+    private final DocumentoRepository documentoRepository;
     private final AreaLookupService areaLookupService;
     private final SubprogramaMapper subprogramaMapper;
     private final UsuarioAreaAutorizacionService usuarioAreaAutorizacionService;
@@ -83,15 +85,29 @@ public class SubprogramaServiceImpl implements SubprogramaService, SubprogramaLo
         Subprograma subprograma = obtenerEntidadPorId(id);
 
         String nombreNormalizado = normalizarTexto(request.nombre());
+        Long areaIdActual = subprograma.getArea().getId();
+        Area areaObjetivo;
+
+        if (!areaIdActual.equals(request.areaId())) {
+            if (documentoRepository.existsBySubprograma_Id(id)) {
+                throw new BusinessException(
+                        "No se puede cambiar el área responsable porque el subproceso ya está asociado a documentos."
+                );
+            }
+            areaObjetivo = areaLookupService.obtenerActivaPorId(request.areaId());
+        } else {
+            areaObjetivo = subprograma.getArea();
+        }
+
         if (subprogramaRepository.existsByAreaIdAndNombreIgnoreCaseAndIdNot(
-                subprograma.getArea().getId(), nombreNormalizado, id)) {
+                areaObjetivo.getId(), nombreNormalizado, id)) {
             throw new BusinessException(
                     "Ya existe un subprograma con el nombre '" + nombreNormalizado + "' en esa área",
                     HttpStatus.CONFLICT
             );
         }
 
-        subprograma.actualizarDatos(request.nombre(), request.descripcion());
+        subprograma.actualizarDatos(request.nombre(), request.descripcion(), areaObjetivo);
         return subprogramaMapper.toResponse(subprograma);
     }
 

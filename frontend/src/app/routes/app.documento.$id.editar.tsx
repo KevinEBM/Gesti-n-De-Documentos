@@ -129,11 +129,11 @@ function validarFormulario(
     if (!form.areaId) {
         errores.subprogramaId = "Selecciona primero un área responsable.";
     } else if (!form.subprogramaId) {
-        errores.subprogramaId = "Selecciona un subprograma.";
+        errores.subprogramaId = "Selecciona un subproceso.";
     } else {
         const subprograma = subprogramas.find((item) => item.id === form.subprogramaId);
         if (!subprograma || subprograma.areaId !== form.areaId) {
-            errores.subprogramaId = "Selecciona un subprograma del área elegida.";
+            errores.subprogramaId = "Selecciona un subproceso del área elegida.";
         }
     }
 
@@ -542,7 +542,7 @@ function EditarDocumentoPage() {
                                 </Select>
                             </Campo>
 
-                            <Campo label="Subprograma" obligatorio error={errores.subprogramaId}>
+                            <Campo label="Subproceso" obligatorio error={errores.subprogramaId}>
                                 <Select
                                     value={form.subprogramaId}
                                     onValueChange={(subprogramaId) =>
@@ -554,7 +554,7 @@ function EditarDocumentoPage() {
                                         <SelectValue
                                             placeholder={
                                                 form.areaId
-                                                    ? "Seleccionar subprograma…"
+                                                    ? "Seleccionar subproceso…"
                                                     : "Seleccione primero un área"
                                             }
                                         />

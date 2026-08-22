@@ -1,17 +1,19 @@
 import type { LucideIcon } from "lucide-react";
 import {
-    Users,
-    Leaf,
-    CircleCheckBig,
-    PackageSearch,
     BriefcaseBusiness,
+    CircleCheckBig,
     Factory,
-    Wrench,
-    ShieldUser,
+    Leaf,
     MonitorCog,
-    Wallet,
+    PackageSearch,
+    ShieldUser,
     ShoppingCart,
+    Users,
+    Wallet,
+    Wrench,
 } from "lucide-react";
+
+import { normalizarNombre } from "./normalizar-nombre";
 
 export interface IconoArea {
     icono: LucideIcon;
@@ -29,78 +31,28 @@ const color = {
     verde: "text-emerald-600",
     dorado: "text-amber-500",
     cafe: "text-amber-700",
-    blanco: "text-gray-100",
-    morado: "text-purple-500"
+    morado: "text-purple-500",
 };
 
 const ICONOS_AREAS: Record<string, IconoArea> = {
-    "gestion humana": {
-        icono: Users,
-        color: color.piel,
-    },
+    "gestion humana": { icono: Users, color: color.piel },
+    "gestion ambiental": { icono: Leaf, color: color.verdeOscuro },
+    "gestion de calidad": { icono: CircleCheckBig, color: color.verdeClaro },
+    "gestion logistica": { icono: PackageSearch, color: color.metalico },
+    "gestion comercial": { icono: BriefcaseBusiness, color: color.negro },
+    "gestion de produccion": { icono: Factory, color: color.rojo },
+    "gestion de mantenimiento": { icono: Wrench, color: color.azul },
+    "gestion de seguridad fisica": { icono: ShieldUser, color: color.verde },
+    "gestion tics": { icono: MonitorCog, color: color.dorado },
+    "gestion financiera": { icono: Wallet, color: color.cafe },
+    "gestion de compras": { icono: ShoppingCart, color: color.morado },
+};
 
-    "gestion ambiental": {
-        icono: Leaf,
-        color: color.verdeOscuro,
-    },
-
-    "gestion de calidad": {
-        icono: CircleCheckBig,
-        color: color.verdeClaro,
-    },
-
-    "gestion logistica": {
-        icono: PackageSearch,
-        color: color.metalico,
-    },
-
-    "gestion comercial": {
-        icono: BriefcaseBusiness,
-        color: color.negro,
-    },
-
-    "gestion de produccion": {
-        icono: Factory,
-        color: color.rojo,
-    },
-
-    "gestion de mantenimiento": {
-        icono: Wrench,
-        color: color.azul,
-    },
-
-    "gestion de seguridad fisica": {
-        icono: ShieldUser,
-        color: color.verde,
-    },
-
-    "gestion tics": {
-        icono: MonitorCog,
-        color: color.dorado,
-    },
-
-    "gestion financiera": {
-        icono: Wallet,
-        color: color.cafe,
-    },
-
-    "gestion de compras": {
-        icono: ShoppingCart,
-        color: color.morado,
-    },
+const FALLBACK_AREA: IconoArea = {
+    icono: BriefcaseBusiness,
+    color: "text-muted-foreground",
 };
 
 export function obtenerIconoArea(nombre: string): IconoArea {
-    const clave = nombre
-        .trim()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-
-    return (
-        ICONOS_AREAS[clave] ?? {
-            icono: BriefcaseBusiness,
-            color: "text-muted-foreground",
-        }
-    );
+    return ICONOS_AREAS[normalizarNombre(nombre)] ?? FALLBACK_AREA;
 }
