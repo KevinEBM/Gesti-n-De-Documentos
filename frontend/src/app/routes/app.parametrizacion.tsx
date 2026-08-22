@@ -24,13 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { SelectorAreaResponsable } from "@/components/selector-area-responsable";
 import {
     Table,
     TableBody,
@@ -886,27 +880,14 @@ function SeccionSubprogramas({
                                 </p>
                             ) : (
                                 <>
-                                    <Select
-                                        value={form.areaId || ""}
-                                        onValueChange={(value) =>
-                                            setForm({ ...form, areaId: value })
+                                    <SelectorAreaResponsable
+                                        areas={areasActivas}
+                                        value={form.areaId}
+                                        onValueChange={(areaId) =>
+                                            setForm({ ...form, areaId })
                                         }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Seleccione un área" />
-                                        </SelectTrigger>
-
-                                        <SelectContent className="bg-white text-slate-900 dark:bg-zinc-900 dark:text-zinc-50 shadow-2xl border border-slate-200 dark:border-zinc-800 z-[99999]">
-                                            {areasActivas.map((area) => (
-                                                <SelectItem
-                                                    key={area.id}
-                                                    value={area.id}
-                                                >
-                                                    {`${area.codigo} - ${area.nombre}`}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                        placeholder="Seleccione un área"
+                                    />
 
                                     {erroresCampo.areaId && (
                                         <p className="text-xs text-destructive">
