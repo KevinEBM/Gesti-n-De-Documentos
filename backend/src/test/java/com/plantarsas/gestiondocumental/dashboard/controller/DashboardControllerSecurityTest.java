@@ -1,6 +1,6 @@
 package com.plantarsas.gestiondocumental.dashboard.controller;
 
-import com.plantarsas.gestiondocumental.config.SecurityConfig;
+import com.plantarsas.gestiondocumental.config.SecurityTestConfiguration;
 import com.plantarsas.gestiondocumental.dashboard.dto.ActividadDocumentalResponse;
 import com.plantarsas.gestiondocumental.dashboard.dto.DashboardAdminResponse;
 import com.plantarsas.gestiondocumental.dashboard.dto.TipoActividad;
@@ -229,10 +229,7 @@ class DashboardControllerSecurityTest {
     @EnableWebMvc
     @EnableWebSecurity
     @Import({
-            SecurityConfig.class,
-            JwtAuthenticationFilter.class,
-            JwtAuthenticationEntryPoint.class,
-            JwtAccessDeniedHandler.class,
+            SecurityTestConfiguration.class,
             GlobalExceptionHandler.class,
             DashboardController.class
     })

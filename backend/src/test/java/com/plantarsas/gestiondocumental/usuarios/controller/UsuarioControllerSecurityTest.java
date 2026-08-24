@@ -1,6 +1,6 @@
 package com.plantarsas.gestiondocumental.usuarios.controller;
 
-import com.plantarsas.gestiondocumental.config.SecurityConfig;
+import com.plantarsas.gestiondocumental.config.SecurityTestConfiguration;
 import com.plantarsas.gestiondocumental.security.JwtAccessDeniedHandler;
 import com.plantarsas.gestiondocumental.security.JwtAuthenticationEntryPoint;
 import com.plantarsas.gestiondocumental.security.JwtAuthenticationFilter;
@@ -279,10 +279,7 @@ class UsuarioControllerSecurityTest {
     @EnableWebMvc
     @EnableWebSecurity
     @Import({
-            SecurityConfig.class,
-            JwtAuthenticationFilter.class,
-            JwtAuthenticationEntryPoint.class,
-            JwtAccessDeniedHandler.class,
+            SecurityTestConfiguration.class,
             UsuarioController.class
     })
     static class ConfiguracionSeguridadUsuariosTest {

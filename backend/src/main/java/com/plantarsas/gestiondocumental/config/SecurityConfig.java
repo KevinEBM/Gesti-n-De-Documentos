@@ -3,6 +3,7 @@ package com.plantarsas.gestiondocumental.config;
 import com.plantarsas.gestiondocumental.security.JwtAccessDeniedHandler;
 import com.plantarsas.gestiondocumental.security.JwtAuthenticationEntryPoint;
 import com.plantarsas.gestiondocumental.security.JwtAuthenticationFilter;
+import com.plantarsas.gestiondocumental.security.LoginRateLimitFilter;
 import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +34,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
+    private final LoginRateLimitFilter loginRateLimitFilter;
 
     @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
@@ -94,6 +96,10 @@ public class SecurityConfig {
                                         "/api/auth/login"
                                 ).permitAll()
                                 .anyRequest().authenticated()
+                )
+                .addFilterBefore(
+                        loginRateLimitFilter,
+                        UsernamePasswordAuthenticationFilter.class
                 )
                 .addFilterBefore(
                         jwtAuthenticationFilter,

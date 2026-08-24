@@ -2,7 +2,7 @@ package com.plantarsas.gestiondocumental.areas.controller;
 
 import com.plantarsas.gestiondocumental.areas.dto.AreaResponse;
 import com.plantarsas.gestiondocumental.areas.service.AreaService;
-import com.plantarsas.gestiondocumental.config.SecurityConfig;
+import com.plantarsas.gestiondocumental.config.SecurityTestConfiguration;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 import com.plantarsas.gestiondocumental.security.JwtAccessDeniedHandler;
 import com.plantarsas.gestiondocumental.security.JwtAuthenticationEntryPoint;
@@ -390,10 +390,7 @@ class AreaControllerSecurityTest {
     @EnableWebMvc
     @EnableWebSecurity
     @Import({
-            SecurityConfig.class,
-            JwtAuthenticationFilter.class,
-            JwtAuthenticationEntryPoint.class,
-            JwtAccessDeniedHandler.class,
+            SecurityTestConfiguration.class,
             AreaController.class
     })
     static class ConfiguracionSeguridadAreasTest {

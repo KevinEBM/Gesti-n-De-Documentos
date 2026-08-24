@@ -46,7 +46,7 @@ package com.plantarsas.gestiondocumental.documentos.controller;
  * los tests de esta clase no cambia.
  */
 
-import com.plantarsas.gestiondocumental.config.SecurityConfig;
+import com.plantarsas.gestiondocumental.config.SecurityTestConfiguration;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoActualizacionRequest;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoArchivoDescarga;
 import com.plantarsas.gestiondocumental.documentos.dto.DocumentoEstadoActualizacionRequest;
@@ -1354,10 +1354,7 @@ class DocumentoControllerSecurityTest {
     @EnableWebMvc
     @EnableWebSecurity
     @Import({
-            SecurityConfig.class,
-            JwtAuthenticationFilter.class,
-            JwtAuthenticationEntryPoint.class,
-            JwtAccessDeniedHandler.class,
+            SecurityTestConfiguration.class,
             GlobalExceptionHandler.class,
             DocumentoController.class
     })
