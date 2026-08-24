@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SelectorAreaResponsable } from "@/components/selector-area-responsable";
+import { SelectorRol } from "@/components/selector-rol";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ApiError } from "@/lib/api";
@@ -815,66 +817,31 @@ function GestionUsuarios() {
                                     <div className="grid gap-3 sm:grid-cols-2">
                                         <div className="space-y-1.5">
                                             <Label>Área</Label>
-                                            <Select
+                                            <SelectorAreaResponsable
+                                                areas={areasActivas}
                                                 value={formCrear.areaId}
-                                                onValueChange={(v) =>
-                                                    setFormCrear({ ...formCrear, areaId: v })
+                                                onValueChange={(areaId) =>
+                                                    setFormCrear({ ...formCrear, areaId })
                                                 }
+                                                placeholder="Seleccionar…"
+                                                placeholderBusqueda="Buscar área..."
+                                                formato="nombre"
                                                 disabled={formularioDeshabilitado}
-                                            >
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue placeholder="Seleccionar…" />
-                                                </SelectTrigger>
-                                                <SelectContent className="bg-white text-slate-900 dark:bg-zinc-900 dark:text-zinc-50 shadow-2xl border border-slate-200 dark:border-zinc-800 z-[99999]">
-                                                    {areasActivas.map((area) => {
-                                                        const { icono: Icono, color } = obtenerIconoArea(
-                                                            area.nombre,
-                                                        );
-
-                                                        return (
-                                                            <SelectItem key={area.id} value={area.id}>
-                                                                <div className="flex items-center gap-2">
-                                                                    <Icono className={`size-4 ${color}`} />
-                                                                    <span>{area.nombre}</span>
-                                                                </div>
-                                                            </SelectItem>
-                                                        );
-                                                    })}
-                                                </SelectContent>
-                                            </Select>
+                                            />
                                             {errores.areaId && (
                                                 <p className="text-xs text-destructive">{errores.areaId}</p>
                                             )}
                                         </div>
                                         <div className="space-y-1.5">
                                             <Label>Rol</Label>
-                                            <Select
+                                            <SelectorRol
+                                                roles={rolesActivos}
                                                 value={formCrear.rolId}
-                                                onValueChange={(v) =>
-                                                    setFormCrear({ ...formCrear, rolId: v })
+                                                onValueChange={(rolId) =>
+                                                    setFormCrear({ ...formCrear, rolId })
                                                 }
                                                 disabled={formularioDeshabilitado}
-                                            >
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue placeholder="Seleccionar…" />
-                                                </SelectTrigger>
-                                                <SelectContent className="bg-white text-slate-900 dark:bg-zinc-900 dark:text-zinc-50 shadow-2xl border border-slate-200 dark:border-zinc-800 z-[99999]">
-                                                    {rolesActivos.map((item) => {
-                                                        const { icono: Icono, color } = obtenerIconoRol(
-                                                            item.etiqueta,
-                                                        );
-
-                                                        return (
-                                                            <SelectItem key={item.id} value={item.id}>
-                                                                <div className="flex items-center gap-2">
-                                                                    <Icono className={`size-4 ${color}`} />
-                                                                    <span>{item.etiqueta}</span>
-                                                                </div>
-                                                            </SelectItem>
-                                                        );
-                                                    })}
-                                                </SelectContent>
-                                            </Select>
+                                            />
                                             {errores.rolId && (
                                                 <p className="text-xs text-destructive">{errores.rolId}</p>
                                             )}
@@ -954,66 +921,31 @@ function GestionUsuarios() {
                                                     Seleccione un área activa.
                                                 </p>
                                             )}
-                                            <Select
+                                            <SelectorAreaResponsable
+                                                areas={areasActivas}
                                                 value={formEditar.areaId}
-                                                onValueChange={(v) =>
-                                                    setFormEditar({ ...formEditar, areaId: v })
+                                                onValueChange={(areaId) =>
+                                                    setFormEditar({ ...formEditar, areaId })
                                                 }
+                                                placeholder="Seleccionar…"
+                                                placeholderBusqueda="Buscar área..."
+                                                formato="nombre"
                                                 disabled={formularioDeshabilitado}
-                                            >
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue placeholder="Seleccionar…" />
-                                                </SelectTrigger>
-                                                <SelectContent className="bg-white text-slate-900 dark:bg-zinc-900 dark:text-zinc-50 shadow-2xl border border-slate-200 dark:border-zinc-800 z-[99999]">
-                                                    {areasActivas.map((area) => {
-                                                        const { icono: Icono, color } = obtenerIconoArea(
-                                                            area.nombre,
-                                                        );
-
-                                                        return (
-                                                            <SelectItem key={area.id} value={area.id}>
-                                                                <div className="flex items-center gap-2">
-                                                                    <Icono className={`size-4 ${color}`} />
-                                                                    <span>{area.nombre}</span>
-                                                                </div>
-                                                            </SelectItem>
-                                                        );
-                                                    })}
-                                                </SelectContent>
-                                            </Select>
+                                            />
                                             {errores.areaId && (
                                                 <p className="text-xs text-destructive">{errores.areaId}</p>
                                             )}
                                         </div>
                                         <div className="space-y-1.5">
                                             <Label>Rol</Label>
-                                            <Select
+                                            <SelectorRol
+                                                roles={rolesActivos}
                                                 value={formEditar.rolId}
-                                                onValueChange={(v) =>
-                                                    setFormEditar({ ...formEditar, rolId: v })
+                                                onValueChange={(rolId) =>
+                                                    setFormEditar({ ...formEditar, rolId })
                                                 }
                                                 disabled={formularioDeshabilitado}
-                                            >
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue placeholder="Seleccionar…" />
-                                                </SelectTrigger>
-                                                <SelectContent className="bg-white text-slate-900 dark:bg-zinc-900 dark:text-zinc-50 shadow-2xl border border-slate-200 dark:border-zinc-800 z-[99999]">
-                                                    {rolesActivos.map((item) => {
-                                                        const { icono: Icono, color } = obtenerIconoRol(
-                                                            item.etiqueta,
-                                                        );
-
-                                                        return (
-                                                            <SelectItem key={item.id} value={item.id}>
-                                                                <div className="flex items-center gap-2">
-                                                                    <Icono className={`size-4 ${color}`} />
-                                                                    <span>{item.etiqueta}</span>
-                                                                </div>
-                                                            </SelectItem>
-                                                        );
-                                                    })}
-                                                </SelectContent>
-                                            </Select>
+                                            />
                                             {errores.rolId && (
                                                 <p className="text-xs text-destructive">{errores.rolId}</p>
                                             )}
