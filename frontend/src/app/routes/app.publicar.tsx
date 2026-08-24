@@ -1,18 +1,19 @@
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, ChevronDown, Plus, Save, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, ChevronDown, Plus, Save, X } from "lucide-react";
 import {
     useCallback,
     useEffect,
     useMemo,
     useRef,
     useState,
-    type ChangeEvent,
     type FormEvent,
     type ReactNode,
+    type Ref,
 } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/AppShell";
+import { DropzoneArea } from "@/components/DropzoneArea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -35,7 +36,7 @@ import {
     type DocumentoAlcance,
     type DocumentoPublicacionInicialRequestDto,
 } from "@/lib/documentos-api";
-import { aplicarMetadatosDesdeArchivo } from "@/lib/resolver-metadatos-publicacion";
+import { aplicarMetadatosDesdeArchivo, resolverMetadatosCatalogoDesdeArchivo } from "@/lib/resolver-metadatos-publicacion";
 import { obtenerIconoArea } from "@/lib/iconos-areas";
 import { obtenerIconoFormato } from "@/lib/iconos-formatos";
 import { obtenerIconoSubProceso } from "@/lib/iconos-subprocesos";
@@ -58,7 +59,21 @@ export const Route = createFileRoute("/app/publicar")({
     component: NuevoDocumentoPage,
 });
 
-const LIMITE_ARCHIVO = 15 * 1024 * 1024;
+const LIMITE_ARCHIVO = 10 * 1024 * 1024;
+
+const ORDEN_CAMPOS_VALIDACION = [
+    "codigo",
+    "titulo",
+    "descripcion",
+    "areaId",
+    "subprogramaId",
+    "tipoDocumentoId",
+    "alcance",
+    "areasAdicionalesIds",
+    "archivo",
+    "numeroVersionInicial",
+    "descripcionVersionInicial",
+] as const;
 
 const SELECT_CONTENT_CLASS =
     "!bg-white !text-slate-900 border border-slate-200 shadow-2xl z-[99999]";
@@ -125,20 +140,22 @@ function validarFormulario(
     const errores: Record<string, string> = {};
 
     const codigo = form.codigo.trim();
-    if (!codigo) errores.codigo = "El código documental es obligatorio.";
+    if (!codigo) errores.codigo = "El código del documento es obligatorio.";
     else if (codigo.length > 50) errores.codigo = "El código no puede superar los 50 caracteres.";
 
     const titulo = form.titulo.trim();
-    if (!titulo) errores.titulo = "El título es obligatorio.";
+    if (!titulo) errores.titulo = "El nombre del documento es obligatorio.";
     else if (titulo.length > 200) errores.titulo = "El título no puede superar los 200 caracteres.";
 
     const descripcion = form.descripcion.trim();
-    if (descripcion.length > 500) {
+    if (!descripcion) {
+        errores.descripcion = "La descripción del documento es obligatoria.";
+    } else if (descripcion.length > 500) {
         errores.descripcion = "La descripción no puede superar los 500 caracteres.";
     }
 
     if (!form.areaId) {
-        errores.areaId = "Selecciona el área responsable.";
+        errores.areaId = "Selecciona un área responsable.";
     } else if (!areasActivas.some((area) => area.id === form.areaId)) {
         errores.areaId = "Selecciona un área activa válida.";
     }
@@ -164,7 +181,7 @@ function validarFormulario(
         errores.alcance = "Selecciona el alcance del documento.";
     } else if (form.alcance === "AREAS_ESPECIFICAS") {
         if (form.areasAdicionalesIds.length === 0) {
-            errores.areasAdicionalesIds = "Selecciona al menos un área adicional.";
+            errores.areasAdicionalesIds = "Selecciona al menos un área autorizada.";
         } else if (form.areasAdicionalesIds.includes(form.areaId)) {
             errores.areasAdicionalesIds =
                 "El área responsable no puede incluirse como área adicional.";
@@ -172,10 +189,10 @@ function validarFormulario(
     }
 
     if (!archivo) {
-        errores.archivo = "Debes adjuntar un archivo.";
+        errores.archivo = "Debes adjuntar un archivo para el documento.";
     } else {
         if (archivo.size > LIMITE_ARCHIVO) {
-            errores.archivo = "El archivo no puede superar los 15 MB.";
+            errores.archivo = "El archivo no puede superar los 10 MB.";
         }
         if (archivo.name.toLowerCase().endsWith(".apk")) {
             errores.archivo = "No se permiten archivos APK.";
@@ -202,6 +219,15 @@ function validarFormulario(
     }
 
     return errores;
+}
+
+function mostrarToastsValidacion(erroresValidacion: Record<string, string>) {
+    for (const campo of ORDEN_CAMPOS_VALIDACION) {
+        const mensaje = erroresValidacion[campo];
+        if (mensaje) {
+            toast.error(mensaje, { id: `publicar-${campo}` });
+        }
+    }
 }
 
 function construirMetadata(form: FormularioPublicacion): DocumentoPublicacionInicialRequestDto {
@@ -237,13 +263,47 @@ function NuevoDocumentoPage() {
     const [cargandoCatalogos, setCargandoCatalogos] = useState(true);
     const [errorCatalogos, setErrorCatalogos] = useState<string | null>(null);
     const catalogosCargados = useRef(false);
+    const pendienteMetadatosCatalogoRef = useRef<string | null>(null);
 
     const [form, setForm] = useState<FormularioPublicacion>(formularioVacio);
     const [archivo, setArchivo] = useState<File | null>(null);
-    const [archivoInputKey, setArchivoInputKey] = useState(0);
     const [errores, setErrores] = useState<Record<string, string>>({});
     const [publicando, setPublicando] = useState(false);
     const [buscadorAreaAdicionalVisible, setBuscadorAreaAdicionalVisible] = useState(false);
+    const refsCampos = useRef<Partial<Record<string, HTMLDivElement | null>>>({});
+
+    const limpiarError = useCallback((campo: string) => {
+        setErrores((prev) => {
+            if (!(campo in prev)) return prev;
+            const { [campo]: _, ...resto } = prev;
+            return resto;
+        });
+    }, []);
+
+    const registrarRefCampo = useCallback(
+        (campo: string): Ref<HTMLDivElement> =>
+            (elemento) => {
+                refsCampos.current[campo] = elemento;
+            },
+        [],
+    );
+
+    const desplazarAlPrimerError = useCallback((erroresValidacion: Record<string, string>) => {
+        for (const campo of ORDEN_CAMPOS_VALIDACION) {
+            if (!erroresValidacion[campo]) continue;
+
+            const contenedor = refsCampos.current[campo];
+            if (!contenedor) continue;
+
+            contenedor.scrollIntoView({ behavior: "smooth", block: "center" });
+
+            const focusable = contenedor.querySelector<HTMLElement>(
+                "input, textarea, button[role='combobox'], [tabindex='0']",
+            );
+            focusable?.focus({ preventScroll: true });
+            break;
+        }
+    }, []);
 
     const areasActivas = useMemo(
         () => areasCatalogo.filter((area) => area.activo),
@@ -320,6 +380,8 @@ function NuevoDocumentoPage() {
             subprogramaId: "",
             areasAdicionalesIds: prev.areasAdicionalesIds.filter((id) => id !== areaId),
         }));
+        limpiarError("areaId");
+        limpiarError("subprogramaId");
     };
 
     const cambiarAlcance = (alcance: DocumentoAlcance) => {
@@ -328,6 +390,8 @@ function NuevoDocumentoPage() {
             alcance,
             areasAdicionalesIds: alcance === "AREAS_ESPECIFICAS" ? prev.areasAdicionalesIds : [],
         }));
+        limpiarError("alcance");
+        limpiarError("areasAdicionalesIds");
         if (alcance === "AREAS_ESPECIFICAS") {
             setBuscadorAreaAdicionalVisible(form.areasAdicionalesIds.length === 0);
         } else {
@@ -365,59 +429,142 @@ function NuevoDocumentoPage() {
         });
     };
 
-    const manejarArchivo = (evento: ChangeEvent<HTMLInputElement>) => {
-        const file = evento.target.files?.[0] ?? null;
-        evento.target.value = "";
+    const aplicarActualizacionesMetadatos = useCallback(
+        (
+            actualizaciones: Partial<FormularioPublicacion>,
+            opciones?: { soloCamposVacios?: boolean },
+        ) => {
+            if (Object.keys(actualizaciones).length === 0) return;
 
-        if (!file) {
-            setArchivo(null);
-            return;
-        }
+            setForm((prev) => {
+                const cambios: Partial<FormularioPublicacion> = {};
+                for (const [campo, valor] of Object.entries(actualizaciones)) {
+                    const clave = campo as keyof FormularioPublicacion;
+                    if (opciones?.soloCamposVacios) {
+                        const actual = prev[clave];
+                        const vacio =
+                            actual === "" ||
+                            actual == null ||
+                            (Array.isArray(actual) && actual.length === 0);
+                        if (!vacio) continue;
+                    }
+                    (cambios as Record<string, unknown>)[clave] = valor;
+                }
+                return Object.keys(cambios).length > 0 ? { ...prev, ...cambios } : prev;
+            });
 
-        if (file.size > LIMITE_ARCHIVO) {
-            setArchivo(null);
-            setErrores((prev) => ({
-                ...prev,
-                archivo: "El archivo no puede superar los 15 MB.",
-            }));
-            toast.error("El archivo no puede superar los 15 MB.");
-            return;
-        }
+            setErrores((prev) => {
+                const resto = { ...prev };
+                for (const campo of Object.keys(actualizaciones)) {
+                    delete resto[campo];
+                }
+                return resto;
+            });
+        },
+        [],
+    );
 
-        if (file.name.toLowerCase().endsWith(".apk")) {
-            setArchivo(null);
-            setErrores((prev) => ({
-                ...prev,
-                archivo: "No se permiten archivos APK.",
-            }));
-            toast.error("No se permiten archivos APK.");
-            return;
-        }
+    const procesarArchivo = useCallback(
+        (file: File) => {
+            if (file.size > LIMITE_ARCHIVO) {
+                setArchivo(null);
+                pendienteMetadatosCatalogoRef.current = null;
+                setErrores((prev) => ({
+                    ...prev,
+                    archivo: "El archivo no puede superar los 10 MB.",
+                }));
+                return;
+            }
 
-        setArchivo(file);
-        setErrores((prev) => {
-            const { archivo: _, ...resto } = prev;
-            return resto;
-        });
+            if (file.name.toLowerCase().endsWith(".apk")) {
+                setArchivo(null);
+                pendienteMetadatosCatalogoRef.current = null;
+                setErrores((prev) => ({
+                    ...prev,
+                    archivo: "No se permiten archivos APK.",
+                }));
+                return;
+            }
 
-        const resultadoMetadatos = aplicarMetadatosDesdeArchivo(
-            file.name,
+            setArchivo(file);
+            limpiarError("archivo");
+
+            const catalogosListos = catalogosCargados.current && !errorCatalogos;
+            const resultadoMetadatos = aplicarMetadatosDesdeArchivo(
+                file.name,
+                subprogramasCatalogo,
+                tiposCatalogo,
+                { omitirResolucionCatalogo: !catalogosListos },
+            );
+
+            if (resultadoMetadatos.detectado) {
+                aplicarActualizacionesMetadatos(resultadoMetadatos.actualizaciones);
+                if (catalogosListos) {
+                    pendienteMetadatosCatalogoRef.current = null;
+                    toast.success("Metadatos detectados desde el nombre del archivo.");
+                } else {
+                    pendienteMetadatosCatalogoRef.current = file.name;
+                }
+            } else {
+                pendienteMetadatosCatalogoRef.current = null;
+            }
+
+            if (catalogosListos) {
+                for (const aviso of resultadoMetadatos.avisos) {
+                    toast.info(aviso);
+                }
+            }
+        },
+        [
+            aplicarActualizacionesMetadatos,
+            errorCatalogos,
+            limpiarError,
+            subprogramasCatalogo,
+            tiposCatalogo,
+        ],
+    );
+
+    useEffect(() => {
+        const nombrePendiente = pendienteMetadatosCatalogoRef.current;
+        if (cargandoCatalogos || errorCatalogos || !archivo || !nombrePendiente) return;
+        if (archivo.name !== nombrePendiente) return;
+
+        const resultadoCatalogo = resolverMetadatosCatalogoDesdeArchivo(
+            archivo.name,
             subprogramasCatalogo,
             tiposCatalogo,
         );
 
-        if (resultadoMetadatos.detectado) {
-            setForm((prev) => ({
-                ...prev,
-                ...resultadoMetadatos.actualizaciones,
-            }));
+        pendienteMetadatosCatalogoRef.current = null;
+
+        if (resultadoCatalogo.detectado) {
+            aplicarActualizacionesMetadatos(resultadoCatalogo.actualizaciones, {
+                soloCamposVacios: true,
+            });
             toast.success("Metadatos detectados desde el nombre del archivo.");
         }
 
-        for (const aviso of resultadoMetadatos.avisos) {
+        for (const aviso of resultadoCatalogo.avisos) {
             toast.info(aviso);
         }
-    };
+    }, [
+        aplicarActualizacionesMetadatos,
+        archivo,
+        cargandoCatalogos,
+        errorCatalogos,
+        subprogramasCatalogo,
+        tiposCatalogo,
+    ]);
+
+    const manejarRechazoArchivo = useCallback((mensaje: string) => {
+        setArchivo(null);
+        setErrores((prev) => ({ ...prev, archivo: mensaje }));
+    }, []);
+
+    const quitarArchivo = useCallback(() => {
+        pendienteMetadatosCatalogoRef.current = null;
+        setArchivo(null);
+    }, []);
 
     const handleSubmit = async (evento: FormEvent<HTMLFormElement>) => {
         evento.preventDefault();
@@ -434,7 +581,8 @@ function NuevoDocumentoPage() {
         setErrores(erroresValidacion);
 
         if (Object.keys(erroresValidacion).length > 0) {
-            toast.error("Revise los campos marcados en el formulario.");
+            mostrarToastsValidacion(erroresValidacion);
+            desplazarAlPrimerError(erroresValidacion);
             return;
         }
 
@@ -449,7 +597,6 @@ function NuevoDocumentoPage() {
             setForm(formularioVacio);
             setArchivo(null);
             setErrores({});
-            setArchivoInputKey((prev) => prev + 1);
             navigate({ to: "/app/documentos" });
         } catch (err) {
             if (err instanceof ApiError) {
@@ -484,7 +631,6 @@ function NuevoDocumentoPage() {
     }
 
     const formularioDeshabilitado = cargandoCatalogos || !!errorCatalogos || publicando;
-    const archivoSeleccionadoValido = archivo !== null && !errores.archivo;
 
     return (
         <AppShell
@@ -545,15 +691,20 @@ function NuevoDocumentoPage() {
                                 label="Código documental"
                                 obligatorio
                                 error={errores.codigo}
+                                campoRef={registrarRefCampo("codigo")}
                             >
                                 <Input
                                     id="codigo"
                                     placeholder="PR-LD-PO-01"
                                     value={form.codigo}
-                                    onChange={(e) =>
-                                        setForm((prev) => ({ ...prev, codigo: e.target.value }))
-                                    }
+                                    onChange={(e) => {
+                                        setForm((prev) => ({ ...prev, codigo: e.target.value }));
+                                        limpiarError("codigo");
+                                    }}
                                     disabled={formularioDeshabilitado}
+                                    aria-invalid={!!errores.codigo}
+                                    aria-describedby={errores.codigo ? "codigo-error" : undefined}
+                                    className={cn(errores.codigo && "border-destructive")}
                                 />
                             </Campo>
 
@@ -562,31 +713,48 @@ function NuevoDocumentoPage() {
                                 label="Título"
                                 obligatorio
                                 error={errores.titulo}
+                                campoRef={registrarRefCampo("titulo")}
                             >
                                 <Input
                                     id="titulo"
                                     placeholder="Ej: Programa de limpieza y desinfección"
                                     value={form.titulo}
-                                    onChange={(e) =>
-                                        setForm((prev) => ({ ...prev, titulo: e.target.value }))
-                                    }
+                                    onChange={(e) => {
+                                        setForm((prev) => ({ ...prev, titulo: e.target.value }));
+                                        limpiarError("titulo");
+                                    }}
                                     disabled={formularioDeshabilitado}
+                                    aria-invalid={!!errores.titulo}
+                                    aria-describedby={errores.titulo ? "titulo-error" : undefined}
+                                    className={cn(errores.titulo && "border-destructive")}
                                 />
                             </Campo>
 
-                            <Campo id="descripcion" label="Descripción" error={errores.descripcion}>
+                            <Campo
+                                id="descripcion"
+                                label="Descripción"
+                                obligatorio
+                                error={errores.descripcion}
+                                campoRef={registrarRefCampo("descripcion")}
+                            >
                                 <Textarea
                                     id="descripcion"
                                     rows={3}
-                                    placeholder="Descripción opcional del documento…"
+                                    placeholder="Describe brevemente el contenido del documento…"
                                     value={form.descripcion}
-                                    onChange={(e) =>
+                                    onChange={(e) => {
                                         setForm((prev) => ({
                                             ...prev,
                                             descripcion: e.target.value,
-                                        }))
-                                    }
+                                        }));
+                                        limpiarError("descripcion");
+                                    }}
                                     disabled={formularioDeshabilitado}
+                                    aria-invalid={!!errores.descripcion}
+                                    aria-describedby={
+                                        errores.descripcion ? "descripcion-error" : undefined
+                                    }
+                                    className={cn(errores.descripcion && "border-destructive")}
                                 />
                             </Campo>
                         </CardContent>
@@ -601,16 +769,27 @@ function NuevoDocumentoPage() {
                         <CardContent className="space-y-5">
                             <div className="grid gap-4 sm:grid-cols-3">
                                 <Campo
+                                    id="areaId"
                                     label="Área responsable"
                                     obligatorio
                                     error={errores.areaId}
+                                    campoRef={registrarRefCampo("areaId")}
                                 >
                                     <Select
                                         value={form.areaId}
                                         onValueChange={cambiarArea}
                                         disabled={formularioDeshabilitado}
                                     >
-                                        <SelectTrigger className={SELECT_TRIGGER_CLASS}>
+                                        <SelectTrigger
+                                            className={cn(
+                                                SELECT_TRIGGER_CLASS,
+                                                errores.areaId && "border-destructive",
+                                            )}
+                                            aria-invalid={!!errores.areaId}
+                                            aria-describedby={
+                                                errores.areaId ? "areaId-error" : undefined
+                                            }
+                                        >
                                             <SelectValue placeholder="Seleccionar…" />
                                         </SelectTrigger>
                                         <SelectContent className={SELECT_CONTENT_CLASS}>
@@ -636,18 +815,32 @@ function NuevoDocumentoPage() {
                                 </Campo>
 
                                 <Campo
+                                    id="subprogramaId"
                                     label="Subproceso"
                                     obligatorio
                                     error={errores.subprogramaId}
+                                    campoRef={registrarRefCampo("subprogramaId")}
                                 >
                                     <Select
                                         value={form.subprogramaId}
-                                        onValueChange={(subprogramaId) =>
-                                            setForm((prev) => ({ ...prev, subprogramaId }))
-                                        }
+                                        onValueChange={(subprogramaId) => {
+                                            setForm((prev) => ({ ...prev, subprogramaId }));
+                                            limpiarError("subprogramaId");
+                                        }}
                                         disabled={formularioDeshabilitado || !form.areaId}
                                     >
-                                        <SelectTrigger className={SELECT_TRIGGER_CLASS}>
+                                        <SelectTrigger
+                                            className={cn(
+                                                SELECT_TRIGGER_CLASS,
+                                                errores.subprogramaId && "border-destructive",
+                                            )}
+                                            aria-invalid={!!errores.subprogramaId}
+                                            aria-describedby={
+                                                errores.subprogramaId
+                                                    ? "subprogramaId-error"
+                                                    : undefined
+                                            }
+                                        >
                                             <SelectValue
                                                 placeholder={
                                                     form.areaId
@@ -678,18 +871,32 @@ function NuevoDocumentoPage() {
                                 </Campo>
 
                                 <Campo
+                                    id="tipoDocumentoId"
                                     label="Tipo de documento"
                                     obligatorio
                                     error={errores.tipoDocumentoId}
+                                    campoRef={registrarRefCampo("tipoDocumentoId")}
                                 >
                                     <Select
                                         value={form.tipoDocumentoId}
-                                        onValueChange={(tipoDocumentoId) =>
-                                            setForm((prev) => ({ ...prev, tipoDocumentoId }))
-                                        }
+                                        onValueChange={(tipoDocumentoId) => {
+                                            setForm((prev) => ({ ...prev, tipoDocumentoId }));
+                                            limpiarError("tipoDocumentoId");
+                                        }}
                                         disabled={formularioDeshabilitado}
                                     >
-                                        <SelectTrigger className={SELECT_TRIGGER_CLASS}>
+                                        <SelectTrigger
+                                            className={cn(
+                                                SELECT_TRIGGER_CLASS,
+                                                errores.tipoDocumentoId && "border-destructive",
+                                            )}
+                                            aria-invalid={!!errores.tipoDocumentoId}
+                                            aria-describedby={
+                                                errores.tipoDocumentoId
+                                                    ? "tipoDocumentoId-error"
+                                                    : undefined
+                                            }
+                                        >
                                             <SelectValue placeholder="Seleccionar…" />
                                         </SelectTrigger>
                                         <SelectContent className={SELECT_CONTENT_CLASS}>
@@ -715,7 +922,13 @@ function NuevoDocumentoPage() {
                                 </Campo>
                             </div>
 
-                            <Campo label="Alcance" obligatorio error={errores.alcance}>
+                            <Campo
+                                id="alcance"
+                                label="Alcance"
+                                obligatorio
+                                error={errores.alcance}
+                                campoRef={registrarRefCampo("alcance")}
+                            >
                                 <Select
                                     value={form.alcance}
                                     onValueChange={(valor) =>
@@ -723,7 +936,16 @@ function NuevoDocumentoPage() {
                                     }
                                     disabled={formularioDeshabilitado}
                                 >
-                                    <SelectTrigger className={SELECT_TRIGGER_CLASS}>
+                                    <SelectTrigger
+                                        className={cn(
+                                            SELECT_TRIGGER_CLASS,
+                                            errores.alcance && "border-destructive",
+                                        )}
+                                        aria-invalid={!!errores.alcance}
+                                        aria-describedby={
+                                            errores.alcance ? "alcance-error" : undefined
+                                        }
+                                    >
                                         <SelectValue placeholder="Seleccionar alcance…" />
                                     </SelectTrigger>
                                     <SelectContent className={SELECT_CONTENT_CLASS}>
@@ -748,7 +970,13 @@ function NuevoDocumentoPage() {
                             </Campo>
 
                             {form.alcance === "AREAS_ESPECIFICAS" ? (
-                                <div className="space-y-3 rounded-md border p-4">
+                                <div
+                                    ref={registrarRefCampo("areasAdicionalesIds")}
+                                    className={cn(
+                                        "space-y-3 rounded-md border p-4",
+                                        errores.areasAdicionalesIds && "border-destructive",
+                                    )}
+                                >
                                     <div>
                                         <Label>
                                             Áreas adicionales
@@ -828,8 +1056,16 @@ function NuevoDocumentoPage() {
                                     ) : null}
 
                                     {errores.areasAdicionalesIds ? (
-                                        <p className="text-sm text-destructive">
-                                            {errores.areasAdicionalesIds}
+                                        <p
+                                            id="areasAdicionalesIds-error"
+                                            role="alert"
+                                            className="flex items-start gap-1.5 text-sm text-destructive"
+                                        >
+                                            <AlertCircle
+                                                className="mt-0.5 size-3.5 shrink-0"
+                                                aria-hidden
+                                            />
+                                            <span>{errores.areasAdicionalesIds}</span>
                                         </p>
                                     ) : null}
                                 </div>
@@ -842,68 +1078,22 @@ function NuevoDocumentoPage() {
                             <CardTitle className="text-base font-bold">Archivo y versión</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-5">
-                            <Campo label="Archivo" obligatorio error={errores.archivo}>
-                                <div
-                                    className={cn(
-                                        "rounded-md border transition-colors",
-                                        archivoSeleccionadoValido
-                                            ? "border-emerald-500 bg-emerald-500/5"
-                                            : errores.archivo
-                                              ? "border-destructive/50 bg-destructive/5"
-                                              : "border-border bg-white",
-                                    )}
-                                >
-                                    <input
-                                        key={archivoInputKey}
-                                        id="archivo-documento"
-                                        type="file"
-                                        className="sr-only"
-                                        onChange={manejarArchivo}
-                                        disabled={formularioDeshabilitado}
-                                    />
-                                    <label
-                                        htmlFor={
-                                            formularioDeshabilitado
-                                                ? undefined
-                                                : "archivo-documento"
-                                        }
-                                        className={cn(
-                                            "flex cursor-pointer flex-col gap-1.5 rounded-md p-4",
-                                            formularioDeshabilitado &&
-                                                "cursor-not-allowed opacity-50",
-                                        )}
-                                    >
-                                        {archivoSeleccionadoValido && archivo ? (
-                                            <>
-                                                <span className="text-sm font-medium text-emerald-700">
-                                                    Archivo seleccionado
-                                                </span>
-                                                <span className="truncate text-sm font-medium text-slate-900">
-                                                    {archivo.name}
-                                                </span>
-                                                <span className="text-xs text-emerald-800">
-                                                    {(archivo.size / (1024 * 1024)).toFixed(2)} MB
-                                                </span>
-                                                <span className="text-xs font-medium text-emerald-700 underline">
-                                                    Cambiar archivo
-                                                </span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="text-sm font-medium text-slate-900">
-                                                    Seleccionar archivo
-                                                </span>
-                                                <span className="text-xs text-muted-foreground">
-                                                    Ningún archivo seleccionado
-                                                </span>
-                                                <span className="text-xs text-muted-foreground">
-                                                    Tamaño máximo: 15 MB. No se permiten archivos
-                                                    APK.
-                                                </span>
-                                            </>
-                                        )}
-                                    </label>
-                                </div>
+                            <Campo
+                                id="archivo"
+                                label="Archivo"
+                                obligatorio
+                                error={errores.archivo}
+                                campoRef={registrarRefCampo("archivo")}
+                            >
+                                <DropzoneArea
+                                    archivo={archivo}
+                                    disabled={publicando || !!errorCatalogos}
+                                    error={errores.archivo}
+                                    maxSizeBytes={LIMITE_ARCHIVO}
+                                    onArchivoSeleccionado={procesarArchivo}
+                                    onQuitarArchivo={quitarArchivo}
+                                    onRechazo={manejarRechazoArchivo}
+                                />
                             </Campo>
 
                             <Campo
@@ -911,6 +1101,7 @@ function NuevoDocumentoPage() {
                                 label="Versión inicial"
                                 obligatorio
                                 error={errores.numeroVersionInicial}
+                                campoRef={registrarRefCampo("numeroVersionInicial")}
                             >
                                 <Input
                                     id="numeroVersionInicial"
@@ -918,13 +1109,23 @@ function NuevoDocumentoPage() {
                                     min={1}
                                     step={1}
                                     value={form.numeroVersionInicial}
-                                    onChange={(e) =>
+                                    onChange={(e) => {
                                         setForm((prev) => ({
                                             ...prev,
                                             numeroVersionInicial: e.target.value,
-                                        }))
-                                    }
+                                        }));
+                                        limpiarError("numeroVersionInicial");
+                                    }}
                                     disabled={formularioDeshabilitado}
+                                    aria-invalid={!!errores.numeroVersionInicial}
+                                    aria-describedby={
+                                        errores.numeroVersionInicial
+                                            ? "numeroVersionInicial-error"
+                                            : undefined
+                                    }
+                                    className={cn(
+                                        errores.numeroVersionInicial && "border-destructive",
+                                    )}
                                 />
                                 <p className="text-xs text-muted-foreground">
                                     Indica la versión actual del documento.
@@ -936,19 +1137,30 @@ function NuevoDocumentoPage() {
                                 label="Descripción de la versión inicial"
                                 obligatorio
                                 error={errores.descripcionVersionInicial}
+                                campoRef={registrarRefCampo("descripcionVersionInicial")}
                             >
                                 <Textarea
                                     id="descripcionVersionInicial"
                                     rows={3}
                                     placeholder="Indique brevemente qué contiene esta primera versión."
                                     value={form.descripcionVersionInicial}
-                                    onChange={(e) =>
+                                    onChange={(e) => {
                                         setForm((prev) => ({
                                             ...prev,
                                             descripcionVersionInicial: e.target.value,
-                                        }))
-                                    }
+                                        }));
+                                        limpiarError("descripcionVersionInicial");
+                                    }}
                                     disabled={formularioDeshabilitado}
+                                    aria-invalid={!!errores.descripcionVersionInicial}
+                                    aria-describedby={
+                                        errores.descripcionVersionInicial
+                                            ? "descripcionVersionInicial-error"
+                                            : undefined
+                                    }
+                                    className={cn(
+                                        errores.descripcionVersionInicial && "border-destructive",
+                                    )}
                                 />
                             </Campo>
 
@@ -984,21 +1196,34 @@ function Campo({
     obligatorio = false,
     error,
     children,
+    campoRef,
 }: {
     id?: string;
     label: string;
     obligatorio?: boolean;
     error?: string;
     children: ReactNode;
+    campoRef?: Ref<HTMLDivElement>;
 }) {
+    const errorId = id ? `${id}-error` : undefined;
+
     return (
-        <div className="space-y-1.5">
+        <div ref={campoRef} className="space-y-1.5">
             <Label htmlFor={id}>
                 {label}
                 {obligatorio ? <span className="text-destructive"> *</span> : null}
             </Label>
             {children}
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            {error ? (
+                <p
+                    id={errorId}
+                    role="alert"
+                    className="flex items-start gap-1.5 text-sm text-destructive"
+                >
+                    <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                    <span>{error}</span>
+                </p>
+            ) : null}
         </div>
     );
 }
