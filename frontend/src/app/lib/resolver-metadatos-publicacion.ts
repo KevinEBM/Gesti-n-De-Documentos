@@ -21,10 +21,15 @@ export interface ResultadoMetadatosPublicacion {
     detectado: boolean;
 }
 
+export interface OpcionesResolverMetadatosPublicacion {
+    omitirResolucionCatalogo?: boolean;
+}
+
 export function resolverMetadatosPublicacion(
     extraccion: MetadatosExtraidosDocumento,
     subprogramas: SubprogramaCatalogo[],
     tipos: TipoDocumentoCatalogo[],
+    opciones?: OpcionesResolverMetadatosPublicacion,
 ): ResultadoMetadatosPublicacion {
     if (!extraccion.reconocido || !extraccion.codigo) {
         return {
@@ -45,6 +50,67 @@ export function resolverMetadatosPublicacion(
         actualizaciones.titulo = extraccion.nombre;
     }
 
+    if (!opciones?.omitirResolucionCatalogo) {
+        resolverCamposCatalogo(extraccion, subprogramas, tipos, actualizaciones, avisos);
+    }
+
+    if (extraccion.version.tipo === "entera") {
+        actualizaciones.numeroVersionInicial = String(extraccion.version.valor);
+    } else if (extraccion.version.tipo === "decimal") {
+        avisos.push(
+            "Se detectó una versión no compatible con el formato actual. Revise la versión inicial manualmente.",
+        );
+    }
+
+    return {
+        actualizaciones,
+        avisos,
+        detectado: true,
+    };
+}
+
+export function aplicarMetadatosDesdeArchivo(
+    nombreArchivo: string,
+    subprogramas: SubprogramaCatalogo[],
+    tipos: TipoDocumentoCatalogo[],
+    opciones?: OpcionesResolverMetadatosPublicacion,
+): ResultadoMetadatosPublicacion {
+    const extraccion = extraerMetadatosDesdeArchivo(nombreArchivo);
+    return resolverMetadatosPublicacion(extraccion, subprogramas, tipos, opciones);
+}
+
+export function resolverMetadatosCatalogoDesdeArchivo(
+    nombreArchivo: string,
+    subprogramas: SubprogramaCatalogo[],
+    tipos: TipoDocumentoCatalogo[],
+): ResultadoMetadatosPublicacion {
+    const extraccion = extraerMetadatosDesdeArchivo(nombreArchivo);
+    if (!extraccion.reconocido || !extraccion.codigo) {
+        return {
+            actualizaciones: {},
+            avisos: [],
+            detectado: false,
+        };
+    }
+
+    const actualizaciones: ActualizacionMetadatosPublicacion = {};
+    const avisos: string[] = [];
+    resolverCamposCatalogo(extraccion, subprogramas, tipos, actualizaciones, avisos);
+
+    return {
+        actualizaciones,
+        avisos,
+        detectado: Object.keys(actualizaciones).length > 0,
+    };
+}
+
+function resolverCamposCatalogo(
+    extraccion: MetadatosExtraidosDocumento,
+    subprogramas: SubprogramaCatalogo[],
+    tipos: TipoDocumentoCatalogo[],
+    actualizaciones: ActualizacionMetadatosPublicacion,
+    avisos: string[],
+): void {
     if (extraccion.nombreSubproceso) {
         const subprograma = buscarSubprogramaActivo(extraccion.nombreSubproceso, subprogramas);
         if (subprograma) {
@@ -83,29 +149,6 @@ export function resolverMetadatosPublicacion(
             "Se reconoció el tipo de documento, pero no se encontró en los catálogos activos. Revise los metadatos manualmente.",
         );
     }
-
-    if (extraccion.version.tipo === "entera") {
-        actualizaciones.numeroVersionInicial = String(extraccion.version.valor);
-    } else if (extraccion.version.tipo === "decimal") {
-        avisos.push(
-            "Se detectó una versión no compatible con el formato actual. Revise la versión inicial manualmente.",
-        );
-    }
-
-    return {
-        actualizaciones,
-        avisos,
-        detectado: true,
-    };
-}
-
-export function aplicarMetadatosDesdeArchivo(
-    nombreArchivo: string,
-    subprogramas: SubprogramaCatalogo[],
-    tipos: TipoDocumentoCatalogo[],
-): ResultadoMetadatosPublicacion {
-    const extraccion = extraerMetadatosDesdeArchivo(nombreArchivo);
-    return resolverMetadatosPublicacion(extraccion, subprogramas, tipos);
 }
 
 function buscarSubprogramaActivo(
