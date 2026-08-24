@@ -87,6 +87,17 @@ export const ALERT_DIALOG_CANCEL_CLASS =
 export const ALERT_DIALOG_ACTION_CLASS =
     "!bg-[#289248] !text-white hover:!bg-[#289248]/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#289248]/40 disabled:opacity-50";
 
+export type GeneroEtiquetaCatalogo = "femenino" | "masculino";
+
+export function etiquetaCatalogoConsulta(
+    nombre: string,
+    activo: boolean,
+    genero: GeneroEtiquetaCatalogo = "masculino",
+): string {
+    if (activo) return nombre;
+    return genero === "femenino" ? `${nombre} (Inactiva)` : `${nombre} (Inactivo)`;
+}
+
 export function formatFechaDocumento(fecha: string): string {
     try {
         return new Intl.DateTimeFormat("es-CO", {
