@@ -1,6 +1,6 @@
 package com.plantarsas.gestiondocumental.roles.controller;
 
-import com.plantarsas.gestiondocumental.config.SecurityConfig;
+import com.plantarsas.gestiondocumental.config.SecurityTestConfiguration;
 import com.plantarsas.gestiondocumental.exception.GlobalExceptionHandler;
 import com.plantarsas.gestiondocumental.roles.dto.RolResponse;
 import com.plantarsas.gestiondocumental.roles.service.RolService;
@@ -162,10 +162,7 @@ class RolControllerSecurityTest {
     @EnableWebMvc
     @EnableWebSecurity
     @Import({
-            SecurityConfig.class,
-            JwtAuthenticationFilter.class,
-            JwtAuthenticationEntryPoint.class,
-            JwtAccessDeniedHandler.class,
+            SecurityTestConfiguration.class,
             GlobalExceptionHandler.class,
             RolController.class
     })

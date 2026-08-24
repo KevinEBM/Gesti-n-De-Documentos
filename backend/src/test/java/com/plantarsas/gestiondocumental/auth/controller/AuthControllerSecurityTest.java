@@ -27,7 +27,7 @@ package com.plantarsas.gestiondocumental.auth.controller;
  */
 
 import com.plantarsas.gestiondocumental.auth.service.AuthService;
-import com.plantarsas.gestiondocumental.config.SecurityConfig;
+import com.plantarsas.gestiondocumental.config.SecurityTestConfiguration;
 import com.plantarsas.gestiondocumental.exception.BusinessException;
 import com.plantarsas.gestiondocumental.exception.GlobalExceptionHandler;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
@@ -249,10 +249,7 @@ class AuthControllerSecurityTest {
     @EnableWebMvc
     @EnableWebSecurity
     @Import({
-            SecurityConfig.class,
-            JwtAuthenticationFilter.class,
-            JwtAuthenticationEntryPoint.class,
-            JwtAccessDeniedHandler.class,
+            SecurityTestConfiguration.class,
             GlobalExceptionHandler.class,
             AuthController.class
     })

@@ -194,11 +194,7 @@ class SecurityConfigTest {
     @EnableWebMvc
     @EnableWebSecurity
     @Import({
-            SecurityConfig.class,
-            ClockConfig.class,
-            JwtAuthenticationFilter.class,
-            JwtAuthenticationEntryPoint.class,
-            JwtAccessDeniedHandler.class,
+            SecurityTestConfiguration.class,
             PruebaController.class
     })
     static class ConfiguracionSeguridadTest {

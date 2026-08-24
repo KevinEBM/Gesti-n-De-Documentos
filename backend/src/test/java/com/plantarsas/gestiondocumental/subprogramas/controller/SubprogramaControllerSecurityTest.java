@@ -1,6 +1,6 @@
 package com.plantarsas.gestiondocumental.subprogramas.controller;
 
-import com.plantarsas.gestiondocumental.config.SecurityConfig;
+import com.plantarsas.gestiondocumental.config.SecurityTestConfiguration;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 import com.plantarsas.gestiondocumental.security.JwtAccessDeniedHandler;
 import com.plantarsas.gestiondocumental.security.JwtAuthenticationEntryPoint;
@@ -329,10 +329,7 @@ class SubprogramaControllerSecurityTest {
     @EnableWebMvc
     @EnableWebSecurity
     @Import({
-            SecurityConfig.class,
-            JwtAuthenticationFilter.class,
-            JwtAuthenticationEntryPoint.class,
-            JwtAccessDeniedHandler.class,
+            SecurityTestConfiguration.class,
             SubprogramaController.class
     })
     static class ConfiguracionSeguridadSubprogramasTest {
