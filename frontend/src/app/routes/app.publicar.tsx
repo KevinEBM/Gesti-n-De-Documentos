@@ -695,7 +695,7 @@ function NuevoDocumentoPage() {
                             >
                                 <Input
                                     id="codigo"
-                                    placeholder="PR-LD-PO-01"
+                                    placeholder="PR-L&D-PO-01"
                                     value={form.codigo}
                                     onChange={(e) => {
                                         setForm((prev) => ({ ...prev, codigo: e.target.value }));
