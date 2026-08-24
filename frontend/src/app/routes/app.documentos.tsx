@@ -14,11 +14,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ApiError, apiFetch } from "@/lib/api";
+import { ApiError } from "@/lib/api";
 import { listarAreas, type AreaCatalogo } from "@/lib/areas-api";
 import {
     construirFiltrosApi,
     dispararDescargaEnNavegador,
+    etiquetaCatalogoConsulta,
     etiquetasAlcance,
     filtrosVacios,
     formatFechaDocumento,
@@ -35,7 +36,7 @@ import { obtenerIconoFormato } from "@/lib/iconos-formatos";
 import { obtenerIconoSubProceso } from "@/lib/iconos-subprocesos";
 import { listarSubprogramas, type SubprogramaCatalogo } from "@/lib/subprogramas-api";
 import { useIntranet } from "@/lib/store";
-import { listarTiposDocumento, mapTipoDocumentoResponseDto, type TipoDocumentoCatalogo, type TipoDocumentoResponseDto } from "@/lib/tipos-documento-api";
+import { listarTiposDocumento, type TipoDocumentoCatalogo } from "@/lib/tipos-documento-api";
 
 export const Route = createFileRoute("/app/documentos")({
     head: () => ({
@@ -51,11 +52,6 @@ export const Route = createFileRoute("/app/documentos")({
     }),
     component: Biblioteca,
 });
-
-async function listarTiposConsultaBiblioteca(): Promise<TipoDocumentoCatalogo[]> {
-    const datos = await apiFetch<TipoDocumentoResponseDto[]>("/api/tipos-documento/activos");
-    return datos.map(mapTipoDocumentoResponseDto);
-}
 
 function construirFiltrosBase(esAdmin: boolean, areasActivas: AreaCatalogo[]): FiltrosDocumentos {
     if (!esAdmin && areasActivas.length === 1) {
@@ -109,16 +105,41 @@ function Biblioteca() {
             : areaObligatoriaNoAdmin ?? TODOS;
     const requiereSeleccionArea = areaEfectivaFormulario === TODOS;
 
-    const subprogramasActivos = useMemo(() => {
+    const subprogramasFiltro = useMemo(() => {
         if (areaEfectivaFormulario === TODOS) {
             return [];
         }
         return subprogramasCatalogo.filter(
-            (item) => item.activo && item.areaId === areaEfectivaFormulario,
+            (item) => item.areaId === areaEfectivaFormulario,
         );
     }, [subprogramasCatalogo, areaEfectivaFormulario]);
 
-    const tiposActivos = useMemo(() => tiposCatalogo, [tiposCatalogo]);
+    const opcionesAreasFiltro = useMemo(
+        () =>
+            areasCatalogo.map((area) => ({
+                v: area.id,
+                l: etiquetaCatalogoConsulta(area.nombre, area.activo, "femenino"),
+            })),
+        [areasCatalogo],
+    );
+
+    const opcionesSubprogramasFiltro = useMemo(
+        () =>
+            subprogramasFiltro.map((item) => ({
+                v: item.id,
+                l: etiquetaCatalogoConsulta(item.nombre, item.activo, "masculino"),
+            })),
+        [subprogramasFiltro],
+    );
+
+    const opcionesTiposFiltro = useMemo(
+        () =>
+            tiposCatalogo.map((tipo) => ({
+                v: tipo.id,
+                l: etiquetaCatalogoConsulta(tipo.nombre, tipo.activo, "masculino"),
+            })),
+        [tiposCatalogo],
+    );
 
     const filtrosAplicadosActivos = useMemo(
         () =>
@@ -139,7 +160,7 @@ function Biblioteca() {
             const [areas, subprogramas, tipos] = await Promise.all([
                 listarAreas(),
                 listarSubprogramas(),
-                esAdmin ? listarTiposDocumento() : listarTiposConsultaBiblioteca(),
+                listarTiposDocumento(),
             ]);
             setAreasCatalogo(areas);
             setSubprogramasCatalogo(subprogramas);
@@ -543,7 +564,7 @@ function Biblioteca() {
                             label="Área"
                             value={filtrosFormulario.area}
                             onChange={cambiarArea}
-                            opciones={areasActivas.map((area) => ({ v: area.id, l: area.nombre }))}
+                            opciones={opcionesAreasFiltro}
                             tipoFiltro="area"
                             disabled={
                                 cargandoCatalogos ||
@@ -557,10 +578,7 @@ function Biblioteca() {
                             onChange={(subprograma) =>
                                 setFiltrosFormulario((prev) => ({ ...prev, subprograma }))
                             }
-                            opciones={subprogramasActivos.map((item) => ({
-                                v: item.id,
-                                l: item.nombre,
-                            }))}
+                            opciones={opcionesSubprogramasFiltro}
                             tipoFiltro="subproceso"
                             disabled={cargandoCatalogos || !!errorCatalogos || requiereSeleccionArea}
                             placeholder={
@@ -575,7 +593,7 @@ function Biblioteca() {
                             onChange={(tipo) =>
                                 setFiltrosFormulario((prev) => ({ ...prev, tipo }))
                             }
-                            opciones={tiposActivos.map((tipo) => ({ v: tipo.id, l: tipo.nombre }))}
+                            opciones={opcionesTiposFiltro}
                             tipoFiltro="tipo"
                             disabled={cargandoCatalogos || !!errorCatalogos}
                         />

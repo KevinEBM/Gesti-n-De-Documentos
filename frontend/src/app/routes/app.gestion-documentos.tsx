@@ -36,6 +36,7 @@ import {
     ALERT_DIALOG_TITLE_DESACTIVAR_CLASS,
     construirFiltrosApi,
     dispararDescargaEnNavegador,
+    etiquetaCatalogoConsulta,
     etiquetasAlcance,
     filtrosVacios,
     formatFechaDocumento,
@@ -148,22 +149,39 @@ function GestionDocumentos() {
         null,
     );
 
-    const areasActivas = useMemo(
-        () => areasCatalogo.filter((area) => area.activo),
-        [areasCatalogo],
-    );
-
-    const subprogramasActivos = useMemo(() => {
+    const subprogramasFiltro = useMemo(() => {
         if (filtrosFormulario.area === TODOS) {
             return [];
         }
         return subprogramasCatalogo.filter(
-            (item) => item.activo && item.areaId === filtrosFormulario.area,
+            (item) => item.areaId === filtrosFormulario.area,
         );
     }, [subprogramasCatalogo, filtrosFormulario.area]);
 
-    const tiposActivos = useMemo(
-        () => tiposCatalogo.filter((tipo) => tipo.activo),
+    const opcionesAreasFiltro = useMemo(
+        () =>
+            areasCatalogo.map((area) => ({
+                v: area.id,
+                l: etiquetaCatalogoConsulta(area.nombre, area.activo, "femenino"),
+            })),
+        [areasCatalogo],
+    );
+
+    const opcionesSubprogramasFiltro = useMemo(
+        () =>
+            subprogramasFiltro.map((item) => ({
+                v: item.id,
+                l: etiquetaCatalogoConsulta(item.nombre, item.activo, "masculino"),
+            })),
+        [subprogramasFiltro],
+    );
+
+    const opcionesTiposFiltro = useMemo(
+        () =>
+            tiposCatalogo.map((tipo) => ({
+                v: tipo.id,
+                l: etiquetaCatalogoConsulta(tipo.nombre, tipo.activo, "masculino"),
+            })),
         [tiposCatalogo],
     );
 
@@ -572,7 +590,7 @@ function GestionDocumentos() {
                             label="Área"
                             value={filtrosFormulario.area}
                             onChange={cambiarArea}
-                            opciones={areasActivas.map((area) => ({ v: area.id, l: area.nombre }))}
+                            opciones={opcionesAreasFiltro}
                             tipoFiltro="area"
                             disabled={cargandoCatalogos || !!errorCatalogos}
                         />
@@ -582,10 +600,7 @@ function GestionDocumentos() {
                             onChange={(subprograma) =>
                                 setFiltrosFormulario((prev) => ({ ...prev, subprograma }))
                             }
-                            opciones={subprogramasActivos.map((item) => ({
-                                v: item.id,
-                                l: item.nombre,
-                            }))}
+                            opciones={opcionesSubprogramasFiltro}
                             tipoFiltro="subproceso"
                             disabled={cargandoCatalogos || !!errorCatalogos || requiereSeleccionArea}
                             placeholder={
@@ -598,7 +613,7 @@ function GestionDocumentos() {
                             onChange={(tipo) =>
                                 setFiltrosFormulario((prev) => ({ ...prev, tipo }))
                             }
-                            opciones={tiposActivos.map((tipo) => ({ v: tipo.id, l: tipo.nombre }))}
+                            opciones={opcionesTiposFiltro}
                             tipoFiltro="tipo"
                             disabled={cargandoCatalogos || !!errorCatalogos}
                         />
