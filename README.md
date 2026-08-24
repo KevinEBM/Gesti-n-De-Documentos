@@ -101,9 +101,9 @@ Propiedades reales en `backend/src/main/resources/application.properties`. **No 
 | `JWT_EXPIRATION_MS` | Sí | Expiración token en ms → propiedad `jwt.expiration-ms` |
 | `CORS_ALLOWED_ORIGINS` | No | Orígenes CORS (default `http://localhost:5173`) |
 | `STORAGE_LOCATION` | No | Directorio de archivos (default `uploads`) |
-| `STORAGE_MAX_FILE_SIZE` | No | Tamaño máximo bytes (default `15728640` = 15 MB) |
-| `MAX_UPLOAD_FILE_SIZE` | No | Multipart Spring (default `15MB`) |
-| `MAX_UPLOAD_REQUEST_SIZE` | No | Multipart request (default `16MB`) |
+| `STORAGE_MAX_FILE_SIZE` | No | Tamaño máximo bytes (default `10485760` = 10 MB) |
+| `MAX_UPLOAD_FILE_SIZE` | No | Multipart Spring (default `10MB`) |
+| `MAX_UPLOAD_REQUEST_SIZE` | No | Multipart request (default `11MB`) |
 
 En desarrollo local los archivos suelen quedar en `backend/uploads/` si se ejecuta desde esa carpeta. Ver `backend/.env.example` (Spring Boot **no** carga `.env` automáticamente; exportar variables al entorno).
 
@@ -183,7 +183,7 @@ No existe ruta `/app/notificaciones`.
 - Autenticación stateless con JWT en cabecera `Authorization: Bearer …`
 - `@PreAuthorize` en controladores; visibilidad documental por **estado PUBLICADO**, **alcance** (GLOBAL, AREA_RESPONSABLE, AREAS_ESPECIFICAS) y área del usuario
 - `GET /api/roles` restringido a **ADMINISTRADOR**
-- Archivos: máximo **15 MB**, extensión **.apk** bloqueada, hash **SHA-256** al guardar
+- Archivos: máximo **10 MB**, extensión **.apk** bloqueada, hash **SHA-256** al guardar
 
 ## Preparación para producción (A6)
 
