@@ -18,6 +18,8 @@ import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -25,7 +27,7 @@ public class StorageServiceImpl implements StorageService {
 
     private static final int LONGITUD_MAXIMA_EXTENSION = 10;
     private static final String MIME_TYPE_POR_DEFECTO = "application/octet-stream";
-    private static final String EXTENSION_APK = ".apk";
+    private static final Set<String> EXTENSIONES_PROHIBIDAS = Set.of(".apk", ".txt");
 
     private final Path rootLocation;
     private final long maxFileSizeBytes;
@@ -84,8 +86,8 @@ public class StorageServiceImpl implements StorageService {
         }
 
         String extension = extensionDe(nombreOriginal);
-        if (extension.equalsIgnoreCase(EXTENSION_APK)) {
-            throw new BusinessException("No se permite cargar archivos APK");
+        if (extensionEstaProhibida(extension)) {
+            throw new BusinessException(mensajeExtensionProhibida(extension));
         }
 
         String nombreAlmacenado = UUID.randomUUID() + extension;
@@ -220,6 +222,23 @@ public class StorageServiceImpl implements StorageService {
         }
 
         return extension;
+    }
+
+    private boolean extensionEstaProhibida(String extension) {
+        if (extension == null || extension.isBlank()) {
+            return false;
+        }
+        return EXTENSIONES_PROHIBIDAS.contains(extension.toLowerCase(Locale.ROOT));
+    }
+
+    private String mensajeExtensionProhibida(String extension) {
+        if (".apk".equalsIgnoreCase(extension)) {
+            return "No se permite cargar archivos APK";
+        }
+        if (".txt".equalsIgnoreCase(extension)) {
+            return "No se permiten archivos TXT";
+        }
+        return "El tipo de archivo no está permitido";
     }
 
     private void eliminarSilenciosamente(Path destino) {

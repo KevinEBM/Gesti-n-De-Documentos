@@ -43,6 +43,7 @@ import { obtenerIconoSubProceso } from "@/lib/iconos-subprocesos";
 import { listarSubprogramas, type SubprogramaCatalogo } from "@/lib/subprogramas-api";
 import { useIntranet } from "@/lib/store";
 import { listarTiposDocumento, type TipoDocumentoCatalogo } from "@/lib/tipos-documento-api";
+import { LIMITE_ARCHIVO_BYTES, validarArchivoSubida } from "@/lib/validacion-archivo";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/publicar")({
@@ -58,8 +59,6 @@ export const Route = createFileRoute("/app/publicar")({
     }),
     component: NuevoDocumentoPage,
 });
-
-const LIMITE_ARCHIVO = 10 * 1024 * 1024;
 
 const ORDEN_CAMPOS_VALIDACION = [
     "codigo",
@@ -189,13 +188,11 @@ function validarFormulario(
     }
 
     if (!archivo) {
-        errores.archivo = "Debes adjuntar un archivo para el documento.";
+        errores.archivo = "Debes adjuntar un archivo.";
     } else {
-        if (archivo.size > LIMITE_ARCHIVO) {
-            errores.archivo = "El archivo no puede superar los 10 MB.";
-        }
-        if (archivo.name.toLowerCase().endsWith(".apk")) {
-            errores.archivo = "No se permiten archivos APK.";
+        const errorArchivo = validarArchivoSubida(archivo);
+        if (errorArchivo) {
+            errores.archivo = errorArchivo;
         }
     }
 
@@ -466,22 +463,13 @@ function NuevoDocumentoPage() {
 
     const procesarArchivo = useCallback(
         (file: File) => {
-            if (file.size > LIMITE_ARCHIVO) {
+            const errorArchivo = validarArchivoSubida(file);
+            if (errorArchivo) {
                 setArchivo(null);
                 pendienteMetadatosCatalogoRef.current = null;
                 setErrores((prev) => ({
                     ...prev,
-                    archivo: "El archivo no puede superar los 10 MB.",
-                }));
-                return;
-            }
-
-            if (file.name.toLowerCase().endsWith(".apk")) {
-                setArchivo(null);
-                pendienteMetadatosCatalogoRef.current = null;
-                setErrores((prev) => ({
-                    ...prev,
-                    archivo: "No se permiten archivos APK.",
+                    archivo: errorArchivo,
                 }));
                 return;
             }
@@ -1089,7 +1077,7 @@ function NuevoDocumentoPage() {
                                     archivo={archivo}
                                     disabled={publicando || !!errorCatalogos}
                                     error={errores.archivo}
-                                    maxSizeBytes={LIMITE_ARCHIVO}
+                                    maxSizeBytes={LIMITE_ARCHIVO_BYTES}
                                     onArchivoSeleccionado={procesarArchivo}
                                     onQuitarArchivo={quitarArchivo}
                                     onRechazo={manejarRechazoArchivo}

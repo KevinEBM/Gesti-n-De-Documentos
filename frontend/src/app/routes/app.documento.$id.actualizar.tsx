@@ -24,6 +24,7 @@ import {
     type DocumentoDetalle,
 } from "@/lib/documentos-api";
 import { useIntranet } from "@/lib/store";
+import { validarArchivoSubida } from "@/lib/validacion-archivo";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/documento/$id/actualizar")({
@@ -32,8 +33,6 @@ export const Route = createFileRoute("/app/documento/$id/actualizar")({
     }),
     component: ActualizarDocumentoPage,
 });
-
-const LIMITE_ARCHIVO = 10 * 1024 * 1024;
 
 function validarFormulario(
     archivo: File | null,
@@ -44,11 +43,9 @@ function validarFormulario(
     if (!archivo) {
         errores.archivo = "Debes adjuntar un archivo.";
     } else {
-        if (archivo.size > LIMITE_ARCHIVO) {
-            errores.archivo = "El archivo no puede superar los 10 MB.";
-        }
-        if (archivo.name.toLowerCase().endsWith(".apk")) {
-            errores.archivo = "No se permiten archivos APK.";
+        const errorArchivo = validarArchivoSubida(archivo);
+        if (errorArchivo) {
+            errores.archivo = errorArchivo;
         }
     }
 
@@ -119,6 +116,15 @@ function ActualizarDocumentoPage() {
 
     const manejarArchivo = (evento: ChangeEvent<HTMLInputElement>) => {
         const seleccionado = evento.target.files?.[0] ?? null;
+        if (seleccionado) {
+            const errorArchivo = validarArchivoSubida(seleccionado);
+            if (errorArchivo) {
+                setArchivo(null);
+                setErrores((prev) => ({ ...prev, archivo: errorArchivo }));
+                setArchivoInputKey((prev) => prev + 1);
+                return;
+            }
+        }
         setArchivo(seleccionado);
         setErrores((prev) => {
             const { archivo: _, ...resto } = prev;
@@ -358,7 +364,7 @@ function ActualizarDocumentoPage() {
                                                     </span>
                                                     <span className="text-xs text-muted-foreground">
                                                         Tamaño máximo: 10 MB. No se permiten
-                                                        archivos APK.
+                                                        archivos APK ni TXT.
                                                     </span>
                                                 </>
                                             )}

@@ -3,10 +3,12 @@ import { useCallback } from "react";
 import { useDropzone, type FileRejection } from "react-dropzone";
 
 import { Button } from "@/components/ui/button";
+import {
+    extensionProhibida,
+    mensajeExtensionProhibida,
+    MENSAJE_LIMITE_MB,
+} from "@/lib/validacion-archivo";
 import { cn } from "@/lib/utils";
-
-const MENSAJE_LIMITE_MB = "El archivo no puede superar los 10 MB.";
-const MENSAJE_APK = "No se permiten archivos APK.";
 
 export interface DropzoneAreaProps {
     archivo: File | null;
@@ -24,8 +26,8 @@ function mensajeRechazo(rechazos: FileRejection[]): string {
             if (error.code === "file-too-large") {
                 return MENSAJE_LIMITE_MB;
             }
-            if (error.code === "file-invalid-type" || error.message === MENSAJE_APK) {
-                return MENSAJE_APK;
+            if (error.code === "file-invalid-type" && error.message) {
+                return error.message;
             }
         }
     }
@@ -42,10 +44,11 @@ export function DropzoneArea({
     onRechazo,
 }: DropzoneAreaProps) {
     const validarArchivo = useCallback((file: File) => {
-        if (file.name.toLowerCase().endsWith(".apk")) {
+        const extension = extensionProhibida(file.name);
+        if (extension) {
             return {
                 code: "file-invalid-type",
-                message: MENSAJE_APK,
+                message: mensajeExtensionProhibida(extension),
             };
         }
         return null;
@@ -169,7 +172,7 @@ export function DropzoneArea({
                     </p>
                     {!arrastrandoValido && !arrastrandoInvalido ? (
                         <p className="text-xs text-muted-foreground">
-                            Tamaño máximo: 10 MB. No se permiten archivos APK.
+                            Tamaño máximo: 10 MB. No se permiten archivos APK ni TXT.
                         </p>
                     ) : null}
                 </div>
