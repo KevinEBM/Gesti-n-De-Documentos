@@ -142,6 +142,13 @@ export function resolverNombreTipo(abreviatura: string): string | null {
     return NOMBRES_TIPO_POR_ABREVIATURA[clave] ?? null;
 }
 
+export function listarAbreviaturasPorNombreTipo(nombreTipo: string): string[] {
+    const objetivo = normalizarNombre(nombreTipo);
+    return Object.entries(NOMBRES_TIPO_POR_ABREVIATURA)
+        .filter(([, nombre]) => normalizarNombre(nombre) === objetivo)
+        .map(([abreviatura]) => abreviatura);
+}
+
 export function nombresCoinciden(a: string, b: string): boolean {
     return normalizarNombre(a) === normalizarNombre(b);
 }

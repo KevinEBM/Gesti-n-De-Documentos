@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import type { ComponentType } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -24,6 +23,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { SelectorAreaResponsable } from "@/components/selector-area-responsable";
 import {
     Table,
@@ -62,7 +68,14 @@ import {
     cambiarEstadoTipoDocumento,
     type TipoDocumentoCatalogo,
 } from "@/lib/tipos-documento-api";
+import {
+    filtrarAreasCatalogo,
+    filtrarSubprogramasCatalogo,
+    filtrarTiposDocumentoCatalogo,
+    type FiltroEstadoActivo,
+} from "@/lib/filtros-parametrizacion";
 import { useIntranet } from "@/lib/store";
+import { cn } from "@/lib/utils";
 
 import { obtenerIconoArea } from "@/lib/iconos-areas";
 import { obtenerIconoFormato } from "@/lib/iconos-formatos";
@@ -93,6 +106,82 @@ export const Route = createFileRoute("/app/parametrizacion")({
 
 function etiquetaConteoTab(total: number | null): string {
     return total === null ? "…" : String(total);
+}
+
+const SELECT_ESTADO_CLASS =
+    "w-full sm:w-[160px] !bg-white !text-slate-900 border border-slate-200";
+
+const SELECT_ESTADO_CONTENT_CLASS =
+    "!bg-white !text-slate-900 border border-slate-200 shadow-md";
+
+const SELECT_ESTADO_ITEM_CLASS =
+    "!text-slate-900 focus:!bg-slate-100 focus:!text-slate-900 data-[highlighted]:!bg-slate-100 data-[highlighted]:!text-slate-900";
+
+function BarraFiltrosCatalogo({
+    busqueda,
+    onBusquedaChange,
+    estado,
+    onEstadoChange,
+    placeholder,
+    disabled = false,
+}: {
+    busqueda: string;
+    onBusquedaChange: (valor: string) => void;
+    estado: FiltroEstadoActivo;
+    onEstadoChange: (valor: FiltroEstadoActivo) => void;
+    placeholder: string;
+    disabled?: boolean;
+}) {
+    return (
+        <div className="flex flex-col gap-2 px-6 pb-4 sm:flex-row sm:items-center">
+            <div className="relative min-w-0 flex-1">
+                <Search
+                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden
+                />
+                <Input
+                    value={busqueda}
+                    onChange={(evento) => onBusquedaChange(evento.target.value)}
+                    placeholder={placeholder}
+                    disabled={disabled}
+                    className="pl-9 !bg-white !text-slate-900"
+                    aria-label={placeholder}
+                />
+            </div>
+
+            <Select
+                value={estado}
+                onValueChange={(valor) => onEstadoChange(valor as FiltroEstadoActivo)}
+                disabled={disabled}
+            >
+                <SelectTrigger className={SELECT_ESTADO_CLASS} aria-label="Filtrar por estado">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent className={SELECT_ESTADO_CONTENT_CLASS}>
+                    <SelectItem value="todos" className={SELECT_ESTADO_ITEM_CLASS}>
+                        Todos
+                    </SelectItem>
+                    <SelectItem value="activos" className={SELECT_ESTADO_ITEM_CLASS}>
+                        Activos
+                    </SelectItem>
+                    <SelectItem value="inactivos" className={SELECT_ESTADO_ITEM_CLASS}>
+                        Inactivos
+                    </SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
+    );
+}
+
+function MensajeSinResultadosFiltro({ className }: { className?: string }) {
+    return (
+        <div className={cn("px-6 py-14 text-center text-sm text-muted-foreground", className)}>
+            <p>No se encontraron resultados con los filtros seleccionados.</p>
+            <p className="mt-1">
+                Prueba con otro término de búsqueda o cambia el estado.
+            </p>
+        </div>
+    );
 }
 
 function Parametrizacion() {
@@ -193,6 +282,15 @@ function SeccionAreas({ onTotalChange }: { onTotalChange?: (total: number) => vo
     const [erroresCampo, setErroresCampo] = useState<
         Partial<Record<"codigo" | "nombre" | "descripcion", string>>
     >({});
+    const [busqueda, setBusqueda] = useState("");
+    const [estadoFiltro, setEstadoFiltro] = useState<FiltroEstadoActivo>("todos");
+
+    const areasFiltradas = useMemo(
+        () => filtrarAreasCatalogo(areasCatalogo, busqueda, estadoFiltro),
+        [areasCatalogo, busqueda, estadoFiltro],
+    );
+
+    const hayFiltrosActivos = busqueda.trim().length > 0 || estadoFiltro !== "todos";
 
     const notificarTotal = (lista: AreaCatalogo[]) => {
         onTotalChange?.(lista.length);
@@ -363,70 +461,91 @@ function SeccionAreas({ onTotalChange }: { onTotalChange?: (total: number) => vo
                     </Button>
                 </CardContent>
             ) : (
-                <CardContent className="px-0 pb-0">
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="bg-secondary/60">
-                                <TableHead>Nombre</TableHead>
-                                <TableHead>Código</TableHead>
-                                <TableHead>Descripción</TableHead>
-                                <TableHead>Estado</TableHead>
-                                <TableHead className="text-right">Acciones</TableHead>
-                            </TableRow>
-                        </TableHeader>
+                <>
+                    <BarraFiltrosCatalogo
+                        busqueda={busqueda}
+                        onBusquedaChange={setBusqueda}
+                        estado={estadoFiltro}
+                        onEstadoChange={setEstadoFiltro}
+                        placeholder="Buscar área..."
+                    />
 
-                        <TableBody>
-                            {areasCatalogo.map((r) => {
-                                const { icono: Icono, color } = obtenerIconoArea(r.nombre);
+                    {areasFiltradas.length === 0 && areasCatalogo.length > 0 ? (
+                        <MensajeSinResultadosFiltro />
+                    ) : (
+                        <CardContent className="px-0 pb-0">
+                            {hayFiltrosActivos && areasFiltradas.length > 0 ? (
+                                <p className="px-6 pb-3 text-xs text-muted-foreground">
+                                    {areasFiltradas.length}{" "}
+                                    {areasFiltradas.length === 1 ? "resultado" : "resultados"}
+                                </p>
+                            ) : null}
 
-                                return (
-                                    <TableRow key={r.id}>
-                                        <TableCell className="font-medium">
-                                            <div className="flex items-center gap-2">
-                                                <Icono className={`size-4 ${color}`} />
-                                                <span>{r.nombre}</span>
-                                            </div>
-                                        </TableCell>
-
-                                        <TableCell className="text-sm text-muted-foreground">
-                                            {r.codigo}
-                                        </TableCell>
-
-                                        <TableCell className="text-sm text-muted-foreground">
-                                            {r.descripcion}
-                                        </TableCell>
-
-                                        <TableCell>
-                                            <ActivoBadge activo={r.activo} />
-                                        </TableCell>
-
-                                        <TableCell>
-                                            <div className="flex justify-end gap-2">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => abrirEditar(r)}
-                                                    disabled={alternandoId === r.id}
-                                                >
-                                                    Editar
-                                                </Button>
-
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    disabled={alternandoId === r.id}
-                                                    onClick={() => void alternarEstado(r)}
-                                                >
-                                                    {r.activo ? "Desactivar" : "Activar"}
-                                                </Button>
-                                            </div>
-                                        </TableCell>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-secondary/60">
+                                        <TableHead>Nombre</TableHead>
+                                        <TableHead>Código</TableHead>
+                                        <TableHead>Descripción</TableHead>
+                                        <TableHead>Estado</TableHead>
+                                        <TableHead className="text-right">Acciones</TableHead>
                                     </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                </CardContent>
+                                </TableHeader>
+
+                                <TableBody>
+                                    {areasFiltradas.map((r) => {
+                                        const { icono: Icono, color } = obtenerIconoArea(r.nombre);
+
+                                        return (
+                                            <TableRow key={r.id}>
+                                                <TableCell className="font-medium">
+                                                    <div className="flex items-center gap-2">
+                                                        <Icono className={`size-4 ${color}`} />
+                                                        <span>{r.nombre}</span>
+                                                    </div>
+                                                </TableCell>
+
+                                                <TableCell className="text-sm text-muted-foreground">
+                                                    {r.codigo}
+                                                </TableCell>
+
+                                                <TableCell className="text-sm text-muted-foreground">
+                                                    {r.descripcion}
+                                                </TableCell>
+
+                                                <TableCell>
+                                                    <ActivoBadge activo={r.activo} />
+                                                </TableCell>
+
+                                                <TableCell>
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => abrirEditar(r)}
+                                                            disabled={alternandoId === r.id}
+                                                        >
+                                                            Editar
+                                                        </Button>
+
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            disabled={alternandoId === r.id}
+                                                            onClick={() => void alternarEstado(r)}
+                                                        >
+                                                            {r.activo ? "Desactivar" : "Activar"}
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    )}
+                </>
             )}
 
             <Dialog open={abierto} onOpenChange={setAbierto}>
@@ -540,6 +659,15 @@ function SeccionSubprogramas({
     const [erroresCampo, setErroresCampo] = useState<
         Partial<Record<"nombre" | "descripcion" | "areaId", string>>
     >({});
+    const [busqueda, setBusqueda] = useState("");
+    const [estadoFiltro, setEstadoFiltro] = useState<FiltroEstadoActivo>("todos");
+
+    const subprogramasFiltrados = useMemo(
+        () => filtrarSubprogramasCatalogo(subprogramas, busqueda, estadoFiltro),
+        [subprogramas, busqueda, estadoFiltro],
+    );
+
+    const hayFiltrosActivos = busqueda.trim().length > 0 || estadoFiltro !== "todos";
 
     const areasActivas = areasReales.filter((area) => area.activo);
 
@@ -805,77 +933,100 @@ function SeccionSubprogramas({
                     No hay subprocesos registrados.
                 </CardContent>
             ) : (
-                <CardContent className="px-0 pb-0">
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="bg-secondary/60">
-                                <TableHead>Nombre</TableHead>
-                                <TableHead>Área responsable</TableHead>
-                                <TableHead>Descripción</TableHead>
-                                <TableHead>Estado</TableHead>
-                                <TableHead className="text-right">Acciones</TableHead>
-                            </TableRow>
-                        </TableHeader>
+                <>
+                    <BarraFiltrosCatalogo
+                        busqueda={busqueda}
+                        onBusquedaChange={setBusqueda}
+                        estado={estadoFiltro}
+                        onEstadoChange={setEstadoFiltro}
+                        placeholder="Buscar subproceso..."
+                    />
 
-                        <TableBody>
-                            {subprogramas.map((sp) => {
-                                const { icono: Icono, color } =
-                                    obtenerIconoSubProceso(sp.nombre);
+                    {subprogramasFiltrados.length === 0 ? (
+                        <MensajeSinResultadosFiltro />
+                    ) : (
+                        <CardContent className="px-0 pb-0">
+                            {hayFiltrosActivos ? (
+                                <p className="px-6 pb-3 text-xs text-muted-foreground">
+                                    {subprogramasFiltrados.length}{" "}
+                                    {subprogramasFiltrados.length === 1
+                                        ? "resultado"
+                                        : "resultados"}
+                                </p>
+                            ) : null}
 
-                                return (
-                                    <TableRow key={sp.id}>
-                                        <TableCell className="font-medium">
-                                            <div className="flex items-center gap-2">
-                                                <Icono
-                                                    className={`size-4 ${color}`}
-                                                />
-                                                <span>{sp.nombre}</span>
-                                            </div>
-                                        </TableCell>
-
-                                        <TableCell className="text-sm text-muted-foreground">
-                                            {etiquetaArea(sp)}
-                                        </TableCell>
-
-                                        <TableCell className="text-sm text-muted-foreground">
-                                            {sp.descripcion}
-                                        </TableCell>
-
-                                        <TableCell>
-                                            <ActivoBadge activo={sp.activo} />
-                                        </TableCell>
-
-                                        <TableCell>
-                                            <div className="flex justify-end gap-2">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => abrirEditar(sp)}
-                                                    disabled={alternandoId === sp.id}
-                                                >
-                                                    Editar
-                                                </Button>
-
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    disabled={alternandoId === sp.id}
-                                                    onClick={() =>
-                                                        void alternarEstado(sp)
-                                                    }
-                                                >
-                                                    {sp.activo
-                                                        ? "Desactivar"
-                                                        : "Activar"}
-                                                </Button>
-                                            </div>
-                                        </TableCell>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-secondary/60">
+                                        <TableHead>Nombre</TableHead>
+                                        <TableHead>Área responsable</TableHead>
+                                        <TableHead>Descripción</TableHead>
+                                        <TableHead>Estado</TableHead>
+                                        <TableHead className="text-right">Acciones</TableHead>
                                     </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                </CardContent>
+                                </TableHeader>
+
+                                <TableBody>
+                                    {subprogramasFiltrados.map((sp) => {
+                                        const { icono: Icono, color } =
+                                            obtenerIconoSubProceso(sp.nombre);
+
+                                        return (
+                                            <TableRow key={sp.id}>
+                                                <TableCell className="font-medium">
+                                                    <div className="flex items-center gap-2">
+                                                        <Icono
+                                                            className={`size-4 ${color}`}
+                                                        />
+                                                        <span>{sp.nombre}</span>
+                                                    </div>
+                                                </TableCell>
+
+                                                <TableCell className="text-sm text-muted-foreground">
+                                                    {etiquetaArea(sp)}
+                                                </TableCell>
+
+                                                <TableCell className="text-sm text-muted-foreground">
+                                                    {sp.descripcion}
+                                                </TableCell>
+
+                                                <TableCell>
+                                                    <ActivoBadge activo={sp.activo} />
+                                                </TableCell>
+
+                                                <TableCell>
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => abrirEditar(sp)}
+                                                            disabled={alternandoId === sp.id}
+                                                        >
+                                                            Editar
+                                                        </Button>
+
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            disabled={alternandoId === sp.id}
+                                                            onClick={() =>
+                                                                void alternarEstado(sp)
+                                                            }
+                                                        >
+                                                            {sp.activo
+                                                                ? "Desactivar"
+                                                                : "Activar"}
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    )}
+                </>
             )}
 
             <Dialog open={abierto} onOpenChange={setAbierto}>
@@ -998,6 +1149,15 @@ function SeccionTiposDocumento({
     const [erroresCampo, setErroresCampo] = useState<
         Partial<Record<"nombre" | "descripcion", string>>
     >({});
+    const [busqueda, setBusqueda] = useState("");
+    const [estadoFiltro, setEstadoFiltro] = useState<FiltroEstadoActivo>("todos");
+
+    const tiposFiltrados = useMemo(
+        () => filtrarTiposDocumentoCatalogo(tiposDocumento, busqueda, estadoFiltro),
+        [tiposDocumento, busqueda, estadoFiltro],
+    );
+
+    const hayFiltrosActivos = busqueda.trim().length > 0 || estadoFiltro !== "todos";
 
     const notificarTotal = (lista: TipoDocumentoCatalogo[]) => {
         onTotalChange?.(lista.length);
@@ -1179,72 +1339,95 @@ function SeccionTiposDocumento({
                     No hay tipos de documento registrados.
                 </CardContent>
             ) : (
-                <CardContent className="px-0 pb-0">
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="bg-secondary/60">
-                                <TableHead>Nombre</TableHead>
-                                <TableHead>Descripción</TableHead>
-                                <TableHead>Estado</TableHead>
-                                <TableHead className="text-right">Acciones</TableHead>
-                            </TableRow>
-                        </TableHeader>
+                <>
+                    <BarraFiltrosCatalogo
+                        busqueda={busqueda}
+                        onBusquedaChange={setBusqueda}
+                        estado={estadoFiltro}
+                        onEstadoChange={setEstadoFiltro}
+                        placeholder="Buscar tipo de documento..."
+                    />
 
-                        <TableBody>
-                            {tiposDocumento.map((tipo) => {
-                                const { icono: Icono, color } =
-                                    obtenerIconoFormato(tipo.nombre);
+                    {tiposFiltrados.length === 0 ? (
+                        <MensajeSinResultadosFiltro />
+                    ) : (
+                        <CardContent className="px-0 pb-0">
+                            {hayFiltrosActivos ? (
+                                <p className="px-6 pb-3 text-xs text-muted-foreground">
+                                    {tiposFiltrados.length}{" "}
+                                    {tiposFiltrados.length === 1
+                                        ? "resultado"
+                                        : "resultados"}
+                                </p>
+                            ) : null}
 
-                                return (
-                                    <TableRow key={tipo.id}>
-                                        <TableCell className="font-medium">
-                                            <div className="flex items-center gap-2">
-                                                <Icono
-                                                    className={`size-4 ${color}`}
-                                                />
-                                                <span>{tipo.nombre}</span>
-                                            </div>
-                                        </TableCell>
-
-                                        <TableCell className="text-sm text-muted-foreground">
-                                            {tipo.descripcion}
-                                        </TableCell>
-
-                                        <TableCell>
-                                            <ActivoBadge activo={tipo.activo} />
-                                        </TableCell>
-
-                                        <TableCell>
-                                            <div className="flex justify-end gap-2">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => abrirEditar(tipo)}
-                                                    disabled={alternandoId === tipo.id}
-                                                >
-                                                    Editar
-                                                </Button>
-
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    disabled={alternandoId === tipo.id}
-                                                    onClick={() =>
-                                                        void alternarEstado(tipo)
-                                                    }
-                                                >
-                                                    {tipo.activo
-                                                        ? "Desactivar"
-                                                        : "Activar"}
-                                                </Button>
-                                            </div>
-                                        </TableCell>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-secondary/60">
+                                        <TableHead>Nombre</TableHead>
+                                        <TableHead>Descripción</TableHead>
+                                        <TableHead>Estado</TableHead>
+                                        <TableHead className="text-right">Acciones</TableHead>
                                     </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                </CardContent>
+                                </TableHeader>
+
+                                <TableBody>
+                                    {tiposFiltrados.map((tipo) => {
+                                        const { icono: Icono, color } =
+                                            obtenerIconoFormato(tipo.nombre);
+
+                                        return (
+                                            <TableRow key={tipo.id}>
+                                                <TableCell className="font-medium">
+                                                    <div className="flex items-center gap-2">
+                                                        <Icono
+                                                            className={`size-4 ${color}`}
+                                                        />
+                                                        <span>{tipo.nombre}</span>
+                                                    </div>
+                                                </TableCell>
+
+                                                <TableCell className="text-sm text-muted-foreground">
+                                                    {tipo.descripcion}
+                                                </TableCell>
+
+                                                <TableCell>
+                                                    <ActivoBadge activo={tipo.activo} />
+                                                </TableCell>
+
+                                                <TableCell>
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => abrirEditar(tipo)}
+                                                            disabled={alternandoId === tipo.id}
+                                                        >
+                                                            Editar
+                                                        </Button>
+
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            disabled={alternandoId === tipo.id}
+                                                            onClick={() =>
+                                                                void alternarEstado(tipo)
+                                                            }
+                                                        >
+                                                            {tipo.activo
+                                                                ? "Desactivar"
+                                                                : "Activar"}
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    )}
+                </>
             )}
 
             <Dialog open={abierto} onOpenChange={setAbierto}>
