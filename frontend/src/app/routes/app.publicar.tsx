@@ -58,7 +58,7 @@ export const Route = createFileRoute("/app/publicar")({
     component: NuevoDocumentoPage,
 });
 
-const LIMITE_ARCHIVO = 15 * 1024 * 1024;
+const LIMITE_ARCHIVO = 10 * 1024 * 1024;
 
 const SELECT_CONTENT_CLASS =
     "!bg-white !text-slate-900 border border-slate-200 shadow-2xl z-[99999]";
@@ -175,7 +175,7 @@ function validarFormulario(
         errores.archivo = "Debes adjuntar un archivo.";
     } else {
         if (archivo.size > LIMITE_ARCHIVO) {
-            errores.archivo = "El archivo no puede superar los 15 MB.";
+            errores.archivo = "El archivo no puede superar los 10 MB.";
         }
         if (archivo.name.toLowerCase().endsWith(".apk")) {
             errores.archivo = "No se permiten archivos APK.";
@@ -378,9 +378,9 @@ function NuevoDocumentoPage() {
             setArchivo(null);
             setErrores((prev) => ({
                 ...prev,
-                archivo: "El archivo no puede superar los 15 MB.",
+                archivo: "El archivo no puede superar los 10 MB.",
             }));
-            toast.error("El archivo no puede superar los 15 MB.");
+            toast.error("El archivo no puede superar los 10 MB.");
             return;
         }
 
@@ -897,7 +897,7 @@ function NuevoDocumentoPage() {
                                                     Ningún archivo seleccionado
                                                 </span>
                                                 <span className="text-xs text-muted-foreground">
-                                                    Tamaño máximo: 15 MB. No se permiten archivos
+                                                    Tamaño máximo: 10 MB. No se permiten archivos
                                                     APK.
                                                 </span>
                                             </>

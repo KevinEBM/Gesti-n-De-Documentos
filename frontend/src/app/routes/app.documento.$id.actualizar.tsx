@@ -33,7 +33,7 @@ export const Route = createFileRoute("/app/documento/$id/actualizar")({
     component: ActualizarDocumentoPage,
 });
 
-const LIMITE_ARCHIVO = 15 * 1024 * 1024;
+const LIMITE_ARCHIVO = 10 * 1024 * 1024;
 
 function validarFormulario(
     archivo: File | null,
@@ -45,7 +45,7 @@ function validarFormulario(
         errores.archivo = "Debes adjuntar un archivo.";
     } else {
         if (archivo.size > LIMITE_ARCHIVO) {
-            errores.archivo = "El archivo no puede superar los 15 MB.";
+            errores.archivo = "El archivo no puede superar los 10 MB.";
         }
         if (archivo.name.toLowerCase().endsWith(".apk")) {
             errores.archivo = "No se permiten archivos APK.";
@@ -357,7 +357,7 @@ function ActualizarDocumentoPage() {
                                                         Ningún archivo seleccionado
                                                     </span>
                                                     <span className="text-xs text-muted-foreground">
-                                                        Tamaño máximo: 15 MB. No se permiten
+                                                        Tamaño máximo: 10 MB. No se permiten
                                                         archivos APK.
                                                     </span>
                                                 </>

@@ -134,7 +134,7 @@ Descarga histórica **no** restaura versión, no cambia vigente ni estado.
 
 ### Archivos
 
-- Máximo **15 MB** (15 728 640 bytes).
+- Máximo **10 MB** (10 485 760 bytes).
 - Extensión **.apk** rechazada.
 - Almacenamiento local configurable (`STORAGE_LOCATION`, default `uploads`).
 - SHA-256 calculado al guardar; protección path traversal en `StorageServiceImpl`.

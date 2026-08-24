@@ -32,7 +32,7 @@ public class StorageServiceImpl implements StorageService {
 
     public StorageServiceImpl(
             @Value("${storage.location}") String location,
-            @Value("${storage.max-file-size-bytes:15728640}") long maxFileSizeBytes) {
+            @Value("${storage.max-file-size-bytes:10485760}") long maxFileSizeBytes) {
 
         if (location == null || location.isBlank()) {
             throw new IllegalArgumentException("La ubicación de almacenamiento es obligatoria");
