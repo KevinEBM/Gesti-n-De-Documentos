@@ -76,9 +76,9 @@ class StorageServiceImplTest {
         byte[] contenido = "contenido para hash".getBytes(StandardCharsets.UTF_8);
 
         StoredFile resultado = storageServiceImpl.guardar(
-                "hash.txt",
+                "hash.bin",
                 new ByteArrayInputStream(contenido),
-                "text/plain",
+                "application/octet-stream",
                 contenido.length
         );
 
@@ -91,9 +91,9 @@ class StorageServiceImplTest {
     @Test
     void guardar_debeRechazarArchivoVacio() {
         assertThatThrownBy(() -> storageServiceImpl.guardar(
-                "vacio.txt",
+                "vacio.bin",
                 new ByteArrayInputStream(new byte[0]),
-                "text/plain",
+                "application/octet-stream",
                 0))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("El archivo no puede estar vacío")
@@ -105,9 +105,9 @@ class StorageServiceImplTest {
         long tamanoDeclarado = MAX_FILE_SIZE_BYTES + 1;
 
         assertThatThrownBy(() -> storageServiceImpl.guardar(
-                "grande.txt",
+                "grande.bin",
                 new ByteArrayInputStream(new byte[10]),
-                "text/plain",
+                "application/octet-stream",
                 tamanoDeclarado))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("El archivo supera el tamaño máximo permitido")
@@ -120,9 +120,9 @@ class StorageServiceImplTest {
         byte[] contenido = new byte[(int) MAX_FILE_SIZE_BYTES];
 
         StoredFile resultado = storageServiceImpl.guardar(
-                "limite.txt",
+                "limite.bin",
                 new ByteArrayInputStream(contenido),
-                "text/plain",
+                "application/octet-stream",
                 MAX_FILE_SIZE_BYTES
         );
 
@@ -133,9 +133,9 @@ class StorageServiceImplTest {
     void cargar_debeRetornarElContenidoDeUnArchivoExistente() throws Exception {
         byte[] contenido = "contenido a leer".getBytes(StandardCharsets.UTF_8);
         StoredFile guardado = storageServiceImpl.guardar(
-                "lectura.txt",
+                "lectura.pdf",
                 new ByteArrayInputStream(contenido),
-                "text/plain",
+                "application/pdf",
                 contenido.length
         );
 
@@ -149,9 +149,9 @@ class StorageServiceImplTest {
         byte[] contenido = "abc".getBytes(StandardCharsets.UTF_8);
 
         assertThatThrownBy(() -> storageServiceImpl.guardar(
-                "inconsistente.txt",
+                "inconsistente.bin",
                 new ByteArrayInputStream(contenido),
-                "text/plain",
+                "application/octet-stream",
                 contenido.length + 5))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("El tamaño del archivo no coincide con el tamaño declarado")
@@ -168,9 +168,9 @@ class StorageServiceImplTest {
         byte[] contenido = "contenido".getBytes(StandardCharsets.UTF_8);
 
         StoredFile resultado = storageServiceImpl.guardar(
-                "archivo.txt",
+                "archivo.bin",
                 new ByteArrayInputStream(contenido),
-                "text/plain",
+                "application/octet-stream",
                 contenido.length
         );
 
@@ -197,7 +197,7 @@ class StorageServiceImplTest {
         byte[] contenido = "contenido".getBytes(StandardCharsets.UTF_8);
 
         StoredFile resultado = storageServiceImpl.guardar(
-                "archivo.txt",
+                "archivo.bin",
                 new ByteArrayInputStream(contenido),
                 "esto no es un mime",
                 contenido.length
@@ -240,6 +240,24 @@ class StorageServiceImplTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"archivo.txt", "archivo.TXT", "archivo.TxT"})
+    void guardar_debeRechazarArchivoTxtSinImportarMayusculasOMinusculas(String nombreOriginal) throws Exception {
+        assertThatThrownBy(() -> storageServiceImpl.guardar(
+                nombreOriginal,
+                new ByteArrayInputStream("contenido".getBytes(StandardCharsets.UTF_8)),
+                "text/plain",
+                9))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("No se permiten archivos TXT")
+                .satisfies(ex -> assertThat(((BusinessException) ex).getStatus())
+                        .isEqualTo(HttpStatus.BAD_REQUEST));
+
+        try (var archivos = Files.list(directorioTemporal)) {
+            assertThat(archivos).isEmpty();
+        }
+    }
+
     @Test
     void guardar_debeAceptarArchivoConExtensionFinalDistintaAunqueElNombreContengaApk() throws Exception {
         byte[] contenido = "contenido".getBytes(StandardCharsets.UTF_8);
@@ -274,9 +292,9 @@ class StorageServiceImplTest {
     void eliminar_debeEliminarArchivoExistente() throws Exception {
         byte[] contenido = "a borrar".getBytes(StandardCharsets.UTF_8);
         StoredFile guardado = storageServiceImpl.guardar(
-                "borrar.txt",
+                "borrar.bin",
                 new ByteArrayInputStream(contenido),
-                "text/plain",
+                "application/octet-stream",
                 contenido.length
         );
 
@@ -304,9 +322,9 @@ class StorageServiceImplTest {
     void existe_debeRetornarTrueParaArchivoRegularExistente() throws Exception {
         byte[] contenido = "existente".getBytes(StandardCharsets.UTF_8);
         StoredFile guardado = storageServiceImpl.guardar(
-                "existente.txt",
+                "existente.bin",
                 new ByteArrayInputStream(contenido),
-                "text/plain",
+                "application/octet-stream",
                 contenido.length
         );
 
