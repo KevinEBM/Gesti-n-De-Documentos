@@ -1,9 +1,11 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Files, Info, UserRound } from "lucide-react";
+import { useEffect } from "react";
 
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { listarAreas } from "@/lib/areas-api";
 import { etiquetaAreaPrincipal } from "@/lib/auth-storage";
 import { descripcionRolInicio, etiquetaRol } from "@/lib/data";
 import { useIntranet } from "@/lib/store";
@@ -27,7 +29,33 @@ export const Route = createFileRoute("/app/inicio")({
 });
 
 function Inicio() {
-    const { sesion } = useIntranet();
+    const { sesion, sincronizarAreaDesdeCatalogo } = useIntranet();
+
+    useEffect(() => {
+        if (!sesion || sesion.rol === "administrador") {
+            return;
+        }
+
+        let activo = true;
+
+        const refrescarArea = async () => {
+            try {
+                const areas = await listarAreas();
+                if (activo) {
+                    sincronizarAreaDesdeCatalogo(areas);
+                }
+            } catch {
+                // Si falla la API, se conserva el snapshot de sesión existente.
+            }
+        };
+
+        void refrescarArea();
+
+        return () => {
+            activo = false;
+        };
+    }, [sesion, sincronizarAreaDesdeCatalogo]);
+
     if (!sesion) return null;
 
     const nombreSaludo = sesion.nombre.trim() || etiquetaRol[sesion.rol];

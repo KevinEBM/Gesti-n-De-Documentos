@@ -42,6 +42,12 @@ public class TipoDocumentoController {
         return ApiResponse.exitosa(tipoDocumentoService.listar());
     }
 
+    @GetMapping("/consulta")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'JEFE_AREA', 'ADMINISTRATIVO')")
+    public ApiResponse<List<TipoDocumentoResponse>> listarParaConsulta() {
+        return ApiResponse.exitosa(tipoDocumentoService.listar());
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ApiResponse<TipoDocumentoResponse> obtenerPorId(@PathVariable Long id) {

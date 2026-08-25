@@ -18,12 +18,18 @@ import { ApiError } from "@/lib/api";
 import { listarAreas, type AreaCatalogo } from "@/lib/areas-api";
 import {
     construirFiltrosApi,
+    construirFiltrosBaseConsulta,
     dispararDescargaEnNavegador,
     etiquetaCatalogoConsulta,
     etiquetasAlcance,
+    areaConsultaNoAdminBloqueada,
+    filtrarSubprogramasConsulta,
     filtrosVacios,
     formatFechaDocumento,
     hayFiltrosActivos,
+    resolverAreaIdEfectivaConsulta,
+    resolverAreaObligatoriaNoAdmin,
+    subprocesoConsultaDeshabilitado,
     TODOS,
     type FiltrosDocumentos,
 } from "@/lib/documentos-consulta-shared";
@@ -36,7 +42,7 @@ import { obtenerIconoFormato } from "@/lib/iconos-formatos";
 import { obtenerIconoSubProceso } from "@/lib/iconos-subprocesos";
 import { listarSubprogramas, type SubprogramaCatalogo } from "@/lib/subprogramas-api";
 import { useIntranet } from "@/lib/store";
-import { listarTiposDocumento, type TipoDocumentoCatalogo } from "@/lib/tipos-documento-api";
+import { listarTiposDocumentoConsulta, type TipoDocumentoCatalogo } from "@/lib/tipos-documento-api";
 
 export const Route = createFileRoute("/app/documentos")({
     head: () => ({
@@ -53,23 +59,17 @@ export const Route = createFileRoute("/app/documentos")({
     component: Biblioteca,
 });
 
-function construirFiltrosBase(esAdmin: boolean, areasActivas: AreaCatalogo[]): FiltrosDocumentos {
-    if (!esAdmin && areasActivas.length === 1) {
-        return { ...filtrosVacios, area: areasActivas[0].id };
-    }
-    return filtrosVacios;
-}
-
 function opcionesFiltrosApi(esAdmin: boolean) {
     return { incluirAreaEnConsulta: esAdmin };
 }
 
 function Biblioteca() {
     const navigate = useNavigate();
-    const { sesion } = useIntranet();
+    const { sesion, sincronizarAreaDesdeCatalogo } = useIntranet();
     const esAdmin = sesion?.rol === "administrador";
 
     const [areasCatalogo, setAreasCatalogo] = useState<AreaCatalogo[]>([]);
+    const [areasApiCargadas, setAreasApiCargadas] = useState(false);
     const [subprogramasCatalogo, setSubprogramasCatalogo] = useState<SubprogramaCatalogo[]>([]);
     const [tiposCatalogo, setTiposCatalogo] = useState<TipoDocumentoCatalogo[]>([]);
     const [cargandoCatalogos, setCargandoCatalogos] = useState(true);
@@ -91,28 +91,31 @@ function Biblioteca() {
     const [vista, setVista] = useState<"tabla" | "tarjetas">("tabla");
     const [descargandoId, setDescargandoId] = useState<string | null>(null);
 
-    const areasActivas = useMemo(
-        () => areasCatalogo.filter((area) => area.activo),
-        [areasCatalogo],
+    const areaObligatoriaNoAdmin = resolverAreaObligatoriaNoAdmin(
+        esAdmin,
+        areasCatalogo,
+        areasApiCargadas,
+        sesion?.areaId,
+        sesion?.areaPrincipalNombre,
     );
+    const areaFiltroBloqueada = areaConsultaNoAdminBloqueada(esAdmin);
+    const areaIdEfectiva = resolverAreaIdEfectivaConsulta({
+        esAdmin,
+        filtroArea: filtrosFormulario.area,
+        areasUsuario: areasCatalogo,
+        areasApiCargadas,
+        sesionAreaId: sesion?.areaId,
+        sesionAreaNombre: sesion?.areaPrincipalNombre,
+    });
 
-    const areaUnicaPreseleccionada = !esAdmin && areasActivas.length === 1;
-    const areaObligatoriaNoAdmin =
-        areaUnicaPreseleccionada && areasActivas.length === 1 ? areasActivas[0].id : undefined;
-    const areaEfectivaFormulario =
-        filtrosFormulario.area !== TODOS
-            ? filtrosFormulario.area
-            : areaObligatoriaNoAdmin ?? TODOS;
-    const requiereSeleccionArea = areaEfectivaFormulario === TODOS;
-
-    const subprogramasFiltro = useMemo(() => {
-        if (areaEfectivaFormulario === TODOS) {
-            return [];
-        }
-        return subprogramasCatalogo.filter(
-            (item) => item.areaId === areaEfectivaFormulario,
-        );
-    }, [subprogramasCatalogo, areaEfectivaFormulario]);
+    const subprogramasFiltro = useMemo(
+        () =>
+            filtrarSubprogramasConsulta(subprogramasCatalogo, {
+                esAdmin,
+                areaIdEfectiva,
+            }),
+        [subprogramasCatalogo, esAdmin, areaIdEfectiva],
+    );
 
     const opcionesAreasFiltro = useMemo(
         () =>
@@ -160,27 +163,48 @@ function Biblioteca() {
             const [areas, subprogramas, tipos] = await Promise.all([
                 listarAreas(),
                 listarSubprogramas(),
-                listarTiposDocumento(),
+                listarTiposDocumentoConsulta(esAdmin),
             ]);
             setAreasCatalogo(areas);
+            setAreasApiCargadas(true);
             setSubprogramasCatalogo(subprogramas);
             setTiposCatalogo(tipos);
             catalogosCargados.current = true;
+            sincronizarAreaDesdeCatalogo(areas, true);
 
-            const areasActivasCargadas = areas.filter((area) => area.activo);
-            if (!esAdmin && areasActivasCargadas.length === 1) {
-                const areaId = areasActivasCargadas[0].id;
-                setFiltrosFormulario((prev) =>
-                    prev.area === TODOS ? { ...prev, area: areaId, subprograma: TODOS } : prev,
+            if (!esAdmin) {
+                const areaId = resolverAreaObligatoriaNoAdmin(
+                    esAdmin,
+                    areas,
+                    true,
+                    sesion?.areaId,
+                    sesion?.areaPrincipalNombre,
                 );
-                setFiltrosAplicados((prev) =>
-                    prev.area === TODOS ? { ...prev, area: areaId, subprograma: TODOS } : prev,
-                );
+                if (areaId) {
+                    setFiltrosFormulario((prev) =>
+                        prev.area === TODOS || prev.area !== areaId
+                            ? { ...prev, area: areaId, subprograma: TODOS }
+                            : prev,
+                    );
+                    setFiltrosAplicados((prev) =>
+                        prev.area === TODOS || prev.area !== areaId
+                            ? { ...prev, area: areaId, subprograma: TODOS }
+                            : prev,
+                    );
+                } else {
+                    setFiltrosFormulario((prev) =>
+                        prev.area !== TODOS ? { ...prev, area: TODOS, subprograma: TODOS } : prev,
+                    );
+                    setFiltrosAplicados((prev) =>
+                        prev.area !== TODOS ? { ...prev, area: TODOS, subprograma: TODOS } : prev,
+                    );
+                }
             }
 
             return areas;
         } catch (err) {
             catalogosCargados.current = false;
+            setAreasApiCargadas(false);
             const mensaje =
                 err instanceof ApiError
                     ? err.message
@@ -190,7 +214,7 @@ function Biblioteca() {
         } finally {
             setCargandoCatalogos(false);
         }
-    }, [areasCatalogo, errorCatalogos, esAdmin]);
+    }, [areasCatalogo, errorCatalogos, esAdmin, sincronizarAreaDesdeCatalogo, sesion?.areaId, sesion?.areaPrincipalNombre]);
 
     const cargarDocumentos = useCallback(
         async (filtros: FiltrosDocumentos, page: number) => {
@@ -231,8 +255,13 @@ function Biblioteca() {
             const areas = await cargarCatalogos();
             if (!activo) return;
 
-            const areasActivasCargadas = areas.filter((area) => area.activo);
-            const filtrosIniciales = construirFiltrosBase(esAdmin, areasActivasCargadas);
+            const filtrosIniciales = construirFiltrosBaseConsulta(
+                esAdmin,
+                areas,
+                true,
+                sesion?.areaId,
+                sesion?.areaPrincipalNombre,
+            );
             setFiltrosFormulario(filtrosIniciales);
             setFiltrosAplicados(filtrosIniciales);
             await cargarDocumentos(filtrosIniciales, 0);
@@ -271,7 +300,13 @@ function Biblioteca() {
     };
 
     const limpiarFiltros = () => {
-        const base = construirFiltrosBase(esAdmin, areasActivas);
+        const base = construirFiltrosBaseConsulta(
+            esAdmin,
+            areasCatalogo,
+            areasApiCargadas,
+            sesion?.areaId,
+            sesion?.areaPrincipalNombre,
+        );
         setFiltrosFormulario(base);
         setFiltrosAplicados(base);
         setErrorFechas(null);
@@ -566,10 +601,11 @@ function Biblioteca() {
                             onChange={cambiarArea}
                             opciones={opcionesAreasFiltro}
                             tipoFiltro="area"
+                            ocultarTodos={areaFiltroBloqueada}
                             disabled={
                                 cargandoCatalogos ||
                                 !!errorCatalogos ||
-                                areaUnicaPreseleccionada
+                                areaFiltroBloqueada
                             }
                         />
                         <DocumentoFiltroSelect
@@ -580,9 +616,23 @@ function Biblioteca() {
                             }
                             opciones={opcionesSubprogramasFiltro}
                             tipoFiltro="subproceso"
-                            disabled={cargandoCatalogos || !!errorCatalogos || requiereSeleccionArea}
+                            disabled={
+                                cargandoCatalogos ||
+                                !!errorCatalogos ||
+                                subprocesoConsultaDeshabilitado(
+                                    esAdmin,
+                                    areaIdEfectiva,
+                                    cargandoCatalogos,
+                                    errorCatalogos,
+                                )
+                            }
                             placeholder={
-                                requiereSeleccionArea
+                                subprocesoConsultaDeshabilitado(
+                                    esAdmin,
+                                    areaIdEfectiva,
+                                    false,
+                                    null,
+                                )
                                     ? "Seleccione primero un área"
                                     : undefined
                             }

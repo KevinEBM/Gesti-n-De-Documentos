@@ -4,9 +4,14 @@ import {
     clearSession,
     getSession,
     loginResponseToUsuario,
+    patchUsuarioAreaEnSesion,
     saveSession,
     type AuthSession,
 } from "./auth-storage";
+import {
+    resolverAreaPrincipalDesdeCatalogo,
+    type AreaCatalogoConsulta,
+} from "./documentos-consulta-shared";
 import { type Usuario } from "./data";
 
 export interface Permisos {
@@ -23,6 +28,10 @@ interface IntranetContextValue {
     permisos: Permisos;
     iniciarSesion: (correo: string, password: string) => Promise<{ ok: boolean; error?: string }>;
     cerrarSesion: () => void;
+    sincronizarAreaDesdeCatalogo: (
+        areas: AreaCatalogoConsulta[],
+        areasApiCargadas?: boolean,
+    ) => void;
 }
 
 const IntranetContext = createContext<IntranetContextValue | null>(null);
@@ -97,6 +106,39 @@ export function IntranetProvider({ children }: { children: ReactNode }) {
             cerrarSesion: () => {
                 clearSession();
                 setSesion(null);
+            },
+            sincronizarAreaDesdeCatalogo: (areas, areasApiCargadas = true) => {
+                setSesion((actual) => {
+                    if (!actual || actual.rol === "administrador") {
+                        return actual;
+                    }
+
+                    const resuelta = resolverAreaPrincipalDesdeCatalogo(areas, areasApiCargadas);
+
+                    if (!resuelta) {
+                        if (
+                            areasApiCargadas &&
+                            (actual.areaId != null || actual.areaPrincipalNombre != null)
+                        ) {
+                            return patchUsuarioAreaEnSesion(undefined, null) ?? actual;
+                        }
+                        return actual;
+                    }
+
+                    if (
+                        actual.areaId === resuelta.areaId &&
+                        actual.areaPrincipalNombre === resuelta.areaPrincipalNombre
+                    ) {
+                        return actual;
+                    }
+
+                    return (
+                        patchUsuarioAreaEnSesion(
+                            resuelta.areaId,
+                            resuelta.areaPrincipalNombre,
+                        ) ?? actual
+                    );
+                });
             },
         };
     }, [sesion]);
