@@ -16,6 +16,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "documento_area")
@@ -60,10 +61,14 @@ public class DocumentoArea {
         this.esPrincipal = esPrincipal;
     }
 
+    public void registrarFechaAsignacionUtc(LocalDateTime ahoraUtc) {
+        this.fechaAsignacion = ahoraUtc;
+    }
+
     @PrePersist
     protected void alCrear() {
         if (fechaAsignacion == null) {
-            fechaAsignacion = LocalDateTime.now();
+            fechaAsignacion = LocalDateTime.now(ZoneOffset.UTC);
         }
     }
 }

@@ -23,6 +23,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "documentos")
@@ -131,9 +132,18 @@ public class Documento {
         return normalizado.isEmpty() ? null : normalizado;
     }
 
+    public void registrarFechasUtc(LocalDateTime ahoraUtc) {
+        this.fechaCreacion = ahoraUtc;
+        this.fechaActualizacion = ahoraUtc;
+    }
+
+    public void registrarActualizacionUtc(LocalDateTime ahoraUtc) {
+        this.fechaActualizacion = ahoraUtc;
+    }
+
     @PrePersist
     protected void alCrear() {
-        LocalDateTime ahora = LocalDateTime.now();
+        LocalDateTime ahora = LocalDateTime.now(ZoneOffset.UTC);
         if (fechaCreacion == null) {
             fechaCreacion = ahora;
         }
@@ -144,6 +154,8 @@ public class Documento {
 
     @PreUpdate
     protected void alActualizar() {
-        fechaActualizacion = LocalDateTime.now();
+        if (fechaActualizacion == null) {
+            fechaActualizacion = LocalDateTime.now(ZoneOffset.UTC);
+        }
     }
 }

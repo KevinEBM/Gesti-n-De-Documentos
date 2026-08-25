@@ -38,7 +38,7 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -103,7 +103,7 @@ class DashboardControllerSecurityTest {
     private ActividadDocumentalResponse actividadDePrueba() {
         return new ActividadDocumentalResponse(
                 TipoActividad.NUEVA_VERSION, 1L, "PROC-001", "Título de prueba", 2,
-                "Corrección de erratas", LocalDateTime.now(), 9L, "Ana", "Pérez"
+                "Corrección de erratas", Instant.parse("2026-08-25T13:21:57Z"), 9L, "Ana", "Pérez"
         );
     }
 

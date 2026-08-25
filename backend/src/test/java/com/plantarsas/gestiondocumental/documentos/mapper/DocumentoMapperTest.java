@@ -11,10 +11,13 @@ import com.plantarsas.gestiondocumental.shared.enums.DocumentoAlcance;
 import com.plantarsas.gestiondocumental.shared.enums.DocumentoEstado;
 import com.plantarsas.gestiondocumental.subprogramas.entity.Subprograma;
 import com.plantarsas.gestiondocumental.tiposdocumento.entity.TipoDocumento;
+import com.plantarsas.gestiondocumental.shared.time.FechaHoraUtc;
 import com.plantarsas.gestiondocumental.usuarios.entity.Usuario;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -99,9 +102,9 @@ class DocumentoMapperTest {
         assertThat(resultado.tamanoBytes()).isEqualTo(2048L);
         assertThat(resultado.descripcionVersionActual()).isEqualTo("Publicación inicial");
         assertThat(resultado.publicadoPorId()).isEqualTo(50L);
-        assertThat(resultado.fechaPublicacionVersion()).isEqualTo(fechaPublicacionVersion);
-        assertThat(resultado.fechaCreacion()).isEqualTo(fechaCreacion);
-        assertThat(resultado.fechaActualizacion()).isEqualTo(fechaActualizacion);
+        assertThat(resultado.fechaPublicacionVersion()).isEqualTo(FechaHoraUtc.aInstant(fechaPublicacionVersion));
+        assertThat(resultado.fechaCreacion()).isEqualTo(FechaHoraUtc.aInstant(fechaCreacion));
+        assertThat(resultado.fechaActualizacion()).isEqualTo(FechaHoraUtc.aInstant(fechaActualizacion));
         assertThat(resultado.alcance()).isEqualTo(DocumentoAlcance.AREA_RESPONSABLE);
         assertThat(resultado.areasAdicionales()).isEmpty();
     }
@@ -137,6 +140,9 @@ class DocumentoMapperTest {
 
         VersionDocumento version = mock(VersionDocumento.class);
         when(version.getPublicadoPor()).thenReturn(mock(Usuario.class));
+        when(version.getFechaPublicacion()).thenReturn(LocalDateTime.of(2026, 1, 1, 8, 0));
+        when(documento.getFechaCreacion()).thenReturn(LocalDateTime.of(2026, 1, 1, 8, 0));
+        when(documento.getFechaActualizacion()).thenReturn(LocalDateTime.of(2026, 1, 1, 8, 0));
 
         DocumentoResponse resultado = documentoMapper.toResponse(
                 documento,
@@ -172,6 +178,9 @@ class DocumentoMapperTest {
         VersionDocumento version = mock(VersionDocumento.class);
         when(version.getPublicadoPor()).thenReturn(mock(Usuario.class));
         when(version.getDescripcionCambio()).thenReturn("Motivo de la versión vigente");
+        when(version.getFechaPublicacion()).thenReturn(LocalDateTime.of(2026, 1, 1, 8, 0));
+        when(documento.getFechaCreacion()).thenReturn(LocalDateTime.of(2026, 1, 1, 8, 0));
+        when(documento.getFechaActualizacion()).thenReturn(LocalDateTime.of(2026, 1, 1, 8, 0));
 
         DocumentoResponse resultado = documentoMapper.toResponse(
                 documento,
@@ -213,7 +222,7 @@ class DocumentoMapperTest {
         assertThat(resultado.alcance()).isEqualTo(DocumentoAlcance.GLOBAL);
         assertThat(resultado.subprogramaNombre()).isEqualTo("Subprograma de prueba");
         assertThat(resultado.tipoDocumentoNombre()).isEqualTo("Tipo de prueba");
-        assertThat(resultado.fechaActualizacion()).isEqualTo(fechaActualizacion);
+        assertThat(resultado.fechaActualizacion()).isEqualTo(FechaHoraUtc.aInstant(fechaActualizacion));
     }
 
     @Test
@@ -243,7 +252,40 @@ class DocumentoMapperTest {
         assertThat(resultado.descripcionCambio()).isEqualTo("prueba 2 inactiva");
         assertThat(resultado.publicadoPorId()).isEqualTo(50L);
         assertThat(resultado.publicadoPorNombre()).isEqualTo("Test Prueba");
+        assertThat(resultado.fechaPublicacion()).isEqualTo(FechaHoraUtc.aInstant(fechaPublicacion));
         assertThat(resultado.vigente()).isTrue();
+    }
+
+    @Test
+    void toResponse_fechasUtcNaive_seSerializanComoInstantEquivalente() {
+        LocalDateTime almacenado = LocalDateTime.of(2026, 8, 25, 13, 21, 57);
+        Instant esperado = Instant.parse("2026-08-25T13:21:57Z");
+
+        Documento documento = mock(Documento.class);
+        when(documento.getSubprograma()).thenReturn(mock(Subprograma.class));
+        when(documento.getTipoDocumento()).thenReturn(mock(TipoDocumento.class));
+        when(documento.getCreadoPor()).thenReturn(mock(Usuario.class));
+        when(documento.getAlcance()).thenReturn(DocumentoAlcance.AREA_RESPONSABLE);
+        when(documento.getFechaCreacion()).thenReturn(almacenado);
+        when(documento.getFechaActualizacion()).thenReturn(almacenado);
+
+        DocumentoArea documentoArea = mock(DocumentoArea.class);
+        when(documentoArea.getArea()).thenReturn(mock(Area.class));
+
+        VersionDocumento version = mock(VersionDocumento.class);
+        when(version.getPublicadoPor()).thenReturn(mock(Usuario.class));
+        when(version.getFechaPublicacion()).thenReturn(almacenado);
+
+        DocumentoResponse resultado = documentoMapper.toResponse(
+                documento,
+                documentoArea,
+                List.of(),
+                version
+        );
+
+        assertThat(resultado.fechaCreacion()).isEqualTo(esperado);
+        assertThat(resultado.fechaActualizacion()).isEqualTo(esperado);
+        assertThat(resultado.fechaPublicacionVersion()).isEqualTo(esperado);
     }
 
     @Test

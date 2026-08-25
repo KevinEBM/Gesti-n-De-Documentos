@@ -3,6 +3,7 @@ package com.plantarsas.gestiondocumental.dashboard.mapper;
 import com.plantarsas.gestiondocumental.dashboard.dto.ActividadDocumentalResponse;
 import com.plantarsas.gestiondocumental.dashboard.dto.TipoActividad;
 import com.plantarsas.gestiondocumental.documentos.entity.VersionDocumento;
+import com.plantarsas.gestiondocumental.shared.time.FechaHoraUtc;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -20,7 +21,7 @@ public class DashboardMapper {
                 version.getDocumento().getTitulo(),
                 version.getNumeroVersion(),
                 version.getDescripcionCambio(),
-                version.getFechaPublicacion(),
+                FechaHoraUtc.aInstant(version.getFechaPublicacion()),
                 version.getPublicadoPor().getId(),
                 version.getPublicadoPor().getNombres(),
                 version.getPublicadoPor().getApellidos()

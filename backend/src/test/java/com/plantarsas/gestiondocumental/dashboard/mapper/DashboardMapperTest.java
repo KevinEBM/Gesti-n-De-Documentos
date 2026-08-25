@@ -4,10 +4,13 @@ import com.plantarsas.gestiondocumental.dashboard.dto.ActividadDocumentalRespons
 import com.plantarsas.gestiondocumental.dashboard.dto.TipoActividad;
 import com.plantarsas.gestiondocumental.documentos.entity.Documento;
 import com.plantarsas.gestiondocumental.documentos.entity.VersionDocumento;
+import com.plantarsas.gestiondocumental.shared.time.FechaHoraUtc;
 import com.plantarsas.gestiondocumental.usuarios.entity.Usuario;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -25,6 +28,7 @@ class DashboardMapperTest {
         when(version.getNumeroVersion()).thenReturn(1);
         when(version.getDocumento()).thenReturn(documento);
         when(version.getPublicadoPor()).thenReturn(publicadoPor);
+        when(version.getFechaPublicacion()).thenReturn(LocalDateTime.of(2026, 1, 1, 8, 0));
 
         ActividadDocumentalResponse resultado = dashboardMapper.toActividad(version);
 
@@ -39,6 +43,7 @@ class DashboardMapperTest {
         when(version.getNumeroVersion()).thenReturn(2);
         when(version.getDocumento()).thenReturn(documento);
         when(version.getPublicadoPor()).thenReturn(publicadoPor);
+        when(version.getFechaPublicacion()).thenReturn(LocalDateTime.of(2026, 1, 1, 8, 0));
 
         ActividadDocumentalResponse resultado = dashboardMapper.toActividad(version);
 
@@ -74,7 +79,7 @@ class DashboardMapperTest {
         assertThat(resultado.tituloDocumento()).isEqualTo("Título de prueba");
         assertThat(resultado.numeroVersion()).isEqualTo(2);
         assertThat(resultado.descripcionCambio()).isEqualTo("Corrección de erratas");
-        assertThat(resultado.fechaPublicacion()).isEqualTo(fechaPublicacion);
+        assertThat(resultado.fechaPublicacion()).isEqualTo(FechaHoraUtc.aInstant(fechaPublicacion));
         assertThat(resultado.publicadoPorId()).isEqualTo(9L);
         assertThat(resultado.publicadoPorNombres()).isEqualTo("Ana");
         assertThat(resultado.publicadoPorApellidos()).isEqualTo("Pérez");
