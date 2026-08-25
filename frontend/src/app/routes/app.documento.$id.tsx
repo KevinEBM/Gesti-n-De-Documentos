@@ -1,4 +1,6 @@
 import { Link, createFileRoute, useParams } from "@tanstack/react-router";
+import type { Icon } from "@tabler/icons-react";
+import type { LucideIcon } from "lucide-react";
 import { ArrowLeft, Download, History, Pencil, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -16,6 +18,8 @@ import {
     formatFechaDocumento,
 } from "@/lib/documentos-consulta-shared";
 import { obtenerIconoFormato } from "@/lib/iconos-formatos";
+import { obtenerIconoArea } from "@/lib/iconos-areas";
+import { obtenerIconoSubProceso } from "@/lib/iconos-subprocesos";
 import {
     descargarVersionVigente,
     obtenerDocumento,
@@ -162,6 +166,10 @@ function DetalleDocumento() {
     const { icono: IconoTipo, color: colorTipo } = obtenerIconoFormato(
         documento.tipoDocumentoNombre,
     );
+    const { icono: IconoArea, color: colorArea } = obtenerIconoArea(documento.areaNombre);
+    const { icono: IconoSub, color: colorSub } = obtenerIconoSubProceso(
+        documento.subprogramaNombre,
+    );
 
     return (
         <AppShell titulo="Detalle del documento" descripcion={documento.codigo}>
@@ -196,7 +204,12 @@ function DetalleDocumento() {
                         <Separator />
                         <dl className="grid gap-4 sm:grid-cols-2">
                             <Campo k="Código" v={documento.codigo} mono />
-                            <Campo k="Área responsable" v={documento.areaNombre} />
+                            <Campo
+                                k="Área responsable"
+                                v={documento.areaNombre}
+                                icono={IconoArea}
+                                colorIcono={colorArea}
+                            />
                             <Campo
                                 k="Descripción de la publicación"
                                 v={
@@ -205,8 +218,18 @@ function DetalleDocumento() {
                                         : "Sin descripción"
                                 }
                             />
-                            <Campo k="Subproceso" v={documento.subprogramaNombre} />
-                            <Campo k="Tipo de documento" v={documento.tipoDocumentoNombre} />
+                            <Campo
+                                k="Subproceso"
+                                v={documento.subprogramaNombre}
+                                icono={IconoSub}
+                                colorIcono={colorSub}
+                            />
+                            <Campo
+                                k="Tipo de documento"
+                                v={documento.tipoDocumentoNombre}
+                                icono={IconoTipo}
+                                colorIcono={colorTipo}
+                            />
                             <Campo k="Alcance" v={etiquetasAlcance[documento.alcance]} />
                             <Campo
                                 k="Versión vigente"
@@ -318,11 +341,32 @@ function VisibilidadDocumento({ documento }: { documento: DocumentoDetalle }) {
     );
 }
 
-function Campo({ k, v, mono = false }: { k: string; v: string; mono?: boolean }) {
+function Campo({
+    k,
+    v,
+    mono = false,
+    icono: Icono,
+    colorIcono,
+}: {
+    k: string;
+    v: string;
+    mono?: boolean;
+    icono?: LucideIcon | Icon;
+    colorIcono?: string;
+}) {
     return (
         <div>
             <dt className="text-xs uppercase tracking-wide text-muted-foreground">{k}</dt>
-            <dd className={`mt-1 text-sm font-medium break-words ${mono ? "font-mono" : ""}`}>{v}</dd>
+            <dd className={`mt-1 text-sm font-medium break-words ${mono ? "font-mono" : ""}`}>
+                {Icono ? (
+                    <span className="flex items-center gap-1.5">
+                        <Icono className={`size-4 shrink-0 ${colorIcono ?? ""}`} />
+                        <span>{v}</span>
+                    </span>
+                ) : (
+                    v
+                )}
+            </dd>
         </div>
     );
 }
