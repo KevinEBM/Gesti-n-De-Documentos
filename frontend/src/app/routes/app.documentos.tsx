@@ -23,15 +23,18 @@ import {
     etiquetaCatalogoConsulta,
     etiquetasAlcance,
     areaConsultaNoAdminBloqueada,
+    etiquetasAlcanceConsulta,
     filtrarSubprogramasConsulta,
     filtrosVacios,
     formatFechaDocumento,
     hayFiltrosActivos,
+    mostrarFiltroAlcanceConsulta,
     resolverAreaIdEfectivaConsulta,
     resolverAreaObligatoriaNoAdmin,
     subprocesoConsultaDeshabilitado,
     TODOS,
     type FiltrosDocumentos,
+    type AlcanceConsulta,
 } from "@/lib/documentos-consulta-shared";
 import {
     descargarVersionVigente,
@@ -67,6 +70,7 @@ function Biblioteca() {
     const navigate = useNavigate();
     const { sesion, sincronizarAreaDesdeCatalogo } = useIntranet();
     const esAdmin = sesion?.rol === "administrador";
+    const mostrarAlcance = mostrarFiltroAlcanceConsulta(esAdmin);
 
     const [areasCatalogo, setAreasCatalogo] = useState<AreaCatalogo[]>([]);
     const [areasApiCargadas, setAreasApiCargadas] = useState(false);
@@ -142,6 +146,15 @@ function Biblioteca() {
                 l: etiquetaCatalogoConsulta(tipo.nombre, tipo.activo, "masculino"),
             })),
         [tiposCatalogo],
+    );
+
+    const opcionesAlcanceConsulta = useMemo(
+        () =>
+            (Object.keys(etiquetasAlcanceConsulta) as AlcanceConsulta[]).map((valor) => ({
+                v: valor,
+                l: etiquetasAlcanceConsulta[valor],
+            })),
+        [],
     );
 
     const filtrosAplicadosActivos = useMemo(
@@ -647,6 +660,21 @@ function Biblioteca() {
                             tipoFiltro="tipo"
                             disabled={cargandoCatalogos || !!errorCatalogos}
                         />
+                        {mostrarAlcance ? (
+                            <DocumentoFiltroSelect
+                                label="Alcance"
+                                value={filtrosFormulario.alcance}
+                                onChange={(alcance) =>
+                                    setFiltrosFormulario((prev) => ({
+                                        ...prev,
+                                        alcance: alcance as AlcanceConsulta,
+                                    }))
+                                }
+                                opciones={opcionesAlcanceConsulta}
+                                ocultarTodos
+                                disabled={cargandoCatalogos || !!errorCatalogos}
+                            />
+                        ) : null}
                         <DocumentoFiltroSelect
                             label="Estado"
                             value={filtrosFormulario.estado}

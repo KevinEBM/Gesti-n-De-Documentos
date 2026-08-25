@@ -16,6 +16,7 @@ import com.plantarsas.gestiondocumental.documentos.specification.DocumentoSpecif
 import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 import com.plantarsas.gestiondocumental.security.UsuarioAreaAutorizacionService;
+import com.plantarsas.gestiondocumental.shared.enums.AlcanceConsulta;
 import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
 import com.plantarsas.gestiondocumental.storage.StorageService;
 import lombok.RequiredArgsConstructor;
@@ -50,12 +51,37 @@ public class DocumentoConsultaServiceImpl implements DocumentoConsultaService {
         Set<Long> areaIds = obtenerAreaIds(usuarioAutenticado);
 
         Specification<Documento> base = DocumentoSpecifications.visiblePara(usuarioAutenticado.rol(), areaIds);
+        base = aplicarAlcanceConsulta(base, filtro, usuarioAutenticado.rol(), areaIds);
         base = aplicarFiltros(base, filtro);
 
         Specification<Documento> consulta = base.and(DocumentoSpecifications.conRelacionesDeResumen());
 
         return documentoRepository.findAll(consulta, base, pageable)
                 .map(documentoMapper::toResumen);
+    }
+
+    private Specification<Documento> aplicarAlcanceConsulta(
+            Specification<Documento> base,
+            DocumentoFiltroRequest filtro,
+            RolEnum rol,
+            Set<Long> areaIds
+    ) {
+        AlcanceConsulta alcanceConsulta = filtro.alcanceConsulta();
+        if (alcanceConsulta == null || alcanceConsulta == AlcanceConsulta.TODOS_VISIBLES) {
+            return base;
+        }
+        if (rol == RolEnum.ADMINISTRADOR) {
+            return base;
+        }
+
+        return switch (alcanceConsulta) {
+            case GLOBALES -> base.and(DocumentoSpecifications.conAlcanceGlobal());
+            case MI_AREA -> base.and(
+                    DocumentoSpecifications.sinAlcanceGlobal()
+                            .and(DocumentoSpecifications.asociadoAAreas(areaIds))
+            );
+            case TODOS_VISIBLES -> base;
+        };
     }
 
     private Specification<Documento> aplicarFiltros(Specification<Documento> base, DocumentoFiltroRequest filtro) {
