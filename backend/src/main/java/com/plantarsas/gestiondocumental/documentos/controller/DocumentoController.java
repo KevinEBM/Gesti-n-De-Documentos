@@ -15,6 +15,7 @@ import com.plantarsas.gestiondocumental.exception.BusinessException;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 import com.plantarsas.gestiondocumental.shared.dto.ApiResponse;
 import com.plantarsas.gestiondocumental.shared.dto.PageResponse;
+import com.plantarsas.gestiondocumental.shared.enums.AlcanceConsulta;
 import com.plantarsas.gestiondocumental.shared.enums.DocumentoEstado;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -160,13 +161,15 @@ public class DocumentoController {
             @RequestParam(required = false) Long tipoDocumentoId,
             @RequestParam(required = false) DocumentoEstado estado,
             @RequestParam(required = false) LocalDate fechaDesde,
-            @RequestParam(required = false) LocalDate fechaHasta
+            @RequestParam(required = false) LocalDate fechaHasta,
+            @RequestParam(required = false) AlcanceConsulta alcanceConsulta
     ) {
         validarPaginacion(page, size);
         validarFiltros(areaId, subprogramaId, tipoDocumentoId, fechaDesde, fechaHasta);
 
         DocumentoFiltroRequest filtro = new DocumentoFiltroRequest(
-                codigo, titulo, areaId, subprogramaId, tipoDocumentoId, estado, fechaDesde, fechaHasta
+                codigo, titulo, areaId, subprogramaId, tipoDocumentoId, estado, fechaDesde, fechaHasta,
+                alcanceConsulta
         );
 
         Pageable pageable = PageRequest.of(page, size, ORDEN_LISTADO);

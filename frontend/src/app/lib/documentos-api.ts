@@ -133,6 +133,8 @@ export interface DocumentoDetalle {
     areasAdicionales: AreaResumen[];
 }
 
+export type AlcanceConsulta = "TODOS_VISIBLES" | "MI_AREA" | "GLOBALES";
+
 export interface DocumentoFiltros {
     page?: number;
     size?: number;
@@ -144,6 +146,7 @@ export interface DocumentoFiltros {
     estado?: DocumentoEstado;
     fechaDesde?: string;
     fechaHasta?: string;
+    alcanceConsulta?: AlcanceConsulta;
 }
 
 export interface DocumentosPaginados {
@@ -241,6 +244,9 @@ function construirQueryDocumentos(filtros: DocumentoFiltros = {}): string {
     }
     if (filtros.fechaHasta) {
         params.set("fechaHasta", filtros.fechaHasta);
+    }
+    if (filtros.alcanceConsulta) {
+        params.set("alcanceConsulta", filtros.alcanceConsulta);
     }
 
     return params.toString();

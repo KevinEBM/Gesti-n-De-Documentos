@@ -75,8 +75,29 @@ public final class DocumentoSpecifications {
      * predicado es un filtro de búsqueda adicional, compuesto con AND sobre ella.
      */
     public static Specification<Documento> deArea(Long areaId) {
+        return asociadoAAreas(Set.of(areaId));
+    }
+
+    public static Specification<Documento> conAlcanceGlobal() {
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.equal(root.get("alcance"), DocumentoAlcance.GLOBAL);
+    }
+
+    public static Specification<Documento> sinAlcanceGlobal() {
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.notEqual(root.get("alcance"), DocumentoAlcance.GLOBAL);
+    }
+
+    /**
+     * Documento asociado estructuralmente a alguna de las áreas indicadas vía documento_area.
+     * No implica visibilidad por sí solo; se compone con {@link #visiblePara}.
+     */
+    public static Specification<Documento> asociadoAAreas(Set<Long> areaIds) {
+        if (areaIds.isEmpty()) {
+            return (root, query, criteriaBuilder) -> criteriaBuilder.disjunction();
+        }
         return (root, query, criteriaBuilder) -> criteriaBuilder.exists(
-                subconsultaAsociacionConAreas(root, query, criteriaBuilder, Set.of(areaId))
+                subconsultaAsociacionConAreas(root, query, criteriaBuilder, areaIds)
         );
     }
 

@@ -1,5 +1,6 @@
 package com.plantarsas.gestiondocumental.documentos.dto;
 
+import com.plantarsas.gestiondocumental.shared.enums.AlcanceConsulta;
 import com.plantarsas.gestiondocumental.shared.enums.DocumentoEstado;
 
 import java.time.LocalDate;
@@ -12,6 +13,7 @@ public record DocumentoFiltroRequest(
         Long tipoDocumentoId,
         DocumentoEstado estado,
         LocalDate fechaDesde,
-        LocalDate fechaHasta
+        LocalDate fechaHasta,
+        AlcanceConsulta alcanceConsulta
 ) {
 }
