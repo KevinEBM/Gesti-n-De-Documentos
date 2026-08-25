@@ -4,15 +4,17 @@ import { FilePen, Landmark, Notebook, Workflow } from "lucide-react";
 import {
     IconCertificate,
     IconClipboardList,
+    IconFile,
     IconFileChart,
     IconFileDescription,
     IconFileInfo,
     IconFileSettings,
-    IconFileX,
     IconInfoCircle,
     IconListCheck,
     IconMapRoute,
+    IconPhoto,
     IconTemplate,
+    IconWorld,
 } from "@tabler/icons-react";
 
 import { normalizarNombre } from "./normalizar-nombre";
@@ -52,10 +54,10 @@ const ICONOS_TIPOS_DOCUMENTO: Record<string, IconosFormatos> = {
     formato: { icono: FilePen, color: color.piel },
     "ficha tecnica": { icono: IconFileSettings, color: color.metalico },
     diagrama: { icono: IconFileChart, color: color.morado },
-    "otros documentos": { icono: IconFileX, color: color.gris },
-
-    // Extra visual opcional (no pertenece al catálogo institucional de 13)
     plantilla: { icono: IconTemplate, color: color.azul },
+    "otros documentos": { icono: IconFile, color: color.gris },
+    "documentos externos": { icono: IconWorld, color: color.azul },
+    imagenes: { icono: IconPhoto, color: color.verde },
 };
 
 const FALLBACK_TIPO: IconosFormatos = {

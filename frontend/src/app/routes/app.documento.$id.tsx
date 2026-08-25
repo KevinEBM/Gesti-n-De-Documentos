@@ -1,5 +1,5 @@
 import { Link, createFileRoute, useParams } from "@tanstack/react-router";
-import { ArrowLeft, Download, FileText, History, Pencil, Upload } from "lucide-react";
+import { ArrowLeft, Download, History, Pencil, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -15,6 +15,7 @@ import {
     etiquetasAlcance,
     formatFechaDocumento,
 } from "@/lib/documentos-consulta-shared";
+import { obtenerIconoFormato } from "@/lib/iconos-formatos";
 import {
     descargarVersionVigente,
     obtenerDocumento,
@@ -158,6 +159,10 @@ function DetalleDocumento() {
         );
     }
 
+    const { icono: IconoTipo, color: colorTipo } = obtenerIconoFormato(
+        documento.tipoDocumentoNombre,
+    );
+
     return (
         <AppShell titulo="Detalle del documento" descripcion={documento.codigo}>
             <Button asChild variant="ghost" size="sm" className="-ml-2 gap-1.5">
@@ -170,8 +175,8 @@ function DetalleDocumento() {
                 <Card className="lg:col-span-2">
                     <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
                         <div className="flex min-w-0 items-start gap-3">
-                            <div className="flex size-11 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground">
-                                <FileText className="size-5" />
+                            <div className="flex size-11 shrink-0 items-center justify-center rounded-md bg-secondary">
+                                <IconoTipo className={`size-5 ${colorTipo}`} />
                             </div>
                             <div className="min-w-0">
                                 <CardTitle className="text-lg leading-snug break-words">
