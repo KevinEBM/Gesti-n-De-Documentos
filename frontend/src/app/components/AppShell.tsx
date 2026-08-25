@@ -83,9 +83,11 @@ export function AppShell({
 
                     <div className="min-w-0">
                         <p className="truncate text-base font-bold text-black">
-                            Intranet documental
+                            SIG Plantar S.A.S.
                         </p>
-
+                        <p className="truncate text-xs text-black/70">
+                            Sistema Integrado de Gestión
+                        </p>
                     </div>
 
                     <button
