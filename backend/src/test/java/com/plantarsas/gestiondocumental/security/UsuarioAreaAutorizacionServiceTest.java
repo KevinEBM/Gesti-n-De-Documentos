@@ -85,6 +85,16 @@ class UsuarioAreaAutorizacionServiceTest {
     }
 
     @Test
+    void obtenerAreaIdsAutorizadas_conAreaPrincipalInactiva_debeRetornarElIdDeTodasFormas() {
+        UsuarioArea principal = asignacionPrincipalMock(10L);
+        when(usuarioAreaRepository.findByUsuario_Id(USUARIO_ID)).thenReturn(List.of(principal));
+
+        Set<Long> resultado = usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(jefeArea());
+
+        assertThat(resultado).containsExactly(10L);
+    }
+
+    @Test
     void obtenerAreaIdsAutorizadas_conAdministrador_debeRetornarConjuntoVacio() {
         Set<Long> resultado = usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(administrador());
 

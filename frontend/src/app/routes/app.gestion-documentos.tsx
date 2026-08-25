@@ -38,9 +38,11 @@ import {
     dispararDescargaEnNavegador,
     etiquetaCatalogoConsulta,
     etiquetasAlcance,
+    filtrarSubprogramasConsulta,
     filtrosVacios,
     formatFechaDocumento,
     hayFiltrosActivos,
+    resolverAreaIdEfectivaConsulta,
     TODOS,
     type FiltrosDocumentos,
 } from "@/lib/documentos-consulta-shared";
@@ -55,7 +57,7 @@ import { obtenerIconoFormato } from "@/lib/iconos-formatos";
 import { obtenerIconoSubProceso } from "@/lib/iconos-subprocesos";
 import { listarSubprogramas, type SubprogramaCatalogo } from "@/lib/subprogramas-api";
 import { useIntranet } from "@/lib/store";
-import { listarTiposDocumento, type TipoDocumentoCatalogo } from "@/lib/tipos-documento-api";
+import { listarTiposDocumentoConsulta, type TipoDocumentoCatalogo } from "@/lib/tipos-documento-api";
 
 export const Route = createFileRoute("/app/gestion-documentos")({
     head: () => ({
@@ -149,14 +151,20 @@ function GestionDocumentos() {
         null,
     );
 
-    const subprogramasFiltro = useMemo(() => {
-        if (filtrosFormulario.area === TODOS) {
-            return [];
-        }
-        return subprogramasCatalogo.filter(
-            (item) => item.areaId === filtrosFormulario.area,
-        );
-    }, [subprogramasCatalogo, filtrosFormulario.area]);
+    const areaIdEfectiva = resolverAreaIdEfectivaConsulta({
+        esAdmin: true,
+        filtroArea: filtrosFormulario.area,
+        areasUsuario: areasCatalogo,
+    });
+
+    const subprogramasFiltro = useMemo(
+        () =>
+            filtrarSubprogramasConsulta(subprogramasCatalogo, {
+                esAdmin: true,
+                areaIdEfectiva,
+            }),
+        [subprogramasCatalogo, areaIdEfectiva],
+    );
 
     const opcionesAreasFiltro = useMemo(
         () =>
@@ -185,8 +193,6 @@ function GestionDocumentos() {
         [tiposCatalogo],
     );
 
-    const requiereSeleccionArea = filtrosFormulario.area === TODOS;
-
     const filtrosAplicadosActivos = useMemo(
         () => hayFiltrosActivos(filtrosAplicados),
         [filtrosAplicados],
@@ -201,7 +207,7 @@ function GestionDocumentos() {
             const [areas, subprogramas, tipos] = await Promise.all([
                 listarAreas(),
                 listarSubprogramas(),
-                listarTiposDocumento(),
+                listarTiposDocumentoConsulta(true),
             ]);
             setAreasCatalogo(areas);
             setSubprogramasCatalogo(subprogramas);
@@ -602,10 +608,7 @@ function GestionDocumentos() {
                             }
                             opciones={opcionesSubprogramasFiltro}
                             tipoFiltro="subproceso"
-                            disabled={cargandoCatalogos || !!errorCatalogos || requiereSeleccionArea}
-                            placeholder={
-                                requiereSeleccionArea ? "Seleccione primero un área" : undefined
-                            }
+                            disabled={cargandoCatalogos || !!errorCatalogos}
                         />
                         <DocumentoFiltroSelect
                             label="Tipo"

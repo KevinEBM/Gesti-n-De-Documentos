@@ -128,6 +128,194 @@ export function hayFiltrosActivos(
     );
 }
 
+export interface AreaCatalogoConsulta {
+    id: string;
+    nombre: string;
+    activo?: boolean;
+}
+
+export interface SubprogramaCatalogoConsulta {
+    id: string;
+    areaId: string;
+    nombre?: string;
+    activo?: boolean;
+}
+
+export interface ResolverAreaAsignadaOpciones {
+    /** Áreas devueltas por GET /api/areas (solo asignaciones autorizadas/principal en BD). */
+    areasUsuario: AreaCatalogoConsulta[];
+    /** true tras respuesta exitosa de GET /api/areas; false mientras carga o si falló. */
+    areasApiCargadas: boolean;
+    /** Snapshot del login; solo fallback temporal antes de que la API responda. */
+    sesionAreaId?: string;
+    sesionAreaNombre?: string | null;
+}
+
+export interface AreaAsignadaConsulta {
+    areaId: string;
+    nombre: string;
+}
+
+/**
+ * Resuelve el área principal asignada de un no-admin.
+ *
+ * Contrato GET /api/areas para JEFE_AREA/ADMINISTRATIVO:
+ * devuelve las áreas de {@code obtenerAreaIdsAutorizadas} (solo principal/es).
+ * En operación normal hay 0 o 1 elemento; si hay más de uno, no se resuelve.
+ */
+export function resolverAreaAsignadaNoAdmin(
+    opciones: ResolverAreaAsignadaOpciones,
+): AreaAsignadaConsulta | null {
+    const { areasUsuario, areasApiCargadas, sesionAreaId, sesionAreaNombre } = opciones;
+
+    if (areasApiCargadas) {
+        if (areasUsuario.length === 1) {
+            return {
+                areaId: areasUsuario[0].id,
+                nombre: areasUsuario[0].nombre,
+            };
+        }
+        return null;
+    }
+
+    if (sesionAreaId) {
+        const nombre = sesionAreaNombre?.trim();
+        if (nombre) {
+            return { areaId: sesionAreaId, nombre };
+        }
+        return { areaId: sesionAreaId, nombre: sesionAreaId };
+    }
+
+    return null;
+}
+
+export interface ResolverAreaIdEfectivaOpciones {
+    esAdmin: boolean;
+    filtroArea: string;
+    areasUsuario: AreaCatalogoConsulta[];
+    areasApiCargadas: boolean;
+    sesionAreaId?: string;
+    sesionAreaNombre?: string | null;
+}
+
+/** Área usada para filtrar subprocesos en formulario de consulta. */
+export function resolverAreaIdEfectivaConsulta(
+    opciones: ResolverAreaIdEfectivaOpciones,
+): string {
+    const {
+        esAdmin,
+        filtroArea,
+        areasUsuario,
+        areasApiCargadas,
+        sesionAreaId,
+        sesionAreaNombre,
+    } = opciones;
+
+    if (esAdmin) {
+        return filtroArea !== TODOS ? filtroArea : TODOS;
+    }
+
+    const asignada = resolverAreaAsignadaNoAdmin({
+        areasUsuario,
+        areasApiCargadas,
+        sesionAreaId,
+        sesionAreaNombre,
+    });
+    if (asignada) {
+        return asignada.areaId;
+    }
+
+    return TODOS;
+}
+
+export function resolverAreaObligatoriaNoAdmin(
+    esAdmin: boolean,
+    areasUsuario: AreaCatalogoConsulta[],
+    areasApiCargadas: boolean,
+    sesionAreaId?: string,
+    sesionAreaNombre?: string | null,
+): string | undefined {
+    if (esAdmin) {
+        return undefined;
+    }
+    return resolverAreaAsignadaNoAdmin({
+        areasUsuario,
+        areasApiCargadas,
+        sesionAreaId,
+        sesionAreaNombre,
+    })?.areaId;
+}
+
+export function construirFiltrosBaseConsulta(
+    esAdmin: boolean,
+    areasUsuario: AreaCatalogoConsulta[],
+    areasApiCargadas: boolean,
+    sesionAreaId?: string,
+    sesionAreaNombre?: string | null,
+): FiltrosDocumentos {
+    const areaObligatoria = resolverAreaObligatoriaNoAdmin(
+        esAdmin,
+        areasUsuario,
+        areasApiCargadas,
+        sesionAreaId,
+        sesionAreaNombre,
+    );
+    if (areaObligatoria) {
+        return { ...filtrosVacios, area: areaObligatoria };
+    }
+    return filtrosVacios;
+}
+
+/** El selector de Área queda fijo para no-admin (con o sin asignación resuelta). */
+export function areaConsultaNoAdminBloqueada(esAdmin: boolean): boolean {
+    return !esAdmin;
+}
+
+export function resolverAreaPrincipalDesdeCatalogo(
+    areas: AreaCatalogoConsulta[],
+    areasApiCargadas: boolean,
+): { areaId: string; areaPrincipalNombre: string } | null {
+    const asignada = resolverAreaAsignadaNoAdmin({
+        areasUsuario: areas,
+        areasApiCargadas,
+    });
+    if (!asignada) {
+        return null;
+    }
+    return {
+        areaId: asignada.areaId,
+        areaPrincipalNombre: asignada.nombre,
+    };
+}
+
+export function filtrarSubprogramasConsulta(
+    subprogramas: SubprogramaCatalogoConsulta[],
+    opciones: { esAdmin: boolean; areaIdEfectiva: string },
+): SubprogramaCatalogoConsulta[] {
+    if (opciones.esAdmin && opciones.areaIdEfectiva === TODOS) {
+        return subprogramas;
+    }
+    if (opciones.areaIdEfectiva === TODOS) {
+        return [];
+    }
+    return subprogramas.filter((item) => item.areaId === opciones.areaIdEfectiva);
+}
+
+export function subprocesoConsultaDeshabilitado(
+    esAdmin: boolean,
+    areaIdEfectiva: string,
+    cargandoCatalogos: boolean,
+    errorCatalogos: string | null | undefined,
+): boolean {
+    if (cargandoCatalogos || !!errorCatalogos) {
+        return true;
+    }
+    if (esAdmin) {
+        return false;
+    }
+    return areaIdEfectiva === TODOS;
+}
+
 export function construirFiltrosApi(
     filtros: FiltrosDocumentos,
     page: number,

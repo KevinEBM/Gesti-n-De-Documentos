@@ -46,6 +46,25 @@ export function etiquetaAreaPrincipal(usuario: Usuario): string {
     return "Área no disponible";
 }
 
+export function patchUsuarioAreaEnSesion(
+    areaId: string | undefined,
+    areaPrincipalNombre: string | null | undefined,
+): Usuario | null {
+    const session = getSession();
+    if (!session) {
+        return null;
+    }
+
+    const usuarioActualizado: Usuario = {
+        ...session.usuario,
+        areaId,
+        areaPrincipalNombre: areaPrincipalNombre ?? null,
+    };
+
+    saveSession({ ...session, usuario: usuarioActualizado });
+    return usuarioActualizado;
+}
+
 export function saveSession(session: AuthSession): void {
     const storage = getStorage();
     if (!storage) return;

@@ -201,6 +201,37 @@ class TipoDocumentoControllerSecurityTest {
     }
 
     @Test
+    @WithMockUser(roles = "JEFE_AREA")
+    void listar_conJefeArea_debeResponder403() throws Exception {
+        mockMvc.perform(get("/api/tipos-documento"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(tipoDocumentoService);
+    }
+
+    @Test
+    @WithMockUser(roles = "JEFE_AREA")
+    void listarParaConsulta_conJefeArea_debeResponder200() throws Exception {
+        when(tipoDocumentoService.listar()).thenReturn(List.of(respuestaDePrueba(1L)));
+
+        mockMvc.perform(get("/api/tipos-documento/consulta"))
+                .andExpect(status().isOk());
+
+        verify(tipoDocumentoService).listar();
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMINISTRATIVO")
+    void listarParaConsulta_conAdministrativo_debeResponder200() throws Exception {
+        when(tipoDocumentoService.listar()).thenReturn(List.of(respuestaDePrueba(1L)));
+
+        mockMvc.perform(get("/api/tipos-documento/consulta"))
+                .andExpect(status().isOk());
+
+        verify(tipoDocumentoService).listar();
+    }
+
+    @Test
     @WithMockUser(roles = "ADMINISTRADOR")
     void listar_conAdministrador_debeResponder200() throws Exception {
         when(tipoDocumentoService.listar()).thenReturn(List.of(respuestaDePrueba(1L)));

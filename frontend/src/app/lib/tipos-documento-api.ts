@@ -48,6 +48,15 @@ export async function listarTiposDocumento(): Promise<TipoDocumentoCatalogo[]> {
     return datos.map(mapTipoDocumentoResponseDto);
 }
 
+/** Catálogo completo (activos e inactivos) para filtros de consulta documental. */
+export async function listarTiposDocumentoConsulta(
+    esAdmin: boolean,
+): Promise<TipoDocumentoCatalogo[]> {
+    const path = esAdmin ? "/api/tipos-documento" : "/api/tipos-documento/consulta";
+    const datos = await apiFetch<TipoDocumentoResponseDto[]>(path);
+    return datos.map(mapTipoDocumentoResponseDto);
+}
+
 export async function crearTipoDocumento(
     body: TipoDocumentoRequestDto,
 ): Promise<TipoDocumentoCatalogo> {

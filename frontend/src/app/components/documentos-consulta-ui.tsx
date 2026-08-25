@@ -209,6 +209,7 @@ export function DocumentoFiltroSelect({
     disabled = false,
     placeholder,
     todosLabel = "Todos",
+    ocultarTodos = false,
 }: {
     label: string;
     value: string;
@@ -218,6 +219,7 @@ export function DocumentoFiltroSelect({
     disabled?: boolean;
     placeholder?: string;
     todosLabel?: string;
+    ocultarTodos?: boolean;
 }) {
     return (
         <div className="space-y-1.5">
@@ -227,9 +229,11 @@ export function DocumentoFiltroSelect({
                     <SelectValue placeholder={placeholder} />
                 </SelectTrigger>
                 <SelectContent className={SELECT_CONTENT_CLASS}>
-                    <SelectItem value={TODOS} className={SELECT_ITEM_CLASS}>
-                        {todosLabel}
-                    </SelectItem>
+                    {!ocultarTodos ? (
+                        <SelectItem value={TODOS} className={SELECT_ITEM_CLASS}>
+                            {todosLabel}
+                        </SelectItem>
+                    ) : null}
                     {opciones.map((opcion) => {
                         let Icono: ComponentType<{ className?: string }> | undefined;
                         let color: string | undefined;
