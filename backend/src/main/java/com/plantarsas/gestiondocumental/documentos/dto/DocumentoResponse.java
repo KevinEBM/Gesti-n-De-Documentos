@@ -3,7 +3,7 @@ package com.plantarsas.gestiondocumental.documentos.dto;
 import com.plantarsas.gestiondocumental.shared.enums.DocumentoAlcance;
 import com.plantarsas.gestiondocumental.shared.enums.DocumentoEstado;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 public record DocumentoResponse(
@@ -25,9 +25,9 @@ public record DocumentoResponse(
         long tamanoBytes,
         String descripcionVersionActual,
         Long publicadoPorId,
-        LocalDateTime fechaPublicacionVersion,
-        LocalDateTime fechaCreacion,
-        LocalDateTime fechaActualizacion,
+        Instant fechaPublicacionVersion,
+        Instant fechaCreacion,
+        Instant fechaActualizacion,
         DocumentoAlcance alcance,
         List<AreaResumenResponse> areasAdicionales
 ) {

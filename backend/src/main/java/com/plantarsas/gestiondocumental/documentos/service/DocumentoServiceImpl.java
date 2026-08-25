@@ -29,6 +29,7 @@ import com.plantarsas.gestiondocumental.tiposdocumento.entity.TipoDocumento;
 import com.plantarsas.gestiondocumental.tiposdocumento.service.TipoDocumentoLookupService;
 import com.plantarsas.gestiondocumental.usuarios.entity.Usuario;
 import com.plantarsas.gestiondocumental.usuarios.repository.UsuarioRepository;
+import com.plantarsas.gestiondocumental.shared.time.FechaHoraUtc;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -40,6 +41,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -61,6 +64,7 @@ public class DocumentoServiceImpl implements DocumentoService {
     private final UsuarioRepository usuarioRepository;
     private final StorageService storageService;
     private final DocumentoMapper documentoMapper;
+    private final Clock clock;
 
     @Override
     @Transactional
@@ -115,6 +119,8 @@ public class DocumentoServiceImpl implements DocumentoService {
         try {
             registrarCompensacionSiFallaLaTransaccion(archivoGuardado.ruta());
 
+            LocalDateTime ahora = ahoraUtc();
+
             Documento documento = new Documento(
                     codigoNormalizado,
                     request.titulo(),
@@ -124,12 +130,14 @@ public class DocumentoServiceImpl implements DocumentoService {
                     usuario,
                     request.alcance()
             );
+            documento.registrarFechasUtc(ahora);
             documentoRepository.save(documento);
 
             DocumentoArea principal = DocumentoArea.principal(documento, area);
+            principal.registrarFechaAsignacionUtc(ahora);
             documentoAreaRepository.save(principal);
 
-            List<DocumentoArea> asociacionesAdicionales = crearAreasAdicionales(documento, areasAdicionales);
+            List<DocumentoArea> asociacionesAdicionales = crearAreasAdicionales(documento, areasAdicionales, ahora);
 
             VersionDocumento version = new VersionDocumento(
                     documento,
@@ -142,6 +150,7 @@ public class DocumentoServiceImpl implements DocumentoService {
                     request.descripcionVersionInicial().trim(),
                     usuario
             );
+            version.registrarFechaPublicacionUtc(ahora);
             versionDocumentoRepository.save(version);
 
             documentoRepository.flush();
@@ -239,6 +248,7 @@ public class DocumentoServiceImpl implements DocumentoService {
                     request.descripcionCambio().trim(),
                     usuario
             );
+            nuevaVersion.registrarFechaPublicacionUtc(ahoraUtc());
             versionDocumentoRepository.save(nuevaVersion);
 
             versionDocumentoRepository.flush();
@@ -334,6 +344,7 @@ public class DocumentoServiceImpl implements DocumentoService {
                 tipoDocumento,
                 request.alcance()
         );
+        documento.registrarActualizacionUtc(ahoraUtc());
         documentoRepository.save(documento);
 
         sincronizarAsociacionesArea(documento, area, areasAdicionales);
@@ -398,6 +409,7 @@ public class DocumentoServiceImpl implements DocumentoService {
 
         if (estadoActual != estadoSolicitado) {
             documento.cambiarEstado(estadoSolicitado);
+            documento.registrarActualizacionUtc(ahoraUtc());
             documentoRepository.save(documento);
         }
 
@@ -469,12 +481,14 @@ public class DocumentoServiceImpl implements DocumentoService {
         if (!principalActual.getArea().getId().equals(areaPrincipal.getId())) {
             documentoAreaRepository.deleteByDocumento_IdAndEsPrincipalTrue(documentoId);
             documentoAreaRepository.flush();
-            documentoAreaRepository.save(DocumentoArea.principal(documento, areaPrincipal));
+            DocumentoArea nuevaPrincipal = DocumentoArea.principal(documento, areaPrincipal);
+            nuevaPrincipal.registrarFechaAsignacionUtc(ahoraUtc());
+            documentoAreaRepository.save(nuevaPrincipal);
         }
 
         documentoAreaRepository.deleteAllByDocumento_IdAndEsPrincipalFalse(documentoId);
         documentoAreaRepository.flush();
-        crearAreasAdicionales(documento, areasAdicionales);
+        crearAreasAdicionales(documento, areasAdicionales, ahoraUtc());
     }
 
     private List<Area> resolverAreasAdicionales(
@@ -563,12 +577,23 @@ public class DocumentoServiceImpl implements DocumentoService {
         }
     }
 
-    private List<DocumentoArea> crearAreasAdicionales(Documento documento, List<Area> areasAdicionales) {
+    private List<DocumentoArea> crearAreasAdicionales(
+            Documento documento,
+            List<Area> areasAdicionales,
+            LocalDateTime ahoraUtc
+    ) {
         List<DocumentoArea> asociaciones = areasAdicionales.stream()
                 .map(areaAdicional -> DocumentoArea.adicional(documento, areaAdicional))
                 .toList();
-        asociaciones.forEach(documentoAreaRepository::save);
+        asociaciones.forEach(asociacion -> {
+            asociacion.registrarFechaAsignacionUtc(ahoraUtc);
+            documentoAreaRepository.save(asociacion);
+        });
         return asociaciones;
+    }
+
+    private LocalDateTime ahoraUtc() {
+        return FechaHoraUtc.ahoraDesde(clock);
     }
 
     private void registrarCompensacionSiFallaLaTransaccion(String ruta) {

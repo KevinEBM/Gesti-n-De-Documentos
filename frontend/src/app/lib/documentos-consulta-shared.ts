@@ -105,6 +105,7 @@ export function formatFechaDocumento(fecha: string): string {
         return new Intl.DateTimeFormat("es-CO", {
             dateStyle: "medium",
             timeStyle: "short",
+            timeZone: "America/Bogota",
         }).format(new Date(fecha));
     } catch {
         return fecha;

@@ -8,6 +8,7 @@ import com.plantarsas.gestiondocumental.documentos.entity.Documento;
 import com.plantarsas.gestiondocumental.documentos.entity.DocumentoArea;
 import com.plantarsas.gestiondocumental.documentos.entity.VersionDocumento;
 import com.plantarsas.gestiondocumental.usuarios.entity.Usuario;
+import com.plantarsas.gestiondocumental.shared.time.FechaHoraUtc;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -40,9 +41,9 @@ public class DocumentoMapper {
                 versionActual.getTamanoBytes(),
                 versionActual.getDescripcionCambio(),
                 versionActual.getPublicadoPor().getId(),
-                versionActual.getFechaPublicacion(),
-                documento.getFechaCreacion(),
-                documento.getFechaActualizacion(),
+                FechaHoraUtc.aInstant(versionActual.getFechaPublicacion()),
+                FechaHoraUtc.aInstant(documento.getFechaCreacion()),
+                FechaHoraUtc.aInstant(documento.getFechaActualizacion()),
                 documento.getAlcance(),
                 documentoAreasAdicionales.stream()
                         .map(documentoArea -> new AreaResumenResponse(
@@ -62,7 +63,7 @@ public class DocumentoMapper {
                 documento.getAlcance(),
                 documento.getSubprograma().getNombre(),
                 documento.getTipoDocumento().getNombre(),
-                documento.getFechaActualizacion()
+                FechaHoraUtc.aInstant(documento.getFechaActualizacion())
         );
     }
 
@@ -75,7 +76,7 @@ public class DocumentoMapper {
                 version.getTipoMime(),
                 version.getTamanoBytes(),
                 version.getDescripcionCambio(),
-                version.getFechaPublicacion(),
+                FechaHoraUtc.aInstant(version.getFechaPublicacion()),
                 publicadoPor != null ? publicadoPor.getId() : null,
                 nombrePublicador(publicadoPor),
                 version.isVigente()

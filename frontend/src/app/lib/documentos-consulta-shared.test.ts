@@ -6,6 +6,7 @@ import {
     construirFiltrosBaseConsulta,
     etiquetaCatalogoConsulta,
     filtrarSubprogramasConsulta,
+    formatFechaDocumento,
     resolverAreaAsignadaNoAdmin,
     resolverAreaIdEfectivaConsulta,
     resolverAreaObligatoriaNoAdmin,
@@ -214,6 +215,19 @@ describe("construirFiltrosBaseConsulta", () => {
         expect(
             construirFiltrosBaseConsulta(false, [], true, "2", "Calidad"),
         ).toEqual(expect.objectContaining({ area: TODOS, soloGlobales: false }));
+    });
+});
+
+describe("formatFechaDocumento", () => {
+    it("2026-08-25T13:21:57Z se muestra como 08:21 en Bogotá", () => {
+        const formateado = formatFechaDocumento("2026-08-25T13:21:57Z");
+        expect(formateado).toContain("25");
+        expect(formateado).toMatch(/8:21|08:21/);
+    });
+
+    it("instante nocturno UTC pertenece al día anterior en Bogotá", () => {
+        const formateado = formatFechaDocumento("2026-08-26T03:00:00Z");
+        expect(formateado).toContain("25");
     });
 });
 

@@ -103,6 +103,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -320,7 +321,7 @@ class DocumentoControllerSecurityTest {
     }
 
     private DocumentoResponse respuestaDePrueba() {
-        LocalDateTime ahora = LocalDateTime.now();
+        Instant ahora = Instant.parse("2026-08-25T13:21:57Z");
         return new DocumentoResponse(
                 1L, "PROC-001", "Titulo", "Descripcion", DocumentoEstado.PUBLICADO,
                 1L, "Area", 2L, "Subprograma", 3L, "TipoDocumento",
@@ -333,7 +334,7 @@ class DocumentoControllerSecurityTest {
     private DocumentoResumenResponse resumenDePrueba() {
         return new DocumentoResumenResponse(
                 1L, "PROC-001", "Titulo", DocumentoEstado.PUBLICADO, DocumentoAlcance.AREA_RESPONSABLE,
-                "Subprograma", "TipoDocumento", LocalDateTime.now()
+                "Subprograma", "TipoDocumento", Instant.parse("2026-08-25T13:21:57Z")
         );
     }
 
@@ -352,7 +353,7 @@ class DocumentoControllerSecurityTest {
     private VersionHistoricaResponse versionHistoricaDePrueba() {
         return new VersionHistoricaResponse(
                 2L, 2, "informe-v2.pdf", "application/pdf", 9L,
-                "Corrección de erratas", LocalDateTime.now(), 1L, "Administrador Local", true
+                "Corrección de erratas", Instant.parse("2026-08-25T13:21:57Z"), 1L, "Administrador Local", true
         );
     }
 

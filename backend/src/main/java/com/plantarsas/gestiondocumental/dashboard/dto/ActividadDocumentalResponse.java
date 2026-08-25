@@ -1,6 +1,6 @@
 package com.plantarsas.gestiondocumental.dashboard.dto;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record ActividadDocumentalResponse(
         TipoActividad tipoActividad,
@@ -9,7 +9,7 @@ public record ActividadDocumentalResponse(
         String tituloDocumento,
         int numeroVersion,
         String descripcionCambio,
-        LocalDateTime fechaPublicacion,
+        Instant fechaPublicacion,
         Long publicadoPorId,
         String publicadoPorNombres,
         String publicadoPorApellidos

@@ -1,6 +1,6 @@
 package com.plantarsas.gestiondocumental.documentos.dto;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record VersionHistoricaResponse(
         Long id,
@@ -9,7 +9,7 @@ public record VersionHistoricaResponse(
         String tipoMime,
         long tamanoBytes,
         String descripcionCambio,
-        LocalDateTime fechaPublicacion,
+        Instant fechaPublicacion,
         Long publicadoPorId,
         String publicadoPorNombre,
         boolean vigente

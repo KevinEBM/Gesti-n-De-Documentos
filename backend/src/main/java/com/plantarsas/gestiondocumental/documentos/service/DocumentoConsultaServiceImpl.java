@@ -18,6 +18,7 @@ import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 import com.plantarsas.gestiondocumental.security.UsuarioAreaAutorizacionService;
 import com.plantarsas.gestiondocumental.shared.enums.AlcanceConsulta;
 import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
+import com.plantarsas.gestiondocumental.shared.time.FechaHoraUtc;
 import com.plantarsas.gestiondocumental.storage.StorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -107,11 +108,15 @@ public class DocumentoConsultaServiceImpl implements DocumentoConsultaService {
             resultado = resultado.and(DocumentoSpecifications.conEstado(filtro.estado()));
         }
         if (filtro.fechaDesde() != null) {
-            resultado = resultado.and(DocumentoSpecifications.creadoDesde(filtro.fechaDesde().atStartOfDay()));
+            resultado = resultado.and(DocumentoSpecifications.creadoDesde(
+                    FechaHoraUtc.inicioDiaPresentacionEnAlmacenamiento(filtro.fechaDesde())
+            ));
         }
         if (filtro.fechaHasta() != null) {
             resultado = resultado.and(
-                    DocumentoSpecifications.creadoAntesDe(filtro.fechaHasta().plusDays(1).atStartOfDay())
+                    DocumentoSpecifications.creadoAntesDe(
+                            FechaHoraUtc.inicioDiaSiguientePresentacionEnAlmacenamiento(filtro.fechaHasta())
+                    )
             );
         }
 

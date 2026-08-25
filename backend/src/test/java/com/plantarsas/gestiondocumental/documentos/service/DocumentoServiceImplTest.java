@@ -44,6 +44,10 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -80,6 +84,7 @@ class DocumentoServiceImplTest {
     private static final Long AREA_ADICIONAL_1_ID = 101L;
     private static final Long AREA_ADICIONAL_2_ID = 102L;
     private static final Long AREA_ADICIONAL_3_ID = 103L;
+    private static final Instant INSTANTE_FIJO = Instant.parse("2026-08-25T13:21:57Z");
 
     @Mock
     private DocumentoRepository documentoRepository;
@@ -109,9 +114,11 @@ class DocumentoServiceImplTest {
     private DocumentoMapper documentoMapper;
 
     private DocumentoServiceImpl documentoServiceImpl;
+    private Clock clock;
 
     @BeforeEach
     void inicializar() {
+        clock = Clock.fixed(INSTANTE_FIJO, ZoneOffset.UTC);
         documentoServiceImpl = new DocumentoServiceImpl(
                 documentoRepository,
                 documentoAreaRepository,
@@ -121,7 +128,8 @@ class DocumentoServiceImplTest {
                 tipoDocumentoLookupService,
                 usuarioRepository,
                 storageService,
-                documentoMapper
+                documentoMapper,
+                clock
         );
     }
 
@@ -679,15 +687,23 @@ class DocumentoServiceImplTest {
         ArgumentCaptor<Documento> documentoCaptor = ArgumentCaptor.forClass(Documento.class);
         verify(documentoRepository).save(documentoCaptor.capture());
         assertThat(documentoCaptor.getValue().getEstado()).isEqualTo(DocumentoEstado.PUBLICADO);
+        assertThat(documentoCaptor.getValue().getFechaCreacion())
+                .isEqualTo(LocalDateTime.of(2026, 8, 25, 13, 21, 57));
+        assertThat(documentoCaptor.getValue().getFechaActualizacion())
+                .isEqualTo(LocalDateTime.of(2026, 8, 25, 13, 21, 57));
 
         ArgumentCaptor<DocumentoArea> documentoAreaCaptor = ArgumentCaptor.forClass(DocumentoArea.class);
         verify(documentoAreaRepository).save(documentoAreaCaptor.capture());
         assertThat(documentoAreaCaptor.getValue().isEsPrincipal()).isTrue();
+        assertThat(documentoAreaCaptor.getValue().getFechaAsignacion())
+                .isEqualTo(LocalDateTime.of(2026, 8, 25, 13, 21, 57));
 
         ArgumentCaptor<VersionDocumento> versionCaptor = ArgumentCaptor.forClass(VersionDocumento.class);
         verify(versionDocumentoRepository).save(versionCaptor.capture());
         assertThat(versionCaptor.getValue().getNumeroVersion()).isEqualTo(1);
         assertThat(versionCaptor.getValue().isVigente()).isTrue();
+        assertThat(versionCaptor.getValue().getFechaPublicacion())
+                .isEqualTo(LocalDateTime.of(2026, 8, 25, 13, 21, 57));
     }
 
     @Test
@@ -1071,6 +1087,30 @@ class DocumentoServiceImplTest {
         assertThat(versionCaptor.getValue().isVigente()).isTrue();
         assertThat(vigenteActual.isVigente()).isFalse();
         verify(versionDocumentoRepository, times(2)).flush();
+    }
+
+    @Test
+    void publicarNuevaVersion_noDebeModificarFechaActualizacionDocumento() throws IOException {
+        Documento documento = documentoPublicadoDePrueba();
+        documento.registrarActualizacionUtc(LocalDateTime.of(2026, 8, 20, 15, 0));
+        DocumentoArea documentoArea = documentoAreaDePrueba(documento);
+        VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
+        Usuario usuarioPersistido = usuarioPersistidoMock();
+        stubBusquedasPreviasNuevaVersion(documento, documentoArea, vigenteActual, usuarioPersistido);
+        stubAlmacenamientoYPersistenciaExitosaNuevaVersion(3);
+
+        documentoServiceImpl.publicarNuevaVersion(
+                DOCUMENTO_ID, requestNuevaVersionValido(), usuarioAdministrador(),
+                "v2.pdf", contenidoDePrueba(), "application/pdf", 20L
+        );
+
+        ArgumentCaptor<VersionDocumento> versionCaptor = ArgumentCaptor.forClass(VersionDocumento.class);
+        verify(versionDocumentoRepository).save(versionCaptor.capture());
+        assertThat(versionCaptor.getValue().getFechaPublicacion())
+                .isEqualTo(LocalDateTime.of(2026, 8, 25, 13, 21, 57));
+        assertThat(documento.getFechaActualizacion())
+                .isEqualTo(LocalDateTime.of(2026, 8, 20, 15, 0));
+        verify(documentoRepository, never()).save(any(Documento.class));
     }
 
     @Test
@@ -1831,6 +1871,8 @@ class DocumentoServiceImplTest {
         );
 
         assertThat(documento.getTitulo()).isEqualTo("Título actualizado");
+        assertThat(documento.getFechaActualizacion())
+                .isEqualTo(LocalDateTime.of(2026, 8, 25, 13, 21, 57));
         verify(documentoRepository).save(documento);
         verify(documentoAreaRepository).deleteAllByDocumento_IdAndEsPrincipalFalse(DOCUMENTO_ID);
         verify(versionDocumentoRepository, never()).save(any(VersionDocumento.class));

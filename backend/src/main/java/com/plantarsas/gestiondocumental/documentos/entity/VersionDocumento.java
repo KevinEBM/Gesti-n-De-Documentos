@@ -16,6 +16,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "versiones_documento")
@@ -89,10 +90,14 @@ public class VersionDocumento {
         this.vigente = false;
     }
 
+    public void registrarFechaPublicacionUtc(LocalDateTime ahoraUtc) {
+        this.fechaPublicacion = ahoraUtc;
+    }
+
     @PrePersist
     protected void alCrear() {
         if (fechaPublicacion == null) {
-            fechaPublicacion = LocalDateTime.now();
+            fechaPublicacion = LocalDateTime.now(ZoneOffset.UTC);
         }
     }
 }
