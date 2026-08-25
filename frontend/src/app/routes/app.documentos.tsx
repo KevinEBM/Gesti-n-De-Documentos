@@ -11,6 +11,7 @@ import {
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -23,18 +24,15 @@ import {
     etiquetaCatalogoConsulta,
     etiquetasAlcance,
     areaConsultaNoAdminBloqueada,
-    etiquetasAlcanceConsulta,
     filtrarSubprogramasConsulta,
     filtrosVacios,
     formatFechaDocumento,
     hayFiltrosActivos,
-    mostrarFiltroAlcanceConsulta,
     resolverAreaIdEfectivaConsulta,
     resolverAreaObligatoriaNoAdmin,
     subprocesoConsultaDeshabilitado,
     TODOS,
     type FiltrosDocumentos,
-    type AlcanceConsulta,
 } from "@/lib/documentos-consulta-shared";
 import {
     descargarVersionVigente,
@@ -70,7 +68,6 @@ function Biblioteca() {
     const navigate = useNavigate();
     const { sesion, sincronizarAreaDesdeCatalogo } = useIntranet();
     const esAdmin = sesion?.rol === "administrador";
-    const mostrarAlcance = mostrarFiltroAlcanceConsulta(esAdmin);
 
     const [areasCatalogo, setAreasCatalogo] = useState<AreaCatalogo[]>([]);
     const [areasApiCargadas, setAreasApiCargadas] = useState(false);
@@ -146,15 +143,6 @@ function Biblioteca() {
                 l: etiquetaCatalogoConsulta(tipo.nombre, tipo.activo, "masculino"),
             })),
         [tiposCatalogo],
-    );
-
-    const opcionesAlcanceConsulta = useMemo(
-        () =>
-            (Object.keys(etiquetasAlcanceConsulta) as AlcanceConsulta[]).map((valor) => ({
-                v: valor,
-                l: etiquetasAlcanceConsulta[valor],
-            })),
-        [],
     );
 
     const filtrosAplicadosActivos = useMemo(
@@ -660,21 +648,6 @@ function Biblioteca() {
                             tipoFiltro="tipo"
                             disabled={cargandoCatalogos || !!errorCatalogos}
                         />
-                        {mostrarAlcance ? (
-                            <DocumentoFiltroSelect
-                                label="Alcance"
-                                value={filtrosFormulario.alcance}
-                                onChange={(alcance) =>
-                                    setFiltrosFormulario((prev) => ({
-                                        ...prev,
-                                        alcance: alcance as AlcanceConsulta,
-                                    }))
-                                }
-                                opciones={opcionesAlcanceConsulta}
-                                ocultarTodos
-                                disabled={cargandoCatalogos || !!errorCatalogos}
-                            />
-                        ) : null}
                         <DocumentoFiltroSelect
                             label="Estado"
                             value={filtrosFormulario.estado}
@@ -715,13 +688,28 @@ function Biblioteca() {
                         <p className="text-sm text-destructive">{errorFechas}</p>
                     ) : null}
 
-                    <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={limpiarFiltros} className="gap-1.5">
-                            <X className="size-4" /> Limpiar filtros
-                        </Button>
-                        <Button size="sm" onClick={aplicarFiltros} className="gap-1.5">
-                            <Search className="size-4" /> Buscar
-                        </Button>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                            <Checkbox
+                                checked={filtrosFormulario.soloGlobales}
+                                onCheckedChange={(checked) =>
+                                    setFiltrosFormulario((prev) => ({
+                                        ...prev,
+                                        soloGlobales: checked === true,
+                                    }))
+                                }
+                                disabled={cargandoCatalogos || !!errorCatalogos}
+                            />
+                            Solo globales
+                        </label>
+                        <div className="flex gap-2">
+                            <Button variant="ghost" size="sm" onClick={limpiarFiltros} className="gap-1.5">
+                                <X className="size-4" /> Limpiar filtros
+                            </Button>
+                            <Button size="sm" onClick={aplicarFiltros} className="gap-1.5">
+                                <Search className="size-4" /> Buscar
+                            </Button>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

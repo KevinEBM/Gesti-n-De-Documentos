@@ -895,6 +895,35 @@ class DocumentoConsultaServiceImplTest {
     }
 
     @Test
+    void listar_conAlcanceGlobalesParaAdministrador_debeAplicarloSinLanzarExcepcion() {
+        Pageable pageable = PageRequest.of(0, 20);
+        when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        DocumentoFiltroRequest filtro = new DocumentoFiltroRequest(
+                null, null, null, null, null, null, null, null, AlcanceConsulta.GLOBALES
+        );
+
+        assertThatCode(() -> documentoConsultaServiceImpl.listar(administrador(), filtro, pageable))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void listar_conAlcanceGlobalesParaAdministrativo_debeAplicarloSinLanzarExcepcion() {
+        Pageable pageable = PageRequest.of(0, 20);
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of(10L));
+        when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        DocumentoFiltroRequest filtro = new DocumentoFiltroRequest(
+                null, null, null, null, null, null, null, null, AlcanceConsulta.GLOBALES
+        );
+
+        assertThatCode(() -> documentoConsultaServiceImpl.listar(administrativo(), filtro, pageable))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void listar_conAlcanceMiAreaParaAdministrador_debeIgnorarFiltroDeAlcance() {
         Pageable pageable = PageRequest.of(0, 20);
         when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
