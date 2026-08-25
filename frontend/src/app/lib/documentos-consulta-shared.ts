@@ -20,16 +20,6 @@ export const SELECT_TRIGGER_CLASS = "w-full !bg-white !text-slate-900";
 export const SELECT_ITEM_CLASS =
     "!text-slate-900 focus:!bg-slate-100 focus:!text-slate-900 data-[highlighted]:!bg-slate-100 data-[highlighted]:!text-slate-900";
 
-export type AlcanceConsulta = "TODOS_VISIBLES" | "MI_AREA" | "GLOBALES";
-
-export const ALCANCE_CONSULTA_TODOS: AlcanceConsulta = "TODOS_VISIBLES";
-
-export const etiquetasAlcanceConsulta: Record<AlcanceConsulta, string> = {
-    TODOS_VISIBLES: "Todos los visibles",
-    MI_AREA: "Mi área",
-    GLOBALES: "Globales",
-};
-
 export interface FiltrosDocumentos {
     codigo: string;
     titulo: string;
@@ -37,7 +27,7 @@ export interface FiltrosDocumentos {
     subprograma: string;
     tipo: string;
     estado: string;
-    alcance: AlcanceConsulta;
+    soloGlobales: boolean;
     fechaDesde: string;
     fechaHasta: string;
 }
@@ -49,7 +39,7 @@ export const filtrosVacios: FiltrosDocumentos = {
     subprograma: TODOS,
     tipo: TODOS,
     estado: TODOS,
-    alcance: ALCANCE_CONSULTA_TODOS,
+    soloGlobales: false,
     fechaDesde: "",
     fechaHasta: "",
 };
@@ -135,7 +125,7 @@ export function hayFiltrosActivos(
         filtros.subprograma !== TODOS ||
         filtros.tipo !== TODOS ||
         filtros.estado !== TODOS ||
-        filtros.alcance !== ALCANCE_CONSULTA_TODOS ||
+        filtros.soloGlobales ||
         !!filtros.fechaDesde ||
         !!filtros.fechaHasta
     );
@@ -329,10 +319,6 @@ export function subprocesoConsultaDeshabilitado(
     return areaIdEfectiva === TODOS;
 }
 
-export function mostrarFiltroAlcanceConsulta(esAdmin: boolean): boolean {
-    return !esAdmin;
-}
-
 export function construirFiltrosApi(
     filtros: FiltrosDocumentos,
     page: number,
@@ -352,8 +338,8 @@ export function construirFiltrosApi(
     if (filtros.estado !== TODOS) api.estado = filtros.estado as DocumentoEstado;
     if (filtros.fechaDesde) api.fechaDesde = filtros.fechaDesde;
     if (filtros.fechaHasta) api.fechaHasta = filtros.fechaHasta;
-    if (filtros.alcance !== ALCANCE_CONSULTA_TODOS) {
-        api.alcanceConsulta = filtros.alcance;
+    if (filtros.soloGlobales) {
+        api.alcanceConsulta = "GLOBALES";
     }
 
     return api;

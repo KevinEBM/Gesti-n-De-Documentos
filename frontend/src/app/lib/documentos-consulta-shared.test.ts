@@ -2,12 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
     areaConsultaNoAdminBloqueada,
-    ALCANCE_CONSULTA_TODOS,
     construirFiltrosApi,
     construirFiltrosBaseConsulta,
     etiquetaCatalogoConsulta,
     filtrarSubprogramasConsulta,
-    mostrarFiltroAlcanceConsulta,
     resolverAreaAsignadaNoAdmin,
     resolverAreaIdEfectivaConsulta,
     resolverAreaObligatoriaNoAdmin,
@@ -215,21 +213,11 @@ describe("construirFiltrosBaseConsulta", () => {
     it("JEFE con API [] no preselecciona área stale de sesión", () => {
         expect(
             construirFiltrosBaseConsulta(false, [], true, "2", "Calidad"),
-        ).toEqual(expect.objectContaining({ area: TODOS, alcance: ALCANCE_CONSULTA_TODOS }));
+        ).toEqual(expect.objectContaining({ area: TODOS, soloGlobales: false }));
     });
 });
 
-describe("mostrarFiltroAlcanceConsulta", () => {
-    it("JEFE y ADMINISTRATIVO ven el filtro Alcance", () => {
-        expect(mostrarFiltroAlcanceConsulta(false)).toBe(true);
-    });
-
-    it("ADMIN no ve el filtro Alcance", () => {
-        expect(mostrarFiltroAlcanceConsulta(true)).toBe(false);
-    });
-});
-
-describe("construirFiltrosApi — alcance", () => {
+describe("construirFiltrosApi — solo globales", () => {
     const filtrosBase = {
         codigo: "",
         titulo: "",
@@ -237,54 +225,34 @@ describe("construirFiltrosApi — alcance", () => {
         subprograma: TODOS,
         tipo: TODOS,
         estado: TODOS,
-        alcance: ALCANCE_CONSULTA_TODOS,
+        soloGlobales: false,
         fechaDesde: "",
         fechaHasta: "",
     };
 
-    it("Todos los visibles omite alcanceConsulta en la API", () => {
+    it("casilla desmarcada no agrega alcanceConsulta", () => {
         expect(construirFiltrosApi(filtrosBase, 0, { incluirAreaEnConsulta: false })).not.toHaveProperty(
             "alcanceConsulta",
         );
     });
 
-    it("Globales envía alcanceConsulta=GLOBALES", () => {
+    it("casilla marcada agrega alcanceConsulta=GLOBALES", () => {
         expect(
             construirFiltrosApi(
-                { ...filtrosBase, alcance: "GLOBALES" },
+                { ...filtrosBase, soloGlobales: true },
                 0,
                 { incluirAreaEnConsulta: false },
             ),
         ).toMatchObject({ alcanceConsulta: "GLOBALES" });
     });
 
-    it("Mi área envía alcanceConsulta=MI_AREA", () => {
+    it("Solo globales + Tipo compone ambos filtros", () => {
         expect(
             construirFiltrosApi(
-                { ...filtrosBase, alcance: "MI_AREA" },
-                0,
-                { incluirAreaEnConsulta: false },
-            ),
-        ).toMatchObject({ alcanceConsulta: "MI_AREA" });
-    });
-
-    it("Globales + Tipo compone ambos filtros", () => {
-        expect(
-            construirFiltrosApi(
-                { ...filtrosBase, alcance: "GLOBALES", tipo: "5" },
+                { ...filtrosBase, soloGlobales: true, tipo: "5" },
                 0,
                 { incluirAreaEnConsulta: false },
             ),
         ).toMatchObject({ alcanceConsulta: "GLOBALES", tipoDocumentoId: 5 });
-    });
-
-    it("Mi área + Subproceso compone ambos filtros", () => {
-        expect(
-            construirFiltrosApi(
-                { ...filtrosBase, alcance: "MI_AREA", subprograma: "10" },
-                0,
-                { incluirAreaEnConsulta: false },
-            ),
-        ).toMatchObject({ alcanceConsulta: "MI_AREA", subprogramaId: 10 });
     });
 });

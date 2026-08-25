@@ -70,18 +70,19 @@ public class DocumentoConsultaServiceImpl implements DocumentoConsultaService {
         if (alcanceConsulta == null || alcanceConsulta == AlcanceConsulta.TODOS_VISIBLES) {
             return base;
         }
+        if (alcanceConsulta == AlcanceConsulta.GLOBALES) {
+            return base.and(DocumentoSpecifications.conAlcanceGlobal());
+        }
         if (rol == RolEnum.ADMINISTRADOR) {
             return base;
         }
-
-        return switch (alcanceConsulta) {
-            case GLOBALES -> base.and(DocumentoSpecifications.conAlcanceGlobal());
-            case MI_AREA -> base.and(
+        if (alcanceConsulta == AlcanceConsulta.MI_AREA) {
+            return base.and(
                     DocumentoSpecifications.sinAlcanceGlobal()
                             .and(DocumentoSpecifications.asociadoAAreas(areaIds))
             );
-            case TODOS_VISIBLES -> base;
-        };
+        }
+        return base;
     }
 
     private Specification<Documento> aplicarFiltros(Specification<Documento> base, DocumentoFiltroRequest filtro) {
