@@ -22,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
 import java.util.Optional;
@@ -86,6 +87,7 @@ class SubprogramaServiceImplTest {
     private SubprogramaResponse respuestaDePrueba(Long id) {
         return new SubprogramaResponse(
                 id,
+                "SUB",
                 "Subprograma A",
                 "Descripcion",
                 null,
@@ -97,12 +99,13 @@ class SubprogramaServiceImplTest {
 
     @Test
     void crear_debeCrearSubprogramaConAreaValida() {
-        SubprogramaRequest request = new SubprogramaRequest("Subprograma A", "Descripcion", 1L);
+        SubprogramaRequest request = new SubprogramaRequest("L&D", "Subprograma A", "Descripcion", 1L);
         Area area = areaMock(1L);
         SubprogramaResponse respuestaEsperada = respuestaDePrueba(1L);
 
         when(areaLookupService.obtenerActivaPorId(1L)).thenReturn(area);
         when(subprogramaRepository.existsByAreaIdAndNombreIgnoreCase(1L, "Subprograma A")).thenReturn(false);
+        when(subprogramaRepository.existsByCodigoIgnoreCase("L&D")).thenReturn(false);
         when(subprogramaRepository.save(any(Subprograma.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
         when(subprogramaMapper.toResponse(any(Subprograma.class))).thenReturn(respuestaEsperada);
 
@@ -110,14 +113,67 @@ class SubprogramaServiceImplTest {
 
         ArgumentCaptor<Subprograma> captor = ArgumentCaptor.forClass(Subprograma.class);
         verify(subprogramaRepository).save(captor.capture());
+        assertThat(captor.getValue().getCodigo()).isEqualTo("L&D");
         assertThat(captor.getValue().getNombre()).isEqualTo("Subprograma A");
         assertThat(captor.getValue().getArea()).isEqualTo(area);
         assertThat(resultado).isEqualTo(respuestaEsperada);
     }
 
     @Test
+    void crear_debeNormalizarCodigoConTrimYMayusculas() {
+        SubprogramaRequest request = new SubprogramaRequest("  l&d  ", "Subprograma A", "Descripcion", 1L);
+        Area area = areaMock(1L);
+
+        when(areaLookupService.obtenerActivaPorId(1L)).thenReturn(area);
+        when(subprogramaRepository.existsByAreaIdAndNombreIgnoreCase(1L, "Subprograma A")).thenReturn(false);
+        when(subprogramaRepository.existsByCodigoIgnoreCase("L&D")).thenReturn(false);
+        when(subprogramaRepository.save(any(Subprograma.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
+
+        subprogramaServiceImpl.crear(request);
+
+        ArgumentCaptor<Subprograma> captor = ArgumentCaptor.forClass(Subprograma.class);
+        verify(subprogramaRepository).save(captor.capture());
+        assertThat(captor.getValue().getCodigo()).isEqualTo("L&D");
+        verify(subprogramaRepository).existsByCodigoIgnoreCase("L&D");
+    }
+
+    @Test
+    void crear_debeRechazarCodigoDuplicadoExacto() {
+        SubprogramaRequest request = new SubprogramaRequest("L&D", "Subprograma A", "Descripcion", 1L);
+        Area area = areaMock(1L);
+
+        when(areaLookupService.obtenerActivaPorId(1L)).thenReturn(area);
+        when(subprogramaRepository.existsByAreaIdAndNombreIgnoreCase(1L, "Subprograma A")).thenReturn(false);
+        when(subprogramaRepository.existsByCodigoIgnoreCase("L&D")).thenReturn(true);
+
+        assertThatThrownBy(() -> subprogramaServiceImpl.crear(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Ya existe un subprograma con el código 'L&D'")
+                .satisfies(ex -> assertThat(((BusinessException) ex).getStatus()).isEqualTo(HttpStatus.CONFLICT));
+
+        verify(subprogramaRepository, never()).save(any());
+        verifyNoInteractions(subprogramaMapper);
+    }
+
+    @Test
+    void crear_debeRechazarCodigoDuplicadoIgnorandoMayusculas() {
+        SubprogramaRequest request = new SubprogramaRequest("l&d", "Subprograma A", "Descripcion", 1L);
+        Area area = areaMock(1L);
+
+        when(areaLookupService.obtenerActivaPorId(1L)).thenReturn(area);
+        when(subprogramaRepository.existsByAreaIdAndNombreIgnoreCase(1L, "Subprograma A")).thenReturn(false);
+        when(subprogramaRepository.existsByCodigoIgnoreCase("L&D")).thenReturn(true);
+
+        assertThatThrownBy(() -> subprogramaServiceImpl.crear(request))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getStatus()).isEqualTo(HttpStatus.CONFLICT));
+
+        verify(subprogramaRepository, never()).save(any());
+    }
+
+    @Test
     void crear_debeRechazarAreaInexistente() {
-        SubprogramaRequest request = new SubprogramaRequest("Subprograma A", "Descripcion", 99L);
+        SubprogramaRequest request = new SubprogramaRequest("SUB", "Subprograma A", "Descripcion", 99L);
         when(areaLookupService.obtenerActivaPorId(99L))
                 .thenThrow(new ResourceNotFoundException("No existe un área con id 99"));
 
@@ -130,7 +186,7 @@ class SubprogramaServiceImplTest {
 
     @Test
     void crear_debeRechazarAreaInactiva() {
-        SubprogramaRequest request = new SubprogramaRequest("Subprograma A", "Descripcion", 1L);
+        SubprogramaRequest request = new SubprogramaRequest("SUB", "Subprograma A", "Descripcion", 1L);
         when(areaLookupService.obtenerActivaPorId(1L))
                 .thenThrow(new BusinessException("El área 'Compras' está inactiva y no puede utilizarse"));
 
@@ -143,7 +199,7 @@ class SubprogramaServiceImplTest {
 
     @Test
     void crear_debeRechazarNombreDuplicadoEnMismaArea() {
-        SubprogramaRequest request = new SubprogramaRequest("Subprograma A", "Descripcion", 1L);
+        SubprogramaRequest request = new SubprogramaRequest("SUB", "Subprograma A", "Descripcion", 1L);
         Area area = areaMock(1L);
 
         when(areaLookupService.obtenerActivaPorId(1L)).thenReturn(area);
@@ -158,8 +214,8 @@ class SubprogramaServiceImplTest {
 
     @Test
     void crear_debePermitirMismoNombreEnAreaDiferente() {
-        SubprogramaRequest requestAreaUno = new SubprogramaRequest("Subprograma A", "Descripcion", 1L);
-        SubprogramaRequest requestAreaDos = new SubprogramaRequest("Subprograma A", "Descripcion", 2L);
+        SubprogramaRequest requestAreaUno = new SubprogramaRequest("SUB1", "Subprograma A", "Descripcion", 1L);
+        SubprogramaRequest requestAreaDos = new SubprogramaRequest("SUB2", "Subprograma A", "Descripcion", 2L);
         Area areaUno = areaMock(1L);
         Area areaDos = areaMock(2L);
         SubprogramaResponse respuesta1 = respuestaDePrueba(1L);
@@ -169,6 +225,8 @@ class SubprogramaServiceImplTest {
         when(areaLookupService.obtenerActivaPorId(2L)).thenReturn(areaDos);
         when(subprogramaRepository.existsByAreaIdAndNombreIgnoreCase(1L, "Subprograma A")).thenReturn(false);
         when(subprogramaRepository.existsByAreaIdAndNombreIgnoreCase(2L, "Subprograma A")).thenReturn(false);
+        when(subprogramaRepository.existsByCodigoIgnoreCase("SUB1")).thenReturn(false);
+        when(subprogramaRepository.existsByCodigoIgnoreCase("SUB2")).thenReturn(false);
         when(subprogramaRepository.save(any(Subprograma.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
         when(subprogramaMapper.toResponse(any(Subprograma.class))).thenReturn(respuesta1, respuesta2);
 
@@ -187,18 +245,86 @@ class SubprogramaServiceImplTest {
         Subprograma subprograma = mock(Subprograma.class);
         Area area = areaMock(1L);
         when(subprograma.getArea()).thenReturn(area);
-        SubprogramaUpdateRequest request = new SubprogramaUpdateRequest("Nuevo nombre", "Nueva descripcion", 1L);
+        SubprogramaUpdateRequest request =
+                new SubprogramaUpdateRequest("SUB", "Nuevo nombre", "Nueva descripcion", 1L);
         SubprogramaResponse respuestaEsperada = respuestaDePrueba(id);
 
         when(subprogramaRepository.findById(id)).thenReturn(Optional.of(subprograma));
         when(subprogramaRepository.existsByAreaIdAndNombreIgnoreCaseAndIdNot(1L, "Nuevo nombre", id)).thenReturn(false);
+        when(subprogramaRepository.existsByCodigoIgnoreCaseAndIdNot("SUB", id)).thenReturn(false);
         when(subprogramaMapper.toResponse(subprograma)).thenReturn(respuestaEsperada);
 
         SubprogramaResponse resultado = subprogramaServiceImpl.actualizar(id, request);
 
-        verify(subprograma).actualizarDatos("Nuevo nombre", "Nueva descripcion", area);
+        verify(subprograma).actualizarDatos("SUB", "Nuevo nombre", "Nueva descripcion", area);
         verify(documentoRepository, never()).existsBySubprograma_Id(any());
         assertThat(resultado).isEqualTo(respuestaEsperada);
+    }
+
+    @Test
+    void actualizar_debePermitirConservarSuPropioCodigo() {
+        Long id = 1L;
+        Subprograma subprograma = mock(Subprograma.class);
+        Area area = areaMock(1L);
+        when(subprograma.getArea()).thenReturn(area);
+        SubprogramaUpdateRequest request =
+                new SubprogramaUpdateRequest("L&D", "Limpieza y Desinfección", "Descripcion", 1L);
+        SubprogramaResponse respuestaEsperada = respuestaDePrueba(id);
+
+        when(subprogramaRepository.findById(id)).thenReturn(Optional.of(subprograma));
+        when(subprogramaRepository.existsByAreaIdAndNombreIgnoreCaseAndIdNot(1L, "Limpieza y Desinfección", id))
+                .thenReturn(false);
+        when(subprogramaRepository.existsByCodigoIgnoreCaseAndIdNot("L&D", id)).thenReturn(false);
+        when(subprogramaMapper.toResponse(subprograma)).thenReturn(respuestaEsperada);
+
+        SubprogramaResponse resultado = subprogramaServiceImpl.actualizar(id, request);
+
+        verify(subprograma).actualizarDatos("L&D", "Limpieza y Desinfección", "Descripcion", area);
+        assertThat(resultado).isEqualTo(respuestaEsperada);
+    }
+
+    @Test
+    void actualizar_debePermitirCambiarACodigoLibre() {
+        Long id = 1L;
+        Subprograma subprograma = mock(Subprograma.class);
+        Area area = areaMock(1L);
+        when(subprograma.getArea()).thenReturn(area);
+        SubprogramaUpdateRequest request =
+                new SubprogramaUpdateRequest("LYD", "Limpieza y Desinfección", "Descripcion", 1L);
+        SubprogramaResponse respuestaEsperada = respuestaDePrueba(id);
+
+        when(subprogramaRepository.findById(id)).thenReturn(Optional.of(subprograma));
+        when(subprogramaRepository.existsByAreaIdAndNombreIgnoreCaseAndIdNot(1L, "Limpieza y Desinfección", id))
+                .thenReturn(false);
+        when(subprogramaRepository.existsByCodigoIgnoreCaseAndIdNot("LYD", id)).thenReturn(false);
+        when(subprogramaMapper.toResponse(subprograma)).thenReturn(respuestaEsperada);
+
+        SubprogramaResponse resultado = subprogramaServiceImpl.actualizar(id, request);
+
+        verify(subprograma).actualizarDatos("LYD", "Limpieza y Desinfección", "Descripcion", area);
+        assertThat(resultado).isEqualTo(respuestaEsperada);
+    }
+
+    @Test
+    void actualizar_debeRechazarCodigoDeOtroSubprograma() {
+        Long id = 1L;
+        Subprograma subprograma = mock(Subprograma.class);
+        Area area = areaMock(1L);
+        when(subprograma.getArea()).thenReturn(area);
+        SubprogramaUpdateRequest request =
+                new SubprogramaUpdateRequest("c&d", "Limpieza y Desinfección", "Descripcion", 1L);
+
+        when(subprogramaRepository.findById(id)).thenReturn(Optional.of(subprograma));
+        when(subprogramaRepository.existsByAreaIdAndNombreIgnoreCaseAndIdNot(1L, "Limpieza y Desinfección", id))
+                .thenReturn(false);
+        when(subprogramaRepository.existsByCodigoIgnoreCaseAndIdNot("C&D", id)).thenReturn(true);
+
+        assertThatThrownBy(() -> subprogramaServiceImpl.actualizar(id, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Ya existe un subprograma con el código 'C&D'")
+                .satisfies(ex -> assertThat(((BusinessException) ex).getStatus()).isEqualTo(HttpStatus.CONFLICT));
+
+        verify(subprograma, never()).actualizarDatos(any(), any(), any(), any());
     }
 
     @Test
@@ -208,18 +334,20 @@ class SubprogramaServiceImplTest {
         Area areaActual = areaMock(1L);
         Area areaNueva = areaMock(2L);
         when(subprograma.getArea()).thenReturn(areaActual);
-        SubprogramaUpdateRequest request = new SubprogramaUpdateRequest("Nuevo nombre", "Nueva descripcion", 2L);
+        SubprogramaUpdateRequest request =
+                new SubprogramaUpdateRequest("SUB", "Nuevo nombre", "Nueva descripcion", 2L);
         SubprogramaResponse respuestaEsperada = respuestaDePrueba(id);
 
         when(subprogramaRepository.findById(id)).thenReturn(Optional.of(subprograma));
         when(documentoRepository.existsBySubprograma_Id(id)).thenReturn(false);
         when(areaLookupService.obtenerActivaPorId(2L)).thenReturn(areaNueva);
         when(subprogramaRepository.existsByAreaIdAndNombreIgnoreCaseAndIdNot(2L, "Nuevo nombre", id)).thenReturn(false);
+        when(subprogramaRepository.existsByCodigoIgnoreCaseAndIdNot("SUB", id)).thenReturn(false);
         when(subprogramaMapper.toResponse(subprograma)).thenReturn(respuestaEsperada);
 
         SubprogramaResponse resultado = subprogramaServiceImpl.actualizar(id, request);
 
-        verify(subprograma).actualizarDatos("Nuevo nombre", "Nueva descripcion", areaNueva);
+        verify(subprograma).actualizarDatos("SUB", "Nuevo nombre", "Nueva descripcion", areaNueva);
         assertThat(resultado).isEqualTo(respuestaEsperada);
     }
 
@@ -229,7 +357,8 @@ class SubprogramaServiceImplTest {
         Subprograma subprograma = mock(Subprograma.class);
         Area areaActual = areaMock(1L);
         when(subprograma.getArea()).thenReturn(areaActual);
-        SubprogramaUpdateRequest request = new SubprogramaUpdateRequest("Nuevo nombre", "Nueva descripcion", 2L);
+        SubprogramaUpdateRequest request =
+                new SubprogramaUpdateRequest("SUB", "Nuevo nombre", "Nueva descripcion", 2L);
 
         when(subprogramaRepository.findById(id)).thenReturn(Optional.of(subprograma));
         when(documentoRepository.existsBySubprograma_Id(id)).thenReturn(true);
@@ -240,7 +369,7 @@ class SubprogramaServiceImplTest {
                         "No se puede cambiar el área responsable porque el subproceso ya está asociado a documentos."
                 );
 
-        verify(subprograma, never()).actualizarDatos(any(), any(), any());
+        verify(subprograma, never()).actualizarDatos(any(), any(), any(), any());
         verify(areaLookupService, never()).obtenerActivaPorId(any());
     }
 
@@ -250,7 +379,8 @@ class SubprogramaServiceImplTest {
         Subprograma subprograma = mock(Subprograma.class);
         Area area = areaMock(1L);
         when(subprograma.getArea()).thenReturn(area);
-        SubprogramaUpdateRequest request = new SubprogramaUpdateRequest("Nombre repetido", "Descripcion", 1L);
+        SubprogramaUpdateRequest request =
+                new SubprogramaUpdateRequest("SUB", "Nombre repetido", "Descripcion", 1L);
 
         when(subprogramaRepository.findById(id)).thenReturn(Optional.of(subprograma));
         when(subprogramaRepository.existsByAreaIdAndNombreIgnoreCaseAndIdNot(1L, "Nombre repetido", id)).thenReturn(true);
@@ -259,7 +389,7 @@ class SubprogramaServiceImplTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Nombre repetido");
 
-        verify(subprograma, never()).actualizarDatos(any(), any(), any());
+        verify(subprograma, never()).actualizarDatos(any(), any(), any(), any());
     }
 
     @Test

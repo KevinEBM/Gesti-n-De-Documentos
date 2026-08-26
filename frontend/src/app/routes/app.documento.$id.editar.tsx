@@ -93,7 +93,20 @@ function incluirSubprogramaCatalogo(
     areaId: string,
 ): SubprogramaCatalogo[] {
     if (!id || subprogramas.some((item) => item.id === id)) return subprogramas;
-    return [...subprogramas, { id, nombre, descripcion: "", areaId, activo: false }];
+    return [
+        ...subprogramas,
+        {
+            id,
+            codigo: "",
+            nombre,
+            descripcion: "",
+            areaId,
+            areaCodigo: "",
+            areaNombre: "",
+            areaActiva: false,
+            activo: false,
+        },
+    ];
 }
 
 function incluirTipoCatalogo(tipos: TipoDocumentoCatalogo[], id: string, nombre: string): TipoDocumentoCatalogo[] {

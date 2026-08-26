@@ -15,6 +15,7 @@ public class SubprogramaMapper {
     public SubprogramaResponse toResponse(Subprograma subprograma) {
         return new SubprogramaResponse(
                 subprograma.getId(),
+                subprograma.getCodigo(),
                 subprograma.getNombre(),
                 subprograma.getDescripcion(),
                 areaMapper.toResponse(subprograma.getArea()),

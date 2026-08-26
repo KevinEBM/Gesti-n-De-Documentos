@@ -29,21 +29,23 @@ const areasMock: AreaCatalogo[] = [
 const subprogramasMock: SubprogramaCatalogo[] = [
     {
         id: "10",
+        codigo: "L&D",
         nombre: "Limpieza y Desinfección",
         descripcion: "",
         areaId: "3",
-        areaCodigo: "L&D",
-        areaNombre: "Limpieza y Desinfección",
+        areaCodigo: "GAMB",
+        areaNombre: "Gestión Ambiental",
         areaActiva: true,
         activo: true,
     },
     {
         id: "11",
-        nombre: "Gestión Ambiental",
+        codigo: "PQR",
+        nombre: "Programa de Peticiones Quejas y Reclamos",
         descripcion: "",
         areaId: "4",
-        areaCodigo: "GAMB",
-        areaNombre: "Gestión Ambiental",
+        areaCodigo: "GCAL",
+        areaNombre: "Gestión de Calidad",
         areaActiva: true,
         activo: false,
     },
@@ -72,8 +74,18 @@ describe("filtrarSubprogramasCatalogo", () => {
         expect(resultado.map((item) => item.id)).toEqual(["10"]);
     });
 
-    it("encuentra por código de área", () => {
+    it("encuentra por código de subproceso", () => {
         const resultado = filtrarSubprogramasCatalogo(subprogramasMock, "L&D", "todos");
+        expect(resultado.map((item) => item.id)).toEqual(["10"]);
+    });
+
+    it("encuentra por código de subproceso en minúsculas", () => {
+        const resultado = filtrarSubprogramasCatalogo(subprogramasMock, "pqr", "todos");
+        expect(resultado.map((item) => item.id)).toEqual(["11"]);
+    });
+
+    it("encuentra por código de área", () => {
+        const resultado = filtrarSubprogramasCatalogo(subprogramasMock, "GAMB", "todos");
         expect(resultado.map((item) => item.id)).toEqual(["10"]);
     });
 
@@ -83,7 +95,7 @@ describe("filtrarSubprogramasCatalogo", () => {
             "Gestión Ambiental",
             "todos",
         );
-        expect(resultado.map((item) => item.id)).toEqual(["11"]);
+        expect(resultado.map((item) => item.id)).toEqual(["10"]);
     });
 
     it("filtra solo inactivos", () => {

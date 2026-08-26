@@ -3,6 +3,7 @@ import type { AreaResponseDto } from "./areas-api";
 
 export interface SubprogramaResponseDto {
     id: number;
+    codigo: string;
     nombre: string;
     descripcion: string | null;
     area: AreaResponseDto;
@@ -12,12 +13,14 @@ export interface SubprogramaResponseDto {
 }
 
 export interface SubprogramaRequestDto {
+    codigo: string;
     nombre: string;
     descripcion: string;
     areaId: number;
 }
 
 export interface SubprogramaUpdateRequestDto {
+    codigo: string;
     nombre: string;
     descripcion: string;
     areaId: number;
@@ -29,6 +32,7 @@ export interface SubprogramaEstadoRequestDto {
 
 export interface SubprogramaCatalogo {
     id: string;
+    codigo: string;
     nombre: string;
     descripcion: string;
     areaId: string;
@@ -43,6 +47,7 @@ export function mapSubprogramaResponseDto(
 ): SubprogramaCatalogo {
     return {
         id: String(dto.id),
+        codigo: dto.codigo,
         nombre: dto.nombre,
         descripcion: dto.descripcion ?? "",
         areaId: String(dto.area.id),
