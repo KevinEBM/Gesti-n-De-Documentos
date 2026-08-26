@@ -371,12 +371,20 @@ function NuevoDocumentoPage() {
     }, [cargarCatalogos]);
 
     const cambiarArea = (areaId: string) => {
-        setForm((prev) => ({
-            ...prev,
-            areaId,
-            subprogramaId: "",
-            areasAdicionalesIds: prev.areasAdicionalesIds.filter((id) => id !== areaId),
-        }));
+        // Limpiar el subproceso solo cuando el área cambia de verdad: una reemisión
+        // del mismo área no debe descartar un subproceso ya resuelto.
+        setForm((prev) => {
+            if (prev.areaId === areaId) {
+                return prev;
+            }
+
+            return {
+                ...prev,
+                areaId,
+                subprogramaId: "",
+                areasAdicionalesIds: prev.areasAdicionalesIds.filter((id) => id !== areaId),
+            };
+        });
         limpiarError("areaId");
         limpiarError("subprogramaId");
     };
@@ -812,6 +820,10 @@ function NuevoDocumentoPage() {
                                     <Select
                                         value={form.subprogramaId}
                                         onValueChange={(subprogramaId) => {
+                                            // No hay ningún SelectItem vacío: un "" solo puede
+                                            // venir del <select> oculto de Radix cuando su opción
+                                            // aún no está registrada.
+                                            if (!subprogramaId) return;
                                             setForm((prev) => ({ ...prev, subprogramaId }));
                                             limpiarError("subprogramaId");
                                         }}

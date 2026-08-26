@@ -62,10 +62,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SubprogramaControllerSecurityTest {
 
     private static final String SUBPROGRAMA_REQUEST_JSON =
-            "{\"nombre\":\"Subprograma A\",\"descripcion\":\"Descripcion\",\"areaId\":1}";
+            "{\"codigo\":\"SUB\",\"nombre\":\"Subprograma A\",\"descripcion\":\"Descripcion\",\"areaId\":1}";
 
     private static final String SUBPROGRAMA_UPDATE_REQUEST_JSON =
-            "{\"nombre\":\"Subprograma A\",\"descripcion\":\"Descripcion\",\"areaId\":1}";
+            "{\"codigo\":\"SUB\",\"nombre\":\"Subprograma A\",\"descripcion\":\"Descripcion\",\"areaId\":1}";
 
     private static final String SUBPROGRAMA_ESTADO_REQUEST_JSON =
             "{\"activo\":false}";
@@ -103,6 +103,7 @@ class SubprogramaControllerSecurityTest {
     private SubprogramaResponse respuestaDePrueba(Long id) {
         return new SubprogramaResponse(
                 id,
+                "SUB",
                 "Subprograma A",
                 "Descripcion",
                 null,

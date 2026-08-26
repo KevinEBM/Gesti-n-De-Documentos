@@ -647,17 +647,19 @@ function SeccionSubprogramas({
     const [alternandoId, setAlternandoId] = useState<string | null>(null);
     const [form, setForm] = useState<{
         id?: string;
+        codigo: string;
         nombre: string;
         descripcion: string;
         areaId: string;
     }>({
+        codigo: "",
         nombre: "",
         descripcion: "",
         areaId: "",
     });
     const [errorForm, setErrorForm] = useState("");
     const [erroresCampo, setErroresCampo] = useState<
-        Partial<Record<"nombre" | "descripcion" | "areaId", string>>
+        Partial<Record<"codigo" | "nombre" | "descripcion" | "areaId", string>>
     >({});
     const [busqueda, setBusqueda] = useState("");
     const [estadoFiltro, setEstadoFiltro] = useState<FiltroEstadoActivo>("todos");
@@ -724,7 +726,7 @@ function SeccionSubprogramas({
     }, []);
 
     const abrirNuevo = () => {
-        setForm({ nombre: "", descripcion: "", areaId: "" });
+        setForm({ codigo: "", nombre: "", descripcion: "", areaId: "" });
         setErrorForm("");
         setErroresCampo({});
         setAbierto(true);
@@ -733,6 +735,7 @@ function SeccionSubprogramas({
     const abrirEditar = (sp: SubprogramaCatalogo) => {
         setForm({
             id: sp.id,
+            codigo: sp.codigo,
             nombre: sp.nombre,
             descripcion: sp.descripcion,
             areaId: sp.areaId,
@@ -746,9 +749,18 @@ function SeccionSubprogramas({
         setErrorForm("");
         setErroresCampo({});
 
+        const codigo = form.codigo.trim();
         const nombre = form.nombre.trim();
         const descripcion = form.descripcion.trim();
 
+        if (!codigo) {
+            setErrorForm("El código es obligatorio.");
+            return;
+        }
+        if (codigo.length > 20) {
+            setErrorForm("El código no puede superar los 20 caracteres.");
+            return;
+        }
         if (!nombre) {
             setErrorForm("El nombre es obligatorio.");
             return;
@@ -790,6 +802,7 @@ function SeccionSubprogramas({
         try {
             if (form.id) {
                 const actualizado = await actualizarSubprograma(form.id, {
+                    codigo,
                     nombre,
                     descripcion,
                     areaId: Number(form.areaId),
@@ -802,6 +815,7 @@ function SeccionSubprogramas({
                 toast.success("Registro actualizado");
             } else {
                 const creado = await crearSubprograma({
+                    codigo,
                     nombre,
                     descripcion,
                     areaId: Number(form.areaId),
@@ -818,6 +832,7 @@ function SeccionSubprogramas({
             if (err instanceof ApiError) {
                 if (err.errores) {
                     setErroresCampo({
+                        codigo: err.errores.codigo,
                         nombre: err.errores.nombre,
                         descripcion: err.errores.descripcion,
                         areaId: err.errores.areaId,
@@ -958,6 +973,7 @@ function SeccionSubprogramas({
                             <Table>
                                 <TableHeader>
                                     <TableRow className="bg-secondary/60">
+                                        <TableHead className="w-24">Código</TableHead>
                                         <TableHead>Nombre</TableHead>
                                         <TableHead>Área responsable</TableHead>
                                         <TableHead>Descripción</TableHead>
@@ -973,6 +989,10 @@ function SeccionSubprogramas({
 
                                         return (
                                             <TableRow key={sp.id}>
+                                                <TableCell className="font-medium">
+                                                    {sp.codigo}
+                                                </TableCell>
+
                                                 <TableCell className="font-medium">
                                                     <div className="flex items-center gap-2">
                                                         <Icono
@@ -1037,12 +1057,28 @@ function SeccionSubprogramas({
                         </DialogTitle>
                         <DialogDescription>
                             {form.id
-                                ? "Actualice el área responsable, el nombre y la descripción del subproceso."
-                                : "Seleccione el área responsable y complete la información."}
+                                ? "Actualice el código, el área responsable, el nombre y la descripción del subproceso."
+                                : "Defina el código, seleccione el área responsable y complete la información."}
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="space-y-4">
+                        <div className="space-y-1.5">
+                            <Label>Código</Label>
+                            <Input
+                                value={form.codigo}
+                                maxLength={20}
+                                onChange={(e) =>
+                                    setForm({ ...form, codigo: e.target.value })
+                                }
+                            />
+                            {erroresCampo.codigo && (
+                                <p className="text-xs text-destructive">
+                                    {erroresCampo.codigo}
+                                </p>
+                            )}
+                        </div>
+
                         <div className="space-y-1.5">
                             <Label>Área responsable *</Label>
                             <SelectorAreaResponsable

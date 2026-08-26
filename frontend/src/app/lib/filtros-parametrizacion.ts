@@ -53,6 +53,7 @@ export function filtrarSubprogramasCatalogo(
         (subprograma) =>
             cumpleFiltroEstadoActivo(subprograma.activo, estado) &&
             coincideBusquedaEnCampos(busqueda, [
+                subprograma.codigo,
                 subprograma.nombre,
                 subprograma.areaCodigo,
                 subprograma.areaNombre,

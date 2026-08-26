@@ -17,6 +17,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 @Entity
 @Table(name = "subprogramas")
@@ -27,6 +28,9 @@ public class Subprograma {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false, length = 20)
+    private String codigo;
 
     @Column(nullable = false, length = 100)
     private String nombre;
@@ -47,18 +51,16 @@ public class Subprograma {
     @Column(name = "fecha_actualizacion", nullable = false)
     private LocalDateTime fechaActualizacion;
 
-    public Subprograma(String nombre, String descripcion, Area area) {
+    public Subprograma(String codigo, String nombre, String descripcion, Area area) {
+        this.codigo = normalizarCodigo(codigo);
         this.nombre = normalizarTexto(nombre);
         this.descripcion = normalizarTextoOpcional(descripcion);
         this.area = area;
         this.activo = true;
     }
 
-    public void actualizarDatos(String nombre, String descripcion) {
-        actualizarDatos(nombre, descripcion, null);
-    }
-
-    public void actualizarDatos(String nombre, String descripcion, Area area) {
+    public void actualizarDatos(String codigo, String nombre, String descripcion, Area area) {
+        this.codigo = normalizarCodigo(codigo);
         this.nombre = normalizarTexto(nombre);
         this.descripcion = normalizarTextoOpcional(descripcion);
         if (area != null) {
@@ -72,6 +74,17 @@ public class Subprograma {
 
     public void desactivar() {
         this.activo = false;
+    }
+
+    /**
+     * Regla única de normalización del código, compartida con la capa de
+     * servicio para que la validación de unicidad compare el mismo valor
+     * que finalmente se persiste.
+     */
+    public static String normalizarCodigo(String codigo) {
+        return codigo == null
+                ? null
+                : codigo.trim().toUpperCase(Locale.ROOT);
     }
 
     private String normalizarTexto(String valor) {

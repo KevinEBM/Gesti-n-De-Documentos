@@ -6,17 +6,22 @@ import type { TipoDocumentoCatalogo } from "./tipos-documento-api";
 
 const NOMBRE_VALIDO = "PR-LD-PG-01 Programa limpieza V1.pdf";
 
-const subprogramasMock: SubprogramaCatalogo[] = [
-    {
-        id: "10",
-        nombre: "Limpieza y Desinfección",
+function subprograma(
+    valores: Partial<SubprogramaCatalogo> & Pick<SubprogramaCatalogo, "id" | "codigo" | "nombre">,
+): SubprogramaCatalogo {
+    return {
         descripcion: "",
         areaId: "1",
-        areaCodigo: "LD",
-        areaNombre: "Limpieza y Desinfección",
+        areaCodigo: "GAMB",
+        areaNombre: "Gestión Ambiental",
         areaActiva: true,
         activo: true,
-    },
+        ...valores,
+    };
+}
+
+const subprogramasMock: SubprogramaCatalogo[] = [
+    subprograma({ id: "10", codigo: "L&D", nombre: "Limpieza y Desinfección" }),
 ];
 
 const tiposMock: TipoDocumentoCatalogo[] = [
@@ -68,5 +73,140 @@ describe("resolver metadatos publicación — condición de carrera M4", () => {
         expect(resultado.actualizaciones.tipoDocumentoId).toBe("20");
         expect(resultado.actualizaciones.codigo).toBeUndefined();
         expect(resultado.avisos).toEqual([]);
+    });
+});
+
+describe("resolución del subproceso por código del catálogo", () => {
+    it("resuelve el código canónico y hereda el área del subprograma", () => {
+        const resultado = resolverMetadatosCatalogoDesdeArchivo(
+            "PR-L&D-PG-01 Programa limpieza V1.pdf",
+            subprogramasMock,
+            tiposMock,
+        );
+
+        expect(resultado.actualizaciones.subprogramaId).toBe("10");
+        expect(resultado.actualizaciones.areaId).toBe("1");
+        expect(resultado.avisos).toEqual([]);
+    });
+
+    it("resuelve el código sin distinguir mayúsculas ni espacios", () => {
+        const catalogo = [
+            subprograma({ id: "10", codigo: "  l&d  ", nombre: "Limpieza y Desinfección" }),
+        ];
+
+        const resultado = resolverMetadatosCatalogoDesdeArchivo(
+            "PR-l&d-PG-01 Programa limpieza V1.pdf",
+            catalogo,
+            tiposMock,
+        );
+
+        expect(resultado.actualizaciones.subprogramaId).toBe("10");
+    });
+
+    it("traduce el alias histórico LD al código canónico L&D", () => {
+        const resultado = resolverMetadatosCatalogoDesdeArchivo(
+            "PR-LD-PG-01 Programa limpieza V1.pdf",
+            subprogramasMock,
+            tiposMock,
+        );
+
+        expect(resultado.actualizaciones.subprogramaId).toBe("10");
+        expect(resultado.actualizaciones.areaId).toBe("1");
+    });
+
+    it("traduce el alias histórico CD al código canónico C&D", () => {
+        const catalogo = [
+            subprograma({
+                id: "30",
+                codigo: "C&D",
+                nombre: "Capacitación y Desarrollo",
+                areaId: "2",
+                areaCodigo: "GHUM",
+                areaNombre: "Gestión Humana",
+            }),
+        ];
+
+        const resultado = resolverMetadatosCatalogoDesdeArchivo(
+            "PR-CD-PG-01 Plan de formación V1.pdf",
+            catalogo,
+            tiposMock,
+        );
+
+        expect(resultado.actualizaciones.subprogramaId).toBe("30");
+        expect(resultado.actualizaciones.areaId).toBe("2");
+    });
+
+    it("prefiere el código canónico del catálogo antes que el alias", () => {
+        const catalogo = [
+            subprograma({ id: "40", codigo: "LD", nombre: "Logística Directa" }),
+            subprograma({ id: "10", codigo: "L&D", nombre: "Limpieza y Desinfección" }),
+        ];
+
+        const resultado = resolverMetadatosCatalogoDesdeArchivo(
+            "PR-LD-PG-01 Documento V1.pdf",
+            catalogo,
+            tiposMock,
+        );
+
+        expect(resultado.actualizaciones.subprogramaId).toBe("40");
+    });
+
+    it("no inventa coincidencias parciales para códigos inexistentes", () => {
+        const resultado = resolverMetadatosCatalogoDesdeArchivo(
+            "PR-L-PG-01 Documento V1.pdf",
+            subprogramasMock,
+            tiposMock,
+        );
+
+        expect(resultado.actualizaciones.subprogramaId).toBeUndefined();
+        expect(resultado.actualizaciones.areaId).toBeUndefined();
+        expect(
+            resultado.avisos.some((aviso) => aviso.includes("no se encontró en los catálogos activos")),
+        ).toBe(true);
+    });
+
+    it("no resuelve subprogramas inactivos", () => {
+        const catalogo = [
+            subprograma({
+                id: "10",
+                codigo: "L&D",
+                nombre: "Limpieza y Desinfección",
+                activo: false,
+            }),
+        ];
+
+        const resultado = resolverMetadatosCatalogoDesdeArchivo(
+            "PR-L&D-PG-01 Documento V1.pdf",
+            catalogo,
+            tiposMock,
+        );
+
+        expect(resultado.actualizaciones.subprogramaId).toBeUndefined();
+        expect(
+            resultado.avisos.some((aviso) => aviso.includes("no se encontró en los catálogos activos")),
+        ).toBe(true);
+    });
+
+    it("resuelve un subproceso nuevo del catálogo sin tocar mapas del parser", () => {
+        const catalogo = [
+            subprograma({
+                id: "99",
+                codigo: "NVO",
+                nombre: "Subproceso Recién Parametrizado",
+                areaId: "7",
+                areaCodigo: "GTICS",
+                areaNombre: "Gestión TICs",
+            }),
+        ];
+
+        const resultado = resolverMetadatosCatalogoDesdeArchivo(
+            "PR-NVO-PG-01 Documento nuevo V1.pdf",
+            catalogo,
+            tiposMock,
+        );
+
+        expect(resultado.actualizaciones.subprogramaId).toBe("99");
+        expect(resultado.actualizaciones.areaId).toBe("7");
+        expect(resultado.actualizaciones.tipoDocumentoId).toBe("20");
     });
 });

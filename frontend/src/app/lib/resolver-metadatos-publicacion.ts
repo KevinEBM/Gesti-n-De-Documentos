@@ -25,6 +25,16 @@ export interface OpcionesResolverMetadatosPublicacion {
     omitirResolucionCatalogo?: boolean;
 }
 
+/**
+ * Códigos usados en nombres de archivo antiguos, anteriores a que el símbolo
+ * "&" formara parte del código institucional. Solo se aplican cuando el código
+ * leído no coincide con ningún subprograma del catálogo.
+ */
+const ALIASES_SUBPROCESO: Record<string, string> = {
+    CD: "C&D",
+    LD: "L&D",
+};
+
 export function resolverMetadatosPublicacion(
     extraccion: MetadatosExtraidosDocumento,
     subprogramas: SubprogramaCatalogo[],
@@ -111,24 +121,19 @@ function resolverCamposCatalogo(
     actualizaciones: ActualizacionMetadatosPublicacion,
     avisos: string[],
 ): void {
-    if (extraccion.nombreSubproceso) {
-        const subprograma = buscarSubprogramaActivo(extraccion.nombreSubproceso, subprogramas);
-        if (subprograma) {
+    if (extraccion.codigoSubproceso) {
+        const subprograma = buscarSubprogramaPorCodigo(
+            extraccion.codigoSubproceso,
+            subprogramas,
+        );
+        if (subprograma?.activo) {
             actualizaciones.areaId = subprograma.areaId;
             actualizaciones.subprogramaId = subprograma.id;
-        } else if (existeSubprogramaInactivo(extraccion.nombreSubproceso, subprogramas)) {
-            avisos.push(
-                "Se reconoció el subproceso, pero no se encontró en los catálogos activos. Revise los metadatos manualmente.",
-            );
         } else {
             avisos.push(
                 "Se reconoció el subproceso, pero no se encontró en los catálogos activos. Revise los metadatos manualmente.",
             );
         }
-    } else if (extraccion.abreviaturaSubproceso) {
-        avisos.push(
-            "Se reconoció el subproceso, pero no se encontró en los catálogos activos. Revise los metadatos manualmente.",
-        );
     }
 
     if (extraccion.nombreTipo) {
@@ -151,24 +156,34 @@ function resolverCamposCatalogo(
     }
 }
 
-function buscarSubprogramaActivo(
-    nombreSubproceso: string,
+/**
+ * Coincidencia exacta normalizada contra el código parametrizado en la BD.
+ * Si el código leído no existe se reintenta una única vez con su equivalente
+ * canónico, para nombres de archivo históricos como PR-LD-PG-01.
+ */
+function buscarSubprogramaPorCodigo(
+    codigoSubproceso: string,
     subprogramas: SubprogramaCatalogo[],
 ): SubprogramaCatalogo | null {
-    return (
-        subprogramas.find(
-            (item) => item.activo && nombresCoinciden(item.nombre, nombreSubproceso),
-        ) ?? null
-    );
+    const codigo = normalizarCodigo(codigoSubproceso);
+    const coincidencia = buscarPorCodigoExacto(codigo, subprogramas);
+    if (coincidencia) {
+        return coincidencia;
+    }
+
+    const canonico = ALIASES_SUBPROCESO[codigo];
+    return canonico ? buscarPorCodigoExacto(canonico, subprogramas) : null;
 }
 
-function existeSubprogramaInactivo(
-    nombreSubproceso: string,
+function buscarPorCodigoExacto(
+    codigo: string,
     subprogramas: SubprogramaCatalogo[],
-): boolean {
-    return subprogramas.some(
-        (item) => !item.activo && nombresCoinciden(item.nombre, nombreSubproceso),
-    );
+): SubprogramaCatalogo | null {
+    return subprogramas.find((item) => normalizarCodigo(item.codigo) === codigo) ?? null;
+}
+
+function normalizarCodigo(codigo: string): string {
+    return codigo.trim().toUpperCase();
 }
 
 function buscarTipoActivo(

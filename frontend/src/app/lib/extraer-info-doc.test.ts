@@ -11,23 +11,31 @@ describe("extraerMetadatosDesdeArchivo", () => {
         expect(resultado.reconocido).toBe(true);
         expect(resultado.codigo).toBe("PR-L&D-IN-03");
         expect(resultado.clasificacion).toBe("PR");
-        expect(resultado.abreviaturaSubproceso).toBe("L&D");
-        expect(resultado.nombreSubproceso).toBe("Limpieza y Desinfección");
+        expect(resultado.codigoSubproceso).toBe("L&D");
         expect(resultado.abreviaturaTipo).toBe("IN");
         expect(resultado.nombreTipo).toBe("Instructivo");
         expect(resultado.nombre).toBe("Limpieza y desinfección");
         expect(resultado.version).toEqual({ tipo: "entera", valor: 7 });
     });
 
-    it("resuelve alias LD y tipo Formato con versión 1", () => {
+    it("extrae el código de subproceso en mayúsculas sin resolverlo", () => {
+        const resultado = extraerMetadatosDesdeArchivo(
+            "PR-l&d-FO-04 Registro limpieza V1.pdf",
+        );
+
+        expect(resultado.reconocido).toBe(true);
+        expect(resultado.codigoSubproceso).toBe("L&D");
+        expect(resultado.nombreTipo).toBe("Formato");
+        expect(resultado.version).toEqual({ tipo: "entera", valor: 1 });
+    });
+
+    it("conserva el alias histórico LD sin traducirlo", () => {
         const resultado = extraerMetadatosDesdeArchivo(
             "PR-LD-FO-04 Registro limpieza V1.pdf",
         );
 
         expect(resultado.reconocido).toBe(true);
-        expect(resultado.nombreSubproceso).toBe("Limpieza y Desinfección");
-        expect(resultado.nombreTipo).toBe("Formato");
-        expect(resultado.version).toEqual({ tipo: "entera", valor: 1 });
+        expect(resultado.codigoSubproceso).toBe("LD");
     });
 
     it("no marca error cuando no hay nomenclatura institucional", () => {
@@ -35,17 +43,16 @@ describe("extraerMetadatosDesdeArchivo", () => {
 
         expect(resultado.reconocido).toBe(false);
         expect(resultado.codigo).toBeNull();
-        expect(resultado.nombreSubproceso).toBeNull();
+        expect(resultado.codigoSubproceso).toBeNull();
         expect(resultado.nombreTipo).toBeNull();
         expect(resultado.version).toEqual({ tipo: "ninguna" });
     });
 
-    it("no inventa subproceso para abreviatura desconocida", () => {
+    it("extrae códigos de subproceso desconocidos sin inventar nada", () => {
         const resultado = extraerMetadatosDesdeArchivo("PR-XYZ-IN-01 Documento.pdf");
 
         expect(resultado.reconocido).toBe(true);
-        expect(resultado.abreviaturaSubproceso).toBe("XYZ");
-        expect(resultado.nombreSubproceso).toBeNull();
+        expect(resultado.codigoSubproceso).toBe("XYZ");
         expect(resultado.nombreTipo).toBe("Instructivo");
     });
 

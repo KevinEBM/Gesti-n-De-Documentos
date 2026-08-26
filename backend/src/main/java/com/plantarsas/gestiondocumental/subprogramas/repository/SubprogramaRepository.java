@@ -12,6 +12,10 @@ public interface SubprogramaRepository extends JpaRepository<Subprograma, Long> 
 
     boolean existsByAreaIdAndNombreIgnoreCaseAndIdNot(Long areaId, String nombre, Long id);
 
+    boolean existsByCodigoIgnoreCase(String codigo);
+
+    boolean existsByCodigoIgnoreCaseAndIdNot(String codigo, Long id);
+
     List<Subprograma> findByAreaIdAndActivoTrueOrderByNombreAsc(Long areaId);
 
     List<Subprograma> findByArea_IdInOrderByNombreAsc(Collection<Long> areaIds);

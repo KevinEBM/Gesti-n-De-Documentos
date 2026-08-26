@@ -44,7 +44,14 @@ public class SubprogramaServiceImpl implements SubprogramaService, SubprogramaLo
             );
         }
 
-        Subprograma subprograma = new Subprograma(request.nombre(), request.descripcion(), area);
+        validarCodigoUnico(request.codigo(), null);
+
+        Subprograma subprograma = new Subprograma(
+                request.codigo(),
+                request.nombre(),
+                request.descripcion(),
+                area
+        );
         return subprogramaMapper.toResponse(subprogramaRepository.save(subprograma));
     }
 
@@ -107,7 +114,14 @@ public class SubprogramaServiceImpl implements SubprogramaService, SubprogramaLo
             );
         }
 
-        subprograma.actualizarDatos(request.nombre(), request.descripcion(), areaObjetivo);
+        validarCodigoUnico(request.codigo(), id);
+
+        subprograma.actualizarDatos(
+                request.codigo(),
+                request.nombre(),
+                request.descripcion(),
+                areaObjetivo
+        );
         return subprogramaMapper.toResponse(subprograma);
     }
 
@@ -156,6 +170,25 @@ public class SubprogramaServiceImpl implements SubprogramaService, SubprogramaLo
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "No existe un subprograma con id " + id
                 ));
+    }
+
+    /**
+     * El código identifica al subproceso dentro del código documental, que no
+     * incluye el área. Por eso la unicidad es global y no por área.
+     */
+    private void validarCodigoUnico(String codigo, Long idExcluido) {
+        String codigoNormalizado = Subprograma.normalizarCodigo(codigo);
+
+        boolean duplicado = idExcluido == null
+                ? subprogramaRepository.existsByCodigoIgnoreCase(codigoNormalizado)
+                : subprogramaRepository.existsByCodigoIgnoreCaseAndIdNot(codigoNormalizado, idExcluido);
+
+        if (duplicado) {
+            throw new BusinessException(
+                    "Ya existe un subprograma con el código '" + codigoNormalizado + "'",
+                    HttpStatus.CONFLICT
+            );
+        }
     }
 
     private String normalizarTexto(String valor) {
