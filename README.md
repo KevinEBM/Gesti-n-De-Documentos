@@ -129,16 +129,6 @@ La identidad general del documento pertenece al modulo `documentos`; los archivo
 
 El almacenamiento debe permanecer desacoplado de proveedores especificos. El contrato base esta en `backend/src/main/java/com/plantarsas/gestiondocumental/storage/StorageService.java`. No hay integracion real con Google Cloud, AWS, Azure u otro proveedor en esta etapa.
 
-## Correo
-
-El correo debe permanecer desacoplado de proveedores especificos. La regla operativa prevista es:
-
-1. La publicacion se completa.
-2. Se generan las notificaciones internas.
-3. Se intenta enviar correo.
-4. Si el correo falla, la publicacion no se revierte.
-5. El error queda en logs tecnicos.
-
 ## Documentacion
 
 La documentacion tecnica vive en `docs/`. Las migraciones SQL de Flyway, cuando exista el modelo completo, deberan ubicarse en `backend/src/main/resources/db/migration`.
