@@ -1,6 +1,6 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Files, Info, UserRound } from "lucide-react";
-import { useEffect } from "react";
+import { Files, Info, TriangleAlert, UserRound } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { listarAreas } from "@/lib/areas-api";
 import { etiquetaAreaPrincipal } from "@/lib/auth-storage";
 import { descripcionRolInicio, etiquetaRol } from "@/lib/data";
+import { obtenerIconoArea } from "@/lib/iconos-areas";
 import { useIntranet } from "@/lib/store";
 
 export const Route = createFileRoute("/app/inicio")({
@@ -30,6 +31,8 @@ export const Route = createFileRoute("/app/inicio")({
 
 function Inicio() {
     const { sesion, sincronizarAreaDesdeCatalogo } = useIntranet();
+    const [intento, setIntento] = useState(0);
+    const [areaSinConfirmar, setAreaSinConfirmar] = useState(false);
 
     useEffect(() => {
         if (!sesion || sesion.rol === "administrador") {
@@ -41,11 +44,14 @@ function Inicio() {
         const refrescarArea = async () => {
             try {
                 const areas = await listarAreas();
-                if (activo) {
-                    sincronizarAreaDesdeCatalogo(areas);
-                }
+                if (!activo) return;
+                sincronizarAreaDesdeCatalogo(areas);
+                setAreaSinConfirmar(false);
             } catch {
-                // Si falla la API, se conserva el snapshot de sesión existente.
+                // La sesión sigue siendo válida, así que se conserva el último
+                // dato conocido; pero puede ser anterior a una reasignación de
+                // área, y el usuario debe poder detectarlo y reintentar.
+                if (activo) setAreaSinConfirmar(true);
             }
         };
 
@@ -54,11 +60,14 @@ function Inicio() {
         return () => {
             activo = false;
         };
-    }, [sesion, sincronizarAreaDesdeCatalogo]);
+    }, [sesion, sincronizarAreaDesdeCatalogo, intento]);
 
     if (!sesion) return null;
 
     const nombreSaludo = sesion.nombre.trim() || etiquetaRol[sesion.rol];
+    const etiquetaArea = etiquetaAreaPrincipal(sesion);
+    const tieneAreaAsignada = Boolean(sesion.areaPrincipalNombre?.trim());
+    const { icono: IconoArea, color: colorArea } = obtenerIconoArea(etiquetaArea);
 
     return (
         <AppShell titulo={`Bienvenido, ${nombreSaludo}`}>
@@ -85,9 +94,26 @@ function Inicio() {
                                 <dt className="text-xs uppercase tracking-wide text-muted-foreground">
                                     Área
                                 </dt>
-                                <dd className="mt-1 text-sm font-medium">
-                                    {etiquetaAreaPrincipal(sesion)}
+                                <dd className="mt-1 flex items-center gap-2 text-sm font-medium">
+                                    {tieneAreaAsignada ? (
+                                        <IconoArea className={`size-4 shrink-0 ${colorArea}`} />
+                                    ) : null}
+                                    {etiquetaArea}
                                 </dd>
+                                {areaSinConfirmar ? (
+                                    <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                                        <TriangleAlert className="size-3.5 shrink-0" />
+                                        No se pudo confirmar tu área con el servidor; este es el
+                                        último dato conocido.
+                                        <Button
+                                            variant="link"
+                                            className="h-auto p-0 text-xs"
+                                            onClick={() => setIntento((valor) => valor + 1)}
+                                        >
+                                            Reintentar
+                                        </Button>
+                                    </p>
+                                ) : null}
                             </div>
                         </dl>
 

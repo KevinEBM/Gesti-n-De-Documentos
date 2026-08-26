@@ -315,11 +315,16 @@ function VisibilidadDocumento({ documento }: { documento: DocumentoDetalle }) {
         );
     }
 
+    const { icono: IconoArea, color: colorArea } = obtenerIconoArea(documento.areaNombre);
+
     return (
         <div className="space-y-3">
             <div>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Área responsable</p>
-                <p className="mt-1 text-sm font-medium">{documento.areaNombre}</p>
+                <p className="mt-1 flex items-center gap-2 text-sm font-medium">
+                    <IconoArea className={`size-4 shrink-0 ${colorArea}`} />
+                    {documento.areaNombre}
+                </p>
             </div>
             <div>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -327,11 +332,16 @@ function VisibilidadDocumento({ documento }: { documento: DocumentoDetalle }) {
                 </p>
                 {documento.areasAdicionales.length > 0 ? (
                     <div className="mt-2 flex flex-wrap gap-2">
-                        {documento.areasAdicionales.map((area) => (
-                            <Badge key={area.id} variant="secondary">
-                                {area.nombre}
-                            </Badge>
-                        ))}
+                        {documento.areasAdicionales.map((area) => {
+                            const { icono: Icono, color } = obtenerIconoArea(area.nombre);
+
+                            return (
+                                <Badge key={area.id} variant="secondary" className="gap-1.5">
+                                    <Icono className={`size-3.5 shrink-0 ${color}`} />
+                                    {area.nombre}
+                                </Badge>
+                            );
+                        })}
                     </div>
                 ) : (
                     <p className="mt-1 text-sm text-muted-foreground">Ninguna</p>

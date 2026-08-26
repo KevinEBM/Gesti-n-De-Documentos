@@ -986,6 +986,10 @@ function SeccionSubprogramas({
                                     {subprogramasFiltrados.map((sp) => {
                                         const { icono: Icono, color } =
                                             obtenerIconoSubProceso(sp.nombre);
+                                        const {
+                                            icono: IconoArea,
+                                            color: colorArea,
+                                        } = obtenerIconoArea(sp.areaNombre);
 
                                         return (
                                             <TableRow key={sp.id}>
@@ -1003,7 +1007,12 @@ function SeccionSubprogramas({
                                                 </TableCell>
 
                                                 <TableCell className="text-sm text-muted-foreground">
-                                                    {etiquetaArea(sp)}
+                                                    <div className="flex items-center gap-2">
+                                                        <IconoArea
+                                                            className={`size-4 shrink-0 ${colorArea}`}
+                                                        />
+                                                        <span>{etiquetaArea(sp)}</span>
+                                                    </div>
                                                 </TableCell>
 
                                                 <TableCell className="text-sm text-muted-foreground">
