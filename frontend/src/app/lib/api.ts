@@ -23,6 +23,16 @@ export interface LoginResponseDto {
     areaPrincipalNombre: string | null;
 }
 
+export interface PerfilUsuarioResponseDto {
+    id: number;
+    correo: string;
+    nombres: string;
+    apellidos: string;
+    rol: string;
+    areaPrincipalId: number | null;
+    areaPrincipalNombre: string | null;
+}
+
 export class ApiError extends Error {
     status: number;
     errores?: Record<string, string>;

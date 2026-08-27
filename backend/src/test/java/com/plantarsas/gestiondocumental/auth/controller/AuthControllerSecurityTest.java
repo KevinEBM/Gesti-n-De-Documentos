@@ -65,13 +65,16 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -243,6 +246,56 @@ class AuthControllerSecurityTest {
                         .content(REQUEST_VALIDO_JSON)
                         .with(usuarioAutenticado(RolEnum.ADMINISTRADOR)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void obtenerPerfil_sinAutenticacion_debeResponder401() throws Exception {
+        mockMvc.perform(get("/api/auth/me"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    void obtenerPerfil_conJefeArea_debeDelegarAlServicio() throws Exception {
+        when(authService.obtenerPerfilActual(any(AuthenticatedUser.class)))
+                .thenReturn(new com.plantarsas.gestiondocumental.auth.dto.PerfilUsuarioResponse(
+                        USUARIO_ID, "usuario@plantarsas.com", "Usuario", "Prueba",
+                        RolEnum.JEFE_AREA, 3L, "Gestión Ambiental"
+                ));
+
+        mockMvc.perform(get("/api/auth/me").with(usuarioAutenticado(RolEnum.JEFE_AREA)))
+                .andExpect(status().isOk());
+
+        verify(authService).obtenerPerfilActual(any(AuthenticatedUser.class));
+    }
+
+    @Test
+    void obtenerPerfil_conAdministrador_debeDelegarAlServicio() throws Exception {
+        when(authService.obtenerPerfilActual(any(AuthenticatedUser.class)))
+                .thenReturn(new com.plantarsas.gestiondocumental.auth.dto.PerfilUsuarioResponse(
+                        USUARIO_ID, "usuario@plantarsas.com", "Usuario", "Prueba",
+                        RolEnum.ADMINISTRADOR, null, null
+                ));
+
+        mockMvc.perform(get("/api/auth/me").with(usuarioAutenticado(RolEnum.ADMINISTRADOR)))
+                .andExpect(status().isOk());
+
+        verify(authService).obtenerPerfilActual(any(AuthenticatedUser.class));
+    }
+
+    @Test
+    void obtenerPerfil_conAdministrativo_debeDelegarAlServicio() throws Exception {
+        when(authService.obtenerPerfilActual(any(AuthenticatedUser.class)))
+                .thenReturn(new com.plantarsas.gestiondocumental.auth.dto.PerfilUsuarioResponse(
+                        USUARIO_ID, "usuario@plantarsas.com", "Usuario", "Prueba",
+                        RolEnum.ADMINISTRATIVO, 3L, "Gestión Ambiental"
+                ));
+
+        mockMvc.perform(get("/api/auth/me").with(usuarioAutenticado(RolEnum.ADMINISTRATIVO)))
+                .andExpect(status().isOk());
+
+        verify(authService).obtenerPerfilActual(any(AuthenticatedUser.class));
     }
 
     @Configuration

@@ -614,7 +614,7 @@ class DocumentoConsultaServiceImplTest {
 
     @Test
     void listarHistorico_debeMapearElMismoPublicadorParaAdministradorYJefe() {
-        DocumentoMapper mapperReal = new DocumentoMapper();
+        DocumentoMapper mapperReal = new DocumentoMapper(java.time.Clock.systemUTC());
         documentoConsultaServiceImpl = new DocumentoConsultaServiceImpl(
                 documentoRepository,
                 documentoAreaRepository,

@@ -79,6 +79,9 @@ export interface DocumentoResponseDto {
     fechaPublicacionVersion: string;
     fechaCreacion: string;
     fechaActualizacion: string;
+    fechaObsolescencia: string | null;
+    fechaDisponibleEliminacion: string | null;
+    aptoParaEliminacion: boolean;
     alcance: DocumentoAlcance;
     areasAdicionales: AreaResumenResponseDto[];
 }
@@ -129,6 +132,9 @@ export interface DocumentoDetalle {
     fechaPublicacionVersion: string;
     fechaCreacion: string;
     fechaActualizacion: string;
+    fechaObsolescencia: string | null;
+    fechaDisponibleEliminacion: string | null;
+    aptoParaEliminacion: boolean;
     alcance: DocumentoAlcance;
     areasAdicionales: AreaResumen[];
 }
@@ -208,6 +214,9 @@ export function mapDocumentoResponseDto(dto: DocumentoResponseDto): DocumentoDet
         fechaPublicacionVersion: dto.fechaPublicacionVersion,
         fechaCreacion: dto.fechaCreacion,
         fechaActualizacion: dto.fechaActualizacion,
+        fechaObsolescencia: dto.fechaObsolescencia,
+        fechaDisponibleEliminacion: dto.fechaDisponibleEliminacion,
+        aptoParaEliminacion: dto.aptoParaEliminacion,
         alcance: dto.alcance,
         areasAdicionales: dto.areasAdicionales.map(mapAreaResumenResponseDto),
     };
@@ -299,6 +308,12 @@ export async function actualizarEstadoDocumento(
         body: JSON.stringify({ estado } satisfies DocumentoEstadoActualizacionRequestDto),
     });
     return mapDocumentoResponseDto(dto);
+}
+
+export async function eliminarDocumentoDefinitivo(id: string): Promise<void> {
+    await apiFetch<null>(`/api/documentos/${id}`, {
+        method: "DELETE",
+    });
 }
 
 export async function publicarDocumentoInicial(

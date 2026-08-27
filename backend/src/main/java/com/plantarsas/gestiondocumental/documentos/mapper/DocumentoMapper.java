@@ -9,12 +9,18 @@ import com.plantarsas.gestiondocumental.documentos.entity.DocumentoArea;
 import com.plantarsas.gestiondocumental.documentos.entity.VersionDocumento;
 import com.plantarsas.gestiondocumental.usuarios.entity.Usuario;
 import com.plantarsas.gestiondocumental.shared.time.FechaHoraUtc;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class DocumentoMapper {
+
+    private final Clock clock;
 
     public DocumentoResponse toResponse(
             Documento documento,
@@ -22,6 +28,8 @@ public class DocumentoMapper {
             List<DocumentoArea> documentoAreasAdicionales,
             VersionDocumento versionActual
     ) {
+        LocalDateTime ahoraUtc = FechaHoraUtc.ahoraDesde(clock);
+
         return new DocumentoResponse(
                 documento.getId(),
                 documento.getCodigo(),
@@ -44,6 +52,9 @@ public class DocumentoMapper {
                 FechaHoraUtc.aInstant(versionActual.getFechaPublicacion()),
                 FechaHoraUtc.aInstant(documento.getFechaCreacion()),
                 FechaHoraUtc.aInstant(documento.getFechaActualizacion()),
+                FechaHoraUtc.aInstantONulo(documento.getFechaObsolescencia()),
+                FechaHoraUtc.aInstantONulo(documento.fechaDisponibleEliminacion()),
+                documento.esAptoParaEliminacion(ahoraUtc),
                 documento.getAlcance(),
                 documentoAreasAdicionales.stream()
                         .map(documentoArea -> new AreaResumenResponse(

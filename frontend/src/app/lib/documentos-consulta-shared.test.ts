@@ -6,12 +6,14 @@ import {
     construirFiltrosBaseConsulta,
     etiquetaCatalogoConsulta,
     filtrarSubprogramasConsulta,
+    formatFechaCalendarioBogota,
     formatFechaDocumento,
     resolverAreaAsignadaNoAdmin,
     resolverAreaIdEfectivaConsulta,
     resolverAreaObligatoriaNoAdmin,
     resolverAreaPrincipalDesdeCatalogo,
     subprocesoConsultaDeshabilitado,
+    textoRetencionObsoleto,
     TODOS,
 } from "./documentos-consulta-shared";
 
@@ -268,5 +270,24 @@ describe("construirFiltrosApi — solo globales", () => {
                 { incluirAreaEnConsulta: false },
             ),
         ).toMatchObject({ alcanceConsulta: "GLOBALES", tipoDocumentoId: 5 });
+    });
+});
+
+describe("formatFechaCalendarioBogota", () => {
+    it("formatea una fecha UTC como calendario en America/Bogota", () => {
+        expect(formatFechaCalendarioBogota("2026-08-26T15:00:00Z")).toBe("26/08/2026");
+    });
+
+    it("devuelve null si no hay fecha", () => {
+        expect(formatFechaCalendarioBogota(null)).toBeNull();
+        expect(formatFechaCalendarioBogota(undefined)).toBeNull();
+    });
+});
+
+describe("textoRetencionObsoleto", () => {
+    it("incluye la fecha calendario del plazo", () => {
+        expect(textoRetencionObsoleto("2028-08-26T15:00:00Z")).toBe(
+            "Eliminación disponible a partir del 26/08/2028",
+        );
     });
 });

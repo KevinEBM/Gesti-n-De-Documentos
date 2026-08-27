@@ -27,6 +27,11 @@ public final class FechaHoraUtc {
         return almacenadoUtc.toInstant(OFFSET_ALMACENAMIENTO);
     }
 
+    /** Variante para columnas opcionales, como la fecha de obsolescencia. */
+    public static Instant aInstantONulo(LocalDateTime almacenadoUtc) {
+        return almacenadoUtc == null ? null : aInstant(almacenadoUtc);
+    }
+
     /** Inicio del día calendario Colombia expresado como UTC naive para comparar en BD. */
     public static LocalDateTime inicioDiaPresentacionEnAlmacenamiento(LocalDate dia) {
         return dia.atStartOfDay(ZONA_PRESENTACION)

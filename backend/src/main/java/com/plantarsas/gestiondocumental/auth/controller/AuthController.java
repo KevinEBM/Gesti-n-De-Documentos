@@ -3,6 +3,7 @@ package com.plantarsas.gestiondocumental.auth.controller;
 import com.plantarsas.gestiondocumental.auth.dto.CambiarContrasenaRequest;
 import com.plantarsas.gestiondocumental.auth.dto.LoginRequest;
 import com.plantarsas.gestiondocumental.auth.dto.LoginResponse;
+import com.plantarsas.gestiondocumental.auth.dto.PerfilUsuarioResponse;
 import com.plantarsas.gestiondocumental.auth.service.AuthService;
 import com.plantarsas.gestiondocumental.exception.BusinessException;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
@@ -11,6 +12,7 @@ import com.plantarsas.gestiondocumental.usuarios.service.UsuarioService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -30,6 +32,13 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request
     ) {
         return ApiResponse.exitosa(authService.login(request));
+    }
+
+    @GetMapping("/me")
+    public ApiResponse<PerfilUsuarioResponse> obtenerPerfilActual(
+            @AuthenticationPrincipal AuthenticatedUser usuarioAutenticado
+    ) {
+        return ApiResponse.exitosa(authService.obtenerPerfilActual(usuarioAutenticado));
     }
 
     @PutMapping("/contrasena")

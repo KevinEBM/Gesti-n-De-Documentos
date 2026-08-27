@@ -112,6 +112,28 @@ export function formatFechaDocumento(fecha: string): string {
     }
 }
 
+export function formatFechaCalendarioBogota(fecha: string | null | undefined): string | null {
+    if (!fecha) return null;
+    try {
+        return new Intl.DateTimeFormat("es-CO", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            timeZone: "America/Bogota",
+        }).format(new Date(fecha));
+    } catch {
+        return fecha;
+    }
+}
+
+export function textoRetencionObsoleto(fechaDisponibleEliminacion: string | null | undefined): string {
+    const formateada = formatFechaCalendarioBogota(fechaDisponibleEliminacion);
+    if (!formateada) {
+        return "Eliminación no disponible todavía.";
+    }
+    return `Eliminación disponible a partir del ${formateada}`;
+}
+
 export function hayFiltrosActivos(
     filtros: FiltrosDocumentos,
     opciones?: HayFiltrosActivosOpciones,

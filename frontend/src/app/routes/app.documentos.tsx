@@ -131,7 +131,7 @@ function Biblioteca() {
         () =>
             subprogramasFiltro.map((item) => ({
                 v: item.id,
-                l: etiquetaCatalogoConsulta(item.nombre, item.activo, "masculino"),
+                l: etiquetaCatalogoConsulta(item.nombre ?? "", item.activo ?? true, "masculino"),
             })),
         [subprogramasFiltro],
     );

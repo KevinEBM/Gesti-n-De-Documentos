@@ -1,10 +1,13 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import { apiFetch, ApiError, type LoginResponseDto } from "./api";
+import { obtenerPerfilActual } from "./auth-api";
 import {
     clearSession,
     getSession,
     loginResponseToUsuario,
+    mismoUsuarioSesion,
     patchUsuarioAreaEnSesion,
+    perfilResponseToUsuario,
     saveSession,
     type AuthSession,
 } from "./auth-storage";
@@ -28,6 +31,7 @@ interface IntranetContextValue {
     permisos: Permisos;
     iniciarSesion: (correo: string, password: string) => Promise<{ ok: boolean; error?: string }>;
     cerrarSesion: () => void;
+    refrescarPerfil: () => Promise<void>;
     sincronizarAreaDesdeCatalogo: (
         areas: AreaCatalogoConsulta[],
         areasApiCargadas?: boolean,
@@ -106,6 +110,22 @@ export function IntranetProvider({ children }: { children: ReactNode }) {
             cerrarSesion: () => {
                 clearSession();
                 setSesion(null);
+            },
+            refrescarPerfil: async () => {
+                const perfil = await obtenerPerfilActual();
+                const usuario = perfilResponseToUsuario(perfil);
+
+                setSesion((actual) => {
+                    const session = getSession();
+                    if (!session) {
+                        return actual;
+                    }
+                    if (actual && mismoUsuarioSesion(actual, usuario)) {
+                        return actual;
+                    }
+                    saveSession({ ...session, usuario });
+                    return usuario;
+                });
             },
             sincronizarAreaDesdeCatalogo: (areas, areasApiCargadas = true) => {
                 setSesion((actual) => {

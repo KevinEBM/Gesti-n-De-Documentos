@@ -4,7 +4,8 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AreaCatalogo } from "@/lib/areas-api";
+import { ApiError } from "@/lib/api";
+import type { PerfilUsuarioResponseDto } from "@/lib/api";
 import { saveSession, type AuthSession } from "@/lib/auth-storage";
 import { IntranetProvider } from "@/lib/store";
 
@@ -22,9 +23,9 @@ vi.mock("@/components/AppShell", () => ({
     ),
 }));
 
-vi.mock("@/lib/areas-api", () => ({ listarAreas: vi.fn() }));
+vi.mock("@/lib/auth-api", () => ({ obtenerPerfilActual: vi.fn() }));
 
-const { listarAreas } = await import("@/lib/areas-api");
+const { obtenerPerfilActual } = await import("@/lib/auth-api");
 const { Route } = await import("./app.inicio");
 
 const PaginaInicio = (Route as unknown as { component: () => ReactNode }).component;
@@ -32,8 +33,19 @@ const PaginaInicio = (Route as unknown as { component: () => ReactNode }).compon
 const AREA_ANTERIOR = "Gestión Ambiental";
 const AREA_NUEVA = "Gestión de la Calidad";
 
-function areaCatalogo(id: string, nombre: string): AreaCatalogo {
-    return { id, codigo: "COD", nombre, descripcion: "", activo: true };
+function perfilDe(
+    rolBackend: PerfilUsuarioResponseDto["rol"],
+    area?: { id: number; nombre: string },
+): PerfilUsuarioResponseDto {
+    return {
+        id: 9,
+        correo: "juan@plantar.com",
+        nombres: "Juan",
+        apellidos: "Pérez",
+        rol: rolBackend,
+        areaPrincipalId: area?.id ?? null,
+        areaPrincipalNombre: area?.nombre ?? null,
+    };
 }
 
 function sesionDe(rol: AuthSession["usuario"]["rol"], area?: { id: string; nombre: string }): AuthSession {
@@ -77,17 +89,21 @@ function renderizarInicio() {
 describe("Inicio — área del usuario", () => {
     it("muestra el área actual del usuario", async () => {
         saveSession(sesionDe("jefe_area", { id: "3", nombre: AREA_ANTERIOR }));
-        vi.mocked(listarAreas).mockResolvedValue([areaCatalogo("3", AREA_ANTERIOR)]);
+        vi.mocked(obtenerPerfilActual).mockResolvedValue(
+            perfilDe("JEFE_AREA", { id: 3, nombre: AREA_ANTERIOR }),
+        );
 
         renderizarInicio();
 
-        await waitFor(() => expect(listarAreas).toHaveBeenCalled());
+        await waitFor(() => expect(obtenerPerfilActual).toHaveBeenCalled());
         expect(areaMostrada()).toBe(AREA_ANTERIOR);
     });
 
     it("reemplaza el área antigua de la sesión cuando el backend devuelve otra", async () => {
         saveSession(sesionDe("jefe_area", { id: "3", nombre: AREA_ANTERIOR }));
-        vi.mocked(listarAreas).mockResolvedValue([areaCatalogo("5", AREA_NUEVA)]);
+        vi.mocked(obtenerPerfilActual).mockResolvedValue(
+            perfilDe("JEFE_AREA", { id: 5, nombre: AREA_NUEVA }),
+        );
 
         renderizarInicio();
 
@@ -97,7 +113,9 @@ describe("Inicio — área del usuario", () => {
 
     it("persiste el área nueva en la sesión almacenada", async () => {
         saveSession(sesionDe("administrativo", { id: "3", nombre: AREA_ANTERIOR }));
-        vi.mocked(listarAreas).mockResolvedValue([areaCatalogo("5", AREA_NUEVA)]);
+        vi.mocked(obtenerPerfilActual).mockResolvedValue(
+            perfilDe("ADMINISTRATIVO", { id: 5, nombre: AREA_NUEVA }),
+        );
 
         renderizarInicio();
 
@@ -107,20 +125,24 @@ describe("Inicio — área del usuario", () => {
         ) as AuthSession;
         expect(guardada.usuario.areaPrincipalNombre).toBe(AREA_NUEVA);
         expect(guardada.usuario.areaId).toBe("5");
+        expect(guardada.token).toBe("token-prueba");
     });
 
-    it("mantiene No aplica para ADMINISTRADOR sin consultar áreas", async () => {
+    it("mantiene No aplica para ADMINISTRADOR", async () => {
         saveSession(sesionDe("administrador"));
+        vi.mocked(obtenerPerfilActual).mockResolvedValue(perfilDe("ADMINISTRADOR"));
 
         renderizarInicio();
 
+        await waitFor(() => expect(obtenerPerfilActual).toHaveBeenCalled());
         expect(areaMostrada()).toBe("No aplica");
-        expect(listarAreas).not.toHaveBeenCalled();
     });
 
     it("no altera nombre ni rol al actualizar el área", async () => {
         saveSession(sesionDe("jefe_area", { id: "3", nombre: AREA_ANTERIOR }));
-        vi.mocked(listarAreas).mockResolvedValue([areaCatalogo("5", AREA_NUEVA)]);
+        vi.mocked(obtenerPerfilActual).mockResolvedValue(
+            perfilDe("JEFE_AREA", { id: 5, nombre: AREA_NUEVA }),
+        );
 
         renderizarInicio();
 
@@ -136,18 +158,18 @@ describe("Inicio — área del usuario", () => {
 
     it("conserva la sesión y el último área conocida si falla la consulta", async () => {
         saveSession(sesionDe("jefe_area", { id: "3", nombre: AREA_ANTERIOR }));
-        vi.mocked(listarAreas).mockRejectedValue(new Error("backend caído"));
+        vi.mocked(obtenerPerfilActual).mockRejectedValue(new Error("backend caído"));
 
         renderizarInicio();
 
-        await waitFor(() => expect(listarAreas).toHaveBeenCalled());
+        await waitFor(() => expect(obtenerPerfilActual).toHaveBeenCalled());
         expect(areaMostrada()).toBe(AREA_ANTERIOR);
         expect(window.sessionStorage.getItem("intranet.auth.session")).not.toBeNull();
     });
 
     it("avisa de que el área no pudo confirmarse cuando falla la consulta", async () => {
         saveSession(sesionDe("jefe_area", { id: "3", nombre: AREA_ANTERIOR }));
-        vi.mocked(listarAreas).mockRejectedValue(new Error("backend caído"));
+        vi.mocked(obtenerPerfilActual).mockRejectedValue(new Error("backend caído"));
 
         renderizarInicio();
 
@@ -158,15 +180,31 @@ describe("Inicio — área del usuario", () => {
 
     it("reintentar recupera el área nueva y retira el aviso", async () => {
         saveSession(sesionDe("jefe_area", { id: "3", nombre: AREA_ANTERIOR }));
-        vi.mocked(listarAreas).mockRejectedValueOnce(new Error("backend caído"));
+        vi.mocked(obtenerPerfilActual).mockRejectedValueOnce(new Error("backend caído"));
 
         renderizarInicio();
 
         const reintentar = await screen.findByRole("button", { name: "Reintentar" });
-        vi.mocked(listarAreas).mockResolvedValue([areaCatalogo("5", AREA_NUEVA)]);
+        vi.mocked(obtenerPerfilActual).mockResolvedValue(
+            perfilDe("JEFE_AREA", { id: 5, nombre: AREA_NUEVA }),
+        );
         await userEvent.click(reintentar);
 
         await waitFor(() => expect(areaMostrada()).toBe(AREA_NUEVA));
         expect(screen.queryByText(/No se pudo confirmar tu área/)).toBeNull();
+    });
+
+    it("cierra la sesión si el perfil responde 401", async () => {
+        saveSession(sesionDe("jefe_area", { id: "3", nombre: AREA_ANTERIOR }));
+        vi.mocked(obtenerPerfilActual).mockRejectedValue(
+            new ApiError(401, "Credenciales inválidas"),
+        );
+
+        renderizarInicio();
+
+        await waitFor(() =>
+            expect(window.sessionStorage.getItem("intranet.auth.session")).toBeNull(),
+        );
+        expect(screen.queryByText("Área")).toBeNull();
     });
 });

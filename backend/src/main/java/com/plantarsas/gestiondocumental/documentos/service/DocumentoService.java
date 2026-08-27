@@ -41,4 +41,10 @@ public interface DocumentoService {
             DocumentoEstadoActualizacionRequest request,
             AuthenticatedUser usuarioAutenticado
     );
+
+    /**
+     * Elimina de forma irreversible un documento obsoleto que ya cumplió el plazo de
+     * retención, junto con sus versiones, asociaciones de área y archivos físicos.
+     */
+    void eliminarDefinitivamente(Long documentoId, AuthenticatedUser usuarioAutenticado);
 }

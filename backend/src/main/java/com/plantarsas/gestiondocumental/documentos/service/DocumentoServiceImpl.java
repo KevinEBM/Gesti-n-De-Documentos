@@ -408,8 +408,9 @@ public class DocumentoServiceImpl implements DocumentoService {
         }
 
         if (estadoActual != estadoSolicitado) {
-            documento.cambiarEstado(estadoSolicitado);
-            documento.registrarActualizacionUtc(ahoraUtc());
+            LocalDateTime ahora = ahoraUtc();
+            documento.cambiarEstado(estadoSolicitado, ahora);
+            documento.registrarActualizacionUtc(ahora);
             documentoRepository.save(documento);
         }
 
@@ -430,6 +431,83 @@ public class DocumentoServiceImpl implements DocumentoService {
         documentoRepository.flush();
 
         return documentoMapper.toResponse(documento, principal, asociacionesAdicionales, versionVigente);
+    }
+
+    /**
+     * Estrategia de consistencia: primero se borra la metadata dentro de la transacción y
+     * los archivos físicos solo se retiran cuando el commit ya se confirmó. Si la
+     * transacción falla, los archivos siguen en disco como huérfanos (se registran en el
+     * log) pero nunca queda metadata apuntando a un archivo inexistente, que es el estado
+     * que sí rompería descargas e historial.
+     */
+    @Override
+    @Transactional
+    public void eliminarDefinitivamente(Long documentoId, AuthenticatedUser usuarioAutenticado) {
+        if (usuarioAutenticado == null) {
+            throw new UnauthorizedException(
+                    "Se requiere un usuario autenticado para eliminar un documento"
+            );
+        }
+        if (usuarioAutenticado.rol() != RolEnum.ADMINISTRADOR) {
+            throw new UnauthorizedException(
+                    "Solo el administrador puede eliminar documentos definitivamente"
+            );
+        }
+        if (documentoId == null || documentoId <= 0) {
+            throw new BusinessException(
+                    "El identificador del documento debe ser un valor válido",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        Documento documento = documentoRepository.findById(documentoId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No existe un documento con id " + documentoId
+                ));
+
+        if (documento.getEstado() != DocumentoEstado.OBSOLETO) {
+            throw new BusinessException(
+                    "Solo se pueden eliminar documentos obsoletos"
+            );
+        }
+        if (!documento.esAptoParaEliminacion(ahoraUtc())) {
+            throw new BusinessException(
+                    "El documento '" + documento.getCodigo() + "' aún no cumple los "
+                            + Documento.ANOS_RETENCION_OBSOLETO
+                            + " años de retención exigidos para eliminarlo"
+            );
+        }
+
+        List<VersionDocumento> versiones =
+                versionDocumentoRepository.findByDocumento_IdOrderByNumeroVersionDesc(documentoId);
+        List<String> rutasArchivos = versiones.stream()
+                .map(VersionDocumento::getRutaArchivo)
+                .toList();
+
+        versionDocumentoRepository.deleteAll(versiones);
+        documentoAreaRepository.deleteAllByDocumento_Id(documentoId);
+        documentoRepository.delete(documento);
+        documentoRepository.flush();
+
+        registrarBorradoDeArchivosTrasCommit(rutasArchivos);
+    }
+
+    private void registrarBorradoDeArchivosTrasCommit(List<String> rutas) {
+        if (rutas.isEmpty()) {
+            return;
+        }
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            rutas.forEach(this::eliminarSilenciosamente);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        rutas.forEach(DocumentoServiceImpl.this::eliminarSilenciosamente);
+                    }
+                }
+        );
     }
 
     private void validarCodigoDocumentoUnico(String codigoNormalizado, Long documentoIdExcluir) {
@@ -616,10 +694,7 @@ public class DocumentoServiceImpl implements DocumentoService {
         try {
             storageService.eliminar(ruta);
         } catch (IOException e) {
-            log.error(
-                    "No se pudo eliminar el archivo huérfano en ruta '{}' tras un fallo de publicación",
-                    ruta, e
-            );
+            log.error("No se pudo eliminar el archivo almacenado en la ruta '{}'", ruta, e);
         }
     }
 }
