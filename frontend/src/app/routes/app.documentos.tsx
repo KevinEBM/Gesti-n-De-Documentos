@@ -530,7 +530,7 @@ function Biblioteca() {
             titulo="Biblioteca de documentos"
             descripcion={`${totalElementos} documento(s) encontrados`}
             acciones={
-                <div className="hidden items-center gap-1 rounded-md border border-border p-0.5 md:flex">
+                <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
                     <Button
                         variant={vista === "tabla" ? "secondary" : "ghost"}
                         size="sm"
@@ -595,7 +595,7 @@ function Biblioteca() {
                         <p className="text-sm text-muted-foreground">Cargando catálogos de filtros...</p>
                     ) : null}
 
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                    <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1.15fr)_minmax(8.5rem,0.65fr)_minmax(10rem,0.85fr)_minmax(10rem,0.85fr)]">
                         <DocumentoFiltroSelect
                             label="Área"
                             value={filtrosFormulario.area}
@@ -656,7 +656,7 @@ function Biblioteca() {
                             }
                             opciones={opcionesEstado}
                         />
-                        <div className="space-y-1.5">
+                        <div className="min-w-0 space-y-1.5">
                             <Label className="text-xs text-muted-foreground">Desde</Label>
                             <Input
                                 type="date"
@@ -669,7 +669,7 @@ function Biblioteca() {
                                 }
                             />
                         </div>
-                        <div className="space-y-1.5">
+                        <div className="min-w-0 space-y-1.5">
                             <Label className="text-xs text-muted-foreground">Hasta</Label>
                             <Input
                                 type="date"

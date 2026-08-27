@@ -249,14 +249,16 @@ function DetalleDocumento() {
                                 <IconoTipo className={`size-5 ${colorTipo}`} />
                             </div>
                             <div className="min-w-0">
-                                <CardTitle className="text-lg leading-snug break-words">
-                                    {documento.titulo}
-                                </CardTitle>
-                                <p className="mt-1.5 font-mono text-sm font-semibold tracking-wide text-foreground">
+                                <div className="flex flex-wrap items-baseline gap-x-8 gap-y-1">
+                                    <CardTitle className="min-w-0 flex-[1_1_14rem] text-lg leading-snug break-words">
+                                        {documento.titulo}
+                                    </CardTitle>
+                                    <p className="shrink-0 text-lg font-medium leading-snug text-muted-foreground">
+                                        Versión vigente: {documento.numeroVersionActual}
+                                    </p>
+                                </div>
+                                <p className="mt-2 font-mono text-base font-semibold tracking-wide text-foreground break-words">
                                     {documento.codigo}
-                                </p>
-                                <p className="mt-0.5 text-sm text-muted-foreground">
-                                    Versión vigente: {documento.numeroVersionActual}
                                 </p>
                             </div>
                         </div>
