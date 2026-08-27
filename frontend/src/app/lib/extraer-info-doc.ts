@@ -28,7 +28,13 @@ interface CodigoInstitucional {
     abreviaturaTipo: string;
 }
 
-const NOMBRES_TIPO_POR_ABREVIATURA: Record<string, string> = {
+/**
+ * Fallback histórico de nomenclatura, anterior a tipos_documento.codigo.
+ * Nunca tiene prioridad sobre el catálogo recibido del backend.
+ * Solo se usa si el catálogo no trae códigos (legado) o para pistas sintácticas
+ * del parser de nombre de archivo.
+ */
+const FALLBACK_NOMBRES_TIPO_POR_ABREVIATURA: Record<string, string> = {
     ma: "Manual",
     pg: "Programa",
     pc: "Proceso",
@@ -88,14 +94,51 @@ export function extraerMetadatosDesdeArchivo(
 
 export function resolverNombreTipo(abreviatura: string): string | null {
     const clave = normalizarAbreviatura(abreviatura);
-    return NOMBRES_TIPO_POR_ABREVIATURA[clave] ?? null;
+    return FALLBACK_NOMBRES_TIPO_POR_ABREVIATURA[clave] ?? null;
 }
 
 export function listarAbreviaturasPorNombreTipo(nombreTipo: string): string[] {
     const objetivo = normalizarNombre(nombreTipo);
-    return Object.entries(NOMBRES_TIPO_POR_ABREVIATURA)
+    return Object.entries(FALLBACK_NOMBRES_TIPO_POR_ABREVIATURA)
         .filter(([, nombre]) => normalizarNombre(nombre) === objetivo)
         .map(([abreviatura]) => abreviatura);
+}
+
+export interface TipoCatalogoResolucion {
+    id: string;
+    codigo?: string;
+    nombre: string;
+    activo: boolean;
+}
+
+export function normalizarCodigoTipo(codigo: string): string {
+    return codigo.trim().toUpperCase();
+}
+
+export function coincidenciasTipoPorCodigo<T extends TipoCatalogoResolucion>(
+    codigo: string,
+    tipos: T[],
+): T[] {
+    const clave = normalizarCodigoTipo(codigo);
+    if (!clave) return [];
+    return tipos.filter(
+        (tipo) =>
+            tipo.activo &&
+            !!tipo.codigo?.trim() &&
+            normalizarCodigoTipo(tipo.codigo) === clave,
+    );
+}
+
+export function resolverTipoUnicoPorCodigo<T extends TipoCatalogoResolucion>(
+    codigo: string,
+    tipos: T[],
+): T | null {
+    const coincidencias = coincidenciasTipoPorCodigo(codigo, tipos);
+    return coincidencias.length === 1 ? coincidencias[0] : null;
+}
+
+export function catalogoTiposTieneCodigos(tipos: TipoCatalogoResolucion[]): boolean {
+    return tipos.some((tipo) => !!tipo.codigo?.trim());
 }
 
 export function nombresCoinciden(a: string, b: string): boolean {
@@ -143,7 +186,7 @@ function parsearCodigoInstitucional(codigo: string): CodigoInstitucional | null 
     if (!consecutivo || !/^\d+$/.test(consecutivo)) {
         return null;
     }
-    if (!abreviaturaTipo || !/^[A-Za-z&]{1,3}$/.test(abreviaturaTipo)) {
+    if (!abreviaturaTipo || !/^[A-Za-z0-9&]{1,20}$/.test(abreviaturaTipo)) {
         return null;
     }
     if (!codigoSubproceso || !/^[A-Za-z0-9&]+$/.test(codigoSubproceso)) {

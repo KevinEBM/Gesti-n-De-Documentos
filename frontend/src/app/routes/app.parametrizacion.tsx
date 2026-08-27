@@ -1184,15 +1184,17 @@ function SeccionTiposDocumento({
     const [alternandoId, setAlternandoId] = useState<string | null>(null);
     const [form, setForm] = useState<{
         id?: string;
+        codigo: string;
         nombre: string;
         descripcion: string;
     }>({
+        codigo: "",
         nombre: "",
         descripcion: "",
     });
     const [errorForm, setErrorForm] = useState("");
     const [erroresCampo, setErroresCampo] = useState<
-        Partial<Record<"nombre" | "descripcion", string>>
+        Partial<Record<"codigo" | "nombre" | "descripcion", string>>
     >({});
     const [busqueda, setBusqueda] = useState("");
     const [estadoFiltro, setEstadoFiltro] = useState<FiltroEstadoActivo>("todos");
@@ -1232,6 +1234,7 @@ function SeccionTiposDocumento({
 
     const abrirNuevo = () => {
         setForm({
+            codigo: "",
             nombre: "",
             descripcion: "",
         });
@@ -1243,6 +1246,7 @@ function SeccionTiposDocumento({
     const abrirEditar = (tipo: TipoDocumentoCatalogo) => {
         setForm({
             id: tipo.id,
+            codigo: tipo.codigo,
             nombre: tipo.nombre,
             descripcion: tipo.descripcion,
         });
@@ -1255,9 +1259,18 @@ function SeccionTiposDocumento({
         setErrorForm("");
         setErroresCampo({});
 
+        const codigo = form.codigo.trim().toUpperCase();
         const nombre = form.nombre.trim();
         const descripcion = form.descripcion.trim();
 
+        if (!codigo) {
+            setErrorForm("El código es obligatorio.");
+            return;
+        }
+        if (codigo.length > 20) {
+            setErrorForm("El código no puede superar los 20 caracteres.");
+            return;
+        }
         if (!nombre) {
             setErrorForm("El nombre es obligatorio.");
             return;
@@ -1275,6 +1288,7 @@ function SeccionTiposDocumento({
         try {
             if (form.id) {
                 const actualizado = await actualizarTipoDocumento(form.id, {
+                    codigo,
                     nombre,
                     descripcion,
                 });
@@ -1286,6 +1300,7 @@ function SeccionTiposDocumento({
                 toast.success("Registro actualizado");
             } else {
                 const creado = await crearTipoDocumento({
+                    codigo,
                     nombre,
                     descripcion,
                 });
@@ -1301,6 +1316,7 @@ function SeccionTiposDocumento({
             if (err instanceof ApiError) {
                 if (err.errores) {
                     setErroresCampo({
+                        codigo: err.errores.codigo,
                         nombre: err.errores.nombre,
                         descripcion: err.errores.descripcion,
                     });
@@ -1409,6 +1425,7 @@ function SeccionTiposDocumento({
                             <Table>
                                 <TableHeader>
                                     <TableRow className="bg-secondary/60">
+                                        <TableHead>Código</TableHead>
                                         <TableHead>Nombre</TableHead>
                                         <TableHead>Descripción</TableHead>
                                         <TableHead>Estado</TableHead>
@@ -1423,6 +1440,9 @@ function SeccionTiposDocumento({
 
                                         return (
                                             <TableRow key={tipo.id}>
+                                                <TableCell className="font-mono text-sm font-medium">
+                                                    {tipo.codigo}
+                                                </TableCell>
                                                 <TableCell className="font-medium">
                                                     <div className="flex items-center gap-2">
                                                         <Icono
@@ -1491,6 +1511,22 @@ function SeccionTiposDocumento({
                     </DialogHeader>
 
                     <div className="space-y-4">
+                        <div className="space-y-1.5">
+                            <Label>Código *</Label>
+                            <Input
+                                value={form.codigo}
+                                maxLength={20}
+                                className="uppercase"
+                                onChange={(e) =>
+                                    setForm({ ...form, codigo: e.target.value })
+                                }
+                            />
+                            {erroresCampo.codigo && (
+                                <p className="text-xs text-destructive">
+                                    {erroresCampo.codigo}
+                                </p>
+                            )}
+                        </div>
                         <div className="space-y-1.5">
                             <Label>Nombre *</Label>
                             <Input

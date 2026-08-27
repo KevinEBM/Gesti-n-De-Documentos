@@ -139,7 +139,7 @@ export interface DocumentoDetalle {
     areasAdicionales: AreaResumen[];
 }
 
-export type AlcanceConsulta = "TODOS_VISIBLES" | "MI_AREA" | "GLOBALES";
+export type AlcanceConsulta = "TODOS_VISIBLES" | "MI_AREA" | "GLOBALES" | "AREAS_ESPECIFICAS";
 
 export interface DocumentoFiltros {
     page?: number;

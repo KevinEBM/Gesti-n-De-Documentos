@@ -7,5 +7,6 @@ package com.plantarsas.gestiondocumental.shared.enums;
 public enum AlcanceConsulta {
     TODOS_VISIBLES,
     MI_AREA,
-    GLOBALES
+    GLOBALES,
+    AREAS_ESPECIFICAS
 }

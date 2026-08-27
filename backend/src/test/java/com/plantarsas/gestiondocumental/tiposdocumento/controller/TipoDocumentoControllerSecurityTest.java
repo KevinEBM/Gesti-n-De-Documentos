@@ -56,16 +56,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class TipoDocumentoControllerSecurityTest {
 
     private static final String TIPO_DOCUMENTO_REQUEST_JSON =
-            "{\"nombre\":\"Tipo A\",\"descripcion\":\"Descripcion\"}";
+            "{\"codigo\":\"MA\",\"nombre\":\"Tipo A\",\"descripcion\":\"Descripcion\"}";
 
     private static final String TIPO_DOCUMENTO_REQUEST_INVALIDO_JSON =
-            "{\"nombre\":\"\",\"descripcion\":\"Descripcion\"}";
+            "{\"codigo\":\"MA\",\"nombre\":\"\",\"descripcion\":\"Descripcion\"}";
 
     private static final String TIPO_DOCUMENTO_UPDATE_REQUEST_JSON =
-            "{\"nombre\":\"Tipo actualizado\",\"descripcion\":\"Descripcion actualizada\"}";
+            "{\"codigo\":\"MA\",\"nombre\":\"Tipo actualizado\",\"descripcion\":\"Descripcion actualizada\"}";
 
     private static final String TIPO_DOCUMENTO_UPDATE_REQUEST_INVALIDO_JSON =
-            "{\"nombre\":\"\",\"descripcion\":\"Descripcion\"}";
+            "{\"codigo\":\"MA\",\"nombre\":\"\",\"descripcion\":\"Descripcion\"}";
 
     private static final String TIPO_DOCUMENTO_ESTADO_REQUEST_JSON =
             "{\"activo\":false}";
@@ -106,6 +106,7 @@ class TipoDocumentoControllerSecurityTest {
     private TipoDocumentoResponse respuestaDePrueba(Long id) {
         return new TipoDocumentoResponse(
                 id,
+                "MA",
                 "Tipo A",
                 "Descripcion",
                 true,
@@ -178,6 +179,28 @@ class TipoDocumentoControllerSecurityTest {
         mockMvc.perform(post("/api/tipos-documento")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(TIPO_DOCUMENTO_REQUEST_INVALIDO_JSON))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(tipoDocumentoService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMINISTRADOR")
+    void crear_conCodigoDemasiadoLargo_debeResponder400() throws Exception {
+        mockMvc.perform(post("/api/tipos-documento")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"codigo\":\"ABCDEFGHIJKLMNOPQRSTU\",\"nombre\":\"Tipo A\",\"descripcion\":\"Descripcion\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(tipoDocumentoService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMINISTRADOR")
+    void crear_conCodigoInvalido_debeResponder400() throws Exception {
+        mockMvc.perform(post("/api/tipos-documento")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"codigo\":\"\",\"nombre\":\"Tipo A\",\"descripcion\":\"Descripcion\"}"))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(tipoDocumentoService);

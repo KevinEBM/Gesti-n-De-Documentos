@@ -2,6 +2,7 @@ import { apiFetch } from "./api";
 
 export interface TipoDocumentoResponseDto {
     id: number;
+    codigo: string;
     nombre: string;
     descripcion: string | null;
     activo: boolean;
@@ -10,11 +11,13 @@ export interface TipoDocumentoResponseDto {
 }
 
 export interface TipoDocumentoRequestDto {
+    codigo: string;
     nombre: string;
     descripcion: string;
 }
 
 export interface TipoDocumentoUpdateRequestDto {
+    codigo: string;
     nombre: string;
     descripcion: string;
 }
@@ -25,6 +28,7 @@ export interface TipoDocumentoEstadoRequestDto {
 
 export interface TipoDocumentoCatalogo {
     id: string;
+    codigo: string;
     nombre: string;
     descripcion: string;
     activo: boolean;
@@ -35,6 +39,7 @@ export function mapTipoDocumentoResponseDto(
 ): TipoDocumentoCatalogo {
     return {
         id: String(dto.id),
+        codigo: dto.codigo,
         nombre: dto.nombre,
         descripcion: dto.descripcion ?? "",
         activo: dto.activo,

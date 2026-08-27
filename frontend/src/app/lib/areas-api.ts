@@ -43,6 +43,12 @@ export async function listarAreas(): Promise<AreaCatalogo[]> {
     return datos.map(mapAreaResponseDto);
 }
 
+/** Catálogo completo para filtros de consulta. No otorga permisos documentales. */
+export async function listarAreasConsulta(): Promise<AreaCatalogo[]> {
+    const datos = await apiFetch<AreaResponseDto[]>("/api/areas/consulta");
+    return datos.map(mapAreaResponseDto);
+}
+
 export async function crearArea(body: AreaRequestDto): Promise<AreaCatalogo> {
     const dto = await apiFetch<AreaResponseDto>("/api/areas", {
         method: "POST",

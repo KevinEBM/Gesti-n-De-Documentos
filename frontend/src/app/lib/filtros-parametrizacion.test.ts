@@ -107,15 +107,38 @@ describe("filtrarSubprogramasCatalogo", () => {
 const tiposMock: TipoDocumentoCatalogo[] = [
     {
         id: "1",
+        codigo: "PT",
         nombre: "Protocolo",
         descripcion: "",
         activo: true,
     },
     {
         id: "2",
+        codigo: "FO",
         nombre: "Formato",
         descripcion: "",
         activo: false,
+    },
+    {
+        id: "3",
+        codigo: "ODE",
+        nombre: "Plantilla",
+        descripcion: "",
+        activo: true,
+    },
+    {
+        id: "4",
+        codigo: "ODE",
+        nombre: "Documentos Externos",
+        descripcion: "",
+        activo: true,
+    },
+    {
+        id: "5",
+        codigo: "ODE",
+        nombre: "Imágenes",
+        descripcion: "",
+        activo: true,
     },
 ];
 
@@ -130,9 +153,19 @@ describe("filtrarTiposDocumentoCatalogo", () => {
         expect(resultado.map((item) => item.id)).toEqual(["1"]);
     });
 
-    it("encuentra por abreviatura institucional FO", () => {
+    it("encuentra por código parametrizado FO", () => {
         const resultado = filtrarTiposDocumentoCatalogo(tiposMock, "FO", "todos");
         expect(resultado.map((item) => item.id)).toEqual(["2"]);
+    });
+
+    it("encuentra los tres tipos ODE por código", () => {
+        const resultado = filtrarTiposDocumentoCatalogo(tiposMock, "ode", "todos");
+        expect(resultado.map((item) => item.id)).toEqual(["3", "4", "5"]);
+    });
+
+    it("encuentra Imágenes sin tilde", () => {
+        const resultado = filtrarTiposDocumentoCatalogo(tiposMock, "imagenes", "todos");
+        expect(resultado.map((item) => item.id)).toEqual(["5"]);
     });
 
     it("combina búsqueda con estado inactivos", () => {

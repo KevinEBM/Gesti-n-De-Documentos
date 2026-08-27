@@ -8,28 +8,28 @@ import {
     DocumentoEstadoBadge,
     DocumentoFiltroSelect,
 } from "@/components/documentos-consulta-ui";
+import { SelectorAreaResponsable } from "@/components/selector-area-responsable";
+import { SelectorSubproceso } from "@/components/selector-subproceso";
+import { SelectorTipoDocumento } from "@/components/selector-tipo-documento";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ApiError } from "@/lib/api";
-import { listarAreas, type AreaCatalogo } from "@/lib/areas-api";
+import { listarAreas, listarAreasConsulta, type AreaCatalogo } from "@/lib/areas-api";
 import {
     construirFiltrosApi,
     construirFiltrosBaseConsulta,
     dispararDescargaEnNavegador,
-    etiquetaCatalogoConsulta,
     etiquetasAlcance,
-    areaConsultaNoAdminBloqueada,
     filtrarSubprogramasConsulta,
     filtrosVacios,
     formatFechaDocumento,
     hayFiltrosActivos,
+    opcionesAlcanceConsulta,
     resolverAreaIdEfectivaConsulta,
-    resolverAreaObligatoriaNoAdmin,
     subprocesoConsultaDeshabilitado,
     TODOS,
     type FiltrosDocumentos,
@@ -41,7 +41,7 @@ import {
 } from "@/lib/documentos-api";
 import { obtenerIconoFormato } from "@/lib/iconos-formatos";
 import { obtenerIconoSubProceso } from "@/lib/iconos-subprocesos";
-import { listarSubprogramas, type SubprogramaCatalogo } from "@/lib/subprogramas-api";
+import { listarSubprogramasConsulta, type SubprogramaCatalogo } from "@/lib/subprogramas-api";
 import { useIntranet } from "@/lib/store";
 import { listarTiposDocumentoConsulta, type TipoDocumentoCatalogo } from "@/lib/tipos-documento-api";
 
@@ -60,8 +60,8 @@ export const Route = createFileRoute("/app/documentos")({
     component: Biblioteca,
 });
 
-function opcionesFiltrosApi(esAdmin: boolean) {
-    return { incluirAreaEnConsulta: esAdmin };
+function opcionesFiltrosApi() {
+    return { incluirAreaEnConsulta: true };
 }
 
 function Biblioteca() {
@@ -92,14 +92,6 @@ function Biblioteca() {
     const [vista, setVista] = useState<"tabla" | "tarjetas">("tabla");
     const [descargandoId, setDescargandoId] = useState<string | null>(null);
 
-    const areaObligatoriaNoAdmin = resolverAreaObligatoriaNoAdmin(
-        esAdmin,
-        areasCatalogo,
-        areasApiCargadas,
-        sesion?.areaId,
-        sesion?.areaPrincipalNombre,
-    );
-    const areaFiltroBloqueada = areaConsultaNoAdminBloqueada(esAdmin);
     const areaIdEfectiva = resolverAreaIdEfectivaConsulta({
         esAdmin,
         filtroArea: filtrosFormulario.area,
@@ -118,39 +110,9 @@ function Biblioteca() {
         [subprogramasCatalogo, esAdmin, areaIdEfectiva],
     );
 
-    const opcionesAreasFiltro = useMemo(
-        () =>
-            areasCatalogo.map((area) => ({
-                v: area.id,
-                l: etiquetaCatalogoConsulta(area.nombre, area.activo, "femenino"),
-            })),
-        [areasCatalogo],
-    );
-
-    const opcionesSubprogramasFiltro = useMemo(
-        () =>
-            subprogramasFiltro.map((item) => ({
-                v: item.id,
-                l: etiquetaCatalogoConsulta(item.nombre ?? "", item.activo ?? true, "masculino"),
-            })),
-        [subprogramasFiltro],
-    );
-
-    const opcionesTiposFiltro = useMemo(
-        () =>
-            tiposCatalogo.map((tipo) => ({
-                v: tipo.id,
-                l: etiquetaCatalogoConsulta(tipo.nombre, tipo.activo, "masculino"),
-            })),
-        [tiposCatalogo],
-    );
-
     const filtrosAplicadosActivos = useMemo(
-        () =>
-            hayFiltrosActivos(filtrosAplicados, {
-                areaNoCuentaComoFiltro: areaObligatoriaNoAdmin,
-            }),
-        [filtrosAplicados, areaObligatoriaNoAdmin],
+        () => hayFiltrosActivos(filtrosAplicados),
+        [filtrosAplicados],
     );
 
     const cargarCatalogos = useCallback(async (forzar = false): Promise<AreaCatalogo[]> => {
@@ -161,9 +123,10 @@ function Biblioteca() {
         setCargandoCatalogos(true);
         setErrorCatalogos(null);
         try {
-            const [areas, subprogramas, tipos] = await Promise.all([
+            const [areasUsuario, areas, subprogramas, tipos] = await Promise.all([
                 listarAreas(),
-                listarSubprogramas(),
+                listarAreasConsulta(),
+                listarSubprogramasConsulta(),
                 listarTiposDocumentoConsulta(esAdmin),
             ]);
             setAreasCatalogo(areas);
@@ -171,37 +134,7 @@ function Biblioteca() {
             setSubprogramasCatalogo(subprogramas);
             setTiposCatalogo(tipos);
             catalogosCargados.current = true;
-            sincronizarAreaDesdeCatalogo(areas, true);
-
-            if (!esAdmin) {
-                const areaId = resolverAreaObligatoriaNoAdmin(
-                    esAdmin,
-                    areas,
-                    true,
-                    sesion?.areaId,
-                    sesion?.areaPrincipalNombre,
-                );
-                if (areaId) {
-                    setFiltrosFormulario((prev) =>
-                        prev.area === TODOS || prev.area !== areaId
-                            ? { ...prev, area: areaId, subprograma: TODOS }
-                            : prev,
-                    );
-                    setFiltrosAplicados((prev) =>
-                        prev.area === TODOS || prev.area !== areaId
-                            ? { ...prev, area: areaId, subprograma: TODOS }
-                            : prev,
-                    );
-                } else {
-                    setFiltrosFormulario((prev) =>
-                        prev.area !== TODOS ? { ...prev, area: TODOS, subprograma: TODOS } : prev,
-                    );
-                    setFiltrosAplicados((prev) =>
-                        prev.area !== TODOS ? { ...prev, area: TODOS, subprograma: TODOS } : prev,
-                    );
-                }
-            }
-
+            sincronizarAreaDesdeCatalogo(areasUsuario, true);
             return areas;
         } catch (err) {
             catalogosCargados.current = false;
@@ -215,7 +148,7 @@ function Biblioteca() {
         } finally {
             setCargandoCatalogos(false);
         }
-    }, [areasCatalogo, errorCatalogos, esAdmin, sincronizarAreaDesdeCatalogo, sesion?.areaId, sesion?.areaPrincipalNombre]);
+    }, [areasCatalogo, errorCatalogos, esAdmin, sincronizarAreaDesdeCatalogo]);
 
     const cargarDocumentos = useCallback(
         async (filtros: FiltrosDocumentos, page: number) => {
@@ -225,7 +158,7 @@ function Biblioteca() {
 
             try {
                 const resultado = await listarDocumentos(
-                    construirFiltrosApi(filtros, page, opcionesFiltrosApi(esAdmin)),
+                    construirFiltrosApi(filtros, page, opcionesFiltrosApi()),
                 );
                 if (requestId !== requestIdRef.current) return;
 
@@ -596,58 +529,49 @@ function Biblioteca() {
                     ) : null}
 
                     <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1.15fr)_minmax(8.5rem,0.65fr)_minmax(10rem,0.85fr)_minmax(10rem,0.85fr)]">
-                        <DocumentoFiltroSelect
-                            label="Área"
-                            value={filtrosFormulario.area}
-                            onChange={cambiarArea}
-                            opciones={opcionesAreasFiltro}
-                            tipoFiltro="area"
-                            ocultarTodos={areaFiltroBloqueada}
-                            disabled={
-                                cargandoCatalogos ||
-                                !!errorCatalogos ||
-                                areaFiltroBloqueada
-                            }
-                        />
-                        <DocumentoFiltroSelect
-                            label="Subproceso"
-                            value={filtrosFormulario.subprograma}
-                            onChange={(subprograma) =>
-                                setFiltrosFormulario((prev) => ({ ...prev, subprograma }))
-                            }
-                            opciones={opcionesSubprogramasFiltro}
-                            tipoFiltro="subproceso"
-                            disabled={
-                                cargandoCatalogos ||
-                                !!errorCatalogos ||
-                                subprocesoConsultaDeshabilitado(
+                        <div className="min-w-0 space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Área responsable</Label>
+                            <SelectorAreaResponsable
+                                areas={areasCatalogo}
+                                value={filtrosFormulario.area}
+                                onValueChange={cambiarArea}
+                                formato="codigo-nombre"
+                                placeholder="Todos"
+                                disabled={cargandoCatalogos || !!errorCatalogos}
+                                opcionTodos={{ value: TODOS, label: "Todos" }}
+                            />
+                        </div>
+                        <div className="min-w-0 space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Subproceso</Label>
+                            <SelectorSubproceso
+                                subprogramas={subprogramasFiltro}
+                                value={filtrosFormulario.subprograma}
+                                onValueChange={(subprograma) =>
+                                    setFiltrosFormulario((prev) => ({ ...prev, subprograma }))
+                                }
+                                placeholder="Todos"
+                                disabled={subprocesoConsultaDeshabilitado(
                                     esAdmin,
                                     areaIdEfectiva,
                                     cargandoCatalogos,
                                     errorCatalogos,
-                                )
-                            }
-                            placeholder={
-                                subprocesoConsultaDeshabilitado(
-                                    esAdmin,
-                                    areaIdEfectiva,
-                                    false,
-                                    null,
-                                )
-                                    ? "Seleccione primero un área"
-                                    : undefined
-                            }
-                        />
-                        <DocumentoFiltroSelect
-                            label="Tipo"
-                            value={filtrosFormulario.tipo}
-                            onChange={(tipo) =>
-                                setFiltrosFormulario((prev) => ({ ...prev, tipo }))
-                            }
-                            opciones={opcionesTiposFiltro}
-                            tipoFiltro="tipo"
-                            disabled={cargandoCatalogos || !!errorCatalogos}
-                        />
+                                )}
+                                opcionTodos={{ value: TODOS, label: "Todos" }}
+                            />
+                        </div>
+                        <div className="min-w-0 space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Tipo</Label>
+                            <SelectorTipoDocumento
+                                tipos={tiposCatalogo}
+                                value={filtrosFormulario.tipo}
+                                onValueChange={(tipo) =>
+                                    setFiltrosFormulario((prev) => ({ ...prev, tipo }))
+                                }
+                                placeholder="Todos"
+                                disabled={cargandoCatalogos || !!errorCatalogos}
+                                opcionTodos={{ value: TODOS, label: "Todos" }}
+                            />
+                        </div>
                         <DocumentoFiltroSelect
                             label="Estado"
                             value={filtrosFormulario.estado}
@@ -688,20 +612,21 @@ function Biblioteca() {
                         <p className="text-sm text-destructive">{errorFechas}</p>
                     ) : null}
 
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
-                            <Checkbox
-                                checked={filtrosFormulario.soloGlobales}
-                                onCheckedChange={(checked) =>
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                        <div className="w-full min-w-0 max-w-56">
+                            <DocumentoFiltroSelect
+                                label="Alcance"
+                                value={filtrosFormulario.alcance}
+                                onChange={(alcance) =>
                                     setFiltrosFormulario((prev) => ({
                                         ...prev,
-                                        soloGlobales: checked === true,
+                                        alcance: alcance as typeof prev.alcance,
                                     }))
                                 }
-                                disabled={cargandoCatalogos || !!errorCatalogos}
+                                opciones={opcionesAlcanceConsulta}
+                                todosLabel="Todos"
                             />
-                            Solo globales
-                        </label>
+                        </div>
                         <div className="flex gap-2">
                             <Button variant="ghost" size="sm" onClick={limpiarFiltros} className="gap-1.5">
                                 <X className="size-4" /> Limpiar filtros

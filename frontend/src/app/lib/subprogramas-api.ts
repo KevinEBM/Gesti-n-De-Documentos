@@ -63,6 +63,12 @@ export async function listarSubprogramas(): Promise<SubprogramaCatalogo[]> {
     return datos.map(mapSubprogramaResponseDto);
 }
 
+/** Catálogo completo para filtros de consulta. No otorga permisos documentales. */
+export async function listarSubprogramasConsulta(): Promise<SubprogramaCatalogo[]> {
+    const datos = await apiFetch<SubprogramaResponseDto[]>("/api/subprogramas/consulta");
+    return datos.map(mapSubprogramaResponseDto);
+}
+
 export async function crearSubprograma(
     body: SubprogramaRequestDto,
 ): Promise<SubprogramaCatalogo> {

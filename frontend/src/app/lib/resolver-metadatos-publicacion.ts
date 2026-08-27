@@ -1,6 +1,9 @@
 import {
     extraerMetadatosDesdeArchivo,
     nombresCoinciden,
+    catalogoTiposTieneCodigos,
+    coincidenciasTipoPorCodigo,
+    resolverTipoUnicoPorCodigo,
     type MetadatosExtraidosDocumento,
 } from "./extraer-info-doc";
 import type { SubprogramaCatalogo } from "./subprogramas-api";
@@ -133,6 +136,29 @@ function resolverCamposCatalogo(
             avisos.push(
                 "Se reconoció el subproceso, pero no se encontró en los catálogos activos. Revise los metadatos manualmente.",
             );
+        }
+    }
+
+    if (extraccion.abreviaturaTipo) {
+        const tipoUnico = resolverTipoUnicoPorCodigo(extraccion.abreviaturaTipo, tipos);
+        if (tipoUnico) {
+            actualizaciones.tipoDocumentoId = tipoUnico.id;
+            return;
+        }
+
+        const coincidencias = coincidenciasTipoPorCodigo(extraccion.abreviaturaTipo, tipos);
+        if (coincidencias.length > 1) {
+            avisos.push(
+                "El código de tipo coincide con varios registros. Seleccione el tipo de documento manualmente.",
+            );
+            return;
+        }
+
+        if (catalogoTiposTieneCodigos(tipos)) {
+            avisos.push(
+                "Se reconoció el tipo de documento, pero no se encontró en los catálogos activos. Revise los metadatos manualmente.",
+            );
+            return;
         }
     }
 

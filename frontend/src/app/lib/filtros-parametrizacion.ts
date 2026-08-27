@@ -65,7 +65,7 @@ export function coincideBusquedaTipoDocumento(
     tipo: TipoDocumentoCatalogo,
     busqueda: string,
 ): boolean {
-    if (coincideBusquedaEnCampos(busqueda, [tipo.nombre])) {
+    if (coincideBusquedaEnCampos(busqueda, [tipo.codigo, tipo.nombre])) {
         return true;
     }
 

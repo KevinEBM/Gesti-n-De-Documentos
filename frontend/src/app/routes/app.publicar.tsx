@@ -14,6 +14,9 @@ import { toast } from "sonner";
 
 import { AppShell } from "@/components/AppShell";
 import { DropzoneArea } from "@/components/DropzoneArea";
+import { SelectorAreaResponsable } from "@/components/selector-area-responsable";
+import { SelectorSubproceso } from "@/components/selector-subproceso";
+import { SelectorTipoDocumento } from "@/components/selector-tipo-documento";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -38,8 +41,6 @@ import {
 } from "@/lib/documentos-api";
 import { aplicarMetadatosDesdeArchivo, resolverMetadatosCatalogoDesdeArchivo } from "@/lib/resolver-metadatos-publicacion";
 import { obtenerIconoArea } from "@/lib/iconos-areas";
-import { obtenerIconoFormato } from "@/lib/iconos-formatos";
-import { obtenerIconoSubProceso } from "@/lib/iconos-subprocesos";
 import { listarSubprogramas, type SubprogramaCatalogo } from "@/lib/subprogramas-api";
 import { useIntranet } from "@/lib/store";
 import { listarTiposDocumento, type TipoDocumentoCatalogo } from "@/lib/tipos-documento-api";
@@ -771,43 +772,17 @@ function NuevoDocumentoPage() {
                                     error={errores.areaId}
                                     campoRef={registrarRefCampo("areaId")}
                                 >
-                                    <Select
+                                    <SelectorAreaResponsable
+                                        id="areaId"
+                                        areas={areasActivas}
                                         value={form.areaId}
                                         onValueChange={cambiarArea}
+                                        formato="nombre"
+                                        placeholder="Seleccionar…"
                                         disabled={formularioDeshabilitado}
-                                    >
-                                        <SelectTrigger
-                                            className={cn(
-                                                SELECT_TRIGGER_CLASS,
-                                                errores.areaId && "border-destructive",
-                                            )}
-                                            aria-invalid={!!errores.areaId}
-                                            aria-describedby={
-                                                errores.areaId ? "areaId-error" : undefined
-                                            }
-                                        >
-                                            <SelectValue placeholder="Seleccionar…" />
-                                        </SelectTrigger>
-                                        <SelectContent className={SELECT_CONTENT_CLASS}>
-                                            {areasActivas.map((area) => {
-                                                const { icono: Icono, color } = obtenerIconoArea(
-                                                    area.nombre,
-                                                );
-                                                return (
-                                                    <SelectItem
-                                                        className={SELECT_ITEM_CLASS}
-                                                        key={area.id}
-                                                        value={area.id}
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <Icono className={`size-4 ${color}`} />
-                                                            <span>{area.nombre}</span>
-                                                        </div>
-                                                    </SelectItem>
-                                                );
-                                            })}
-                                        </SelectContent>
-                                    </Select>
+                                        invalid={!!errores.areaId}
+                                        describedBy={errores.areaId ? "areaId-error" : undefined}
+                                    />
                                 </Campo>
 
                                 <Campo
@@ -817,57 +792,28 @@ function NuevoDocumentoPage() {
                                     error={errores.subprogramaId}
                                     campoRef={registrarRefCampo("subprogramaId")}
                                 >
-                                    <Select
+                                    <SelectorSubproceso
+                                        id="subprogramaId"
+                                        subprogramas={subprogramasActivos}
                                         value={form.subprogramaId}
                                         onValueChange={(subprogramaId) => {
-                                            // No hay ningún SelectItem vacío: un "" solo puede
-                                            // venir del <select> oculto de Radix cuando su opción
-                                            // aún no está registrada.
                                             if (!subprogramaId) return;
                                             setForm((prev) => ({ ...prev, subprogramaId }));
                                             limpiarError("subprogramaId");
                                         }}
+                                        placeholder={
+                                            form.areaId
+                                                ? "Seleccionar…"
+                                                : "Seleccione primero un área"
+                                        }
                                         disabled={formularioDeshabilitado || !form.areaId}
-                                    >
-                                        <SelectTrigger
-                                            className={cn(
-                                                SELECT_TRIGGER_CLASS,
-                                                errores.subprogramaId && "border-destructive",
-                                            )}
-                                            aria-invalid={!!errores.subprogramaId}
-                                            aria-describedby={
-                                                errores.subprogramaId
-                                                    ? "subprogramaId-error"
-                                                    : undefined
-                                            }
-                                        >
-                                            <SelectValue
-                                                placeholder={
-                                                    form.areaId
-                                                        ? "Seleccionar…"
-                                                        : "Seleccione primero un área"
-                                                }
-                                            />
-                                        </SelectTrigger>
-                                        <SelectContent className={SELECT_CONTENT_CLASS}>
-                                            {subprogramasActivos.map((subprograma) => {
-                                                const { icono: Icono, color } =
-                                                    obtenerIconoSubProceso(subprograma.nombre);
-                                                return (
-                                                    <SelectItem
-                                                        className={SELECT_ITEM_CLASS}
-                                                        key={subprograma.id}
-                                                        value={subprograma.id}
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <Icono className={`size-4 ${color}`} />
-                                                            <span>{subprograma.nombre}</span>
-                                                        </div>
-                                                    </SelectItem>
-                                                );
-                                            })}
-                                        </SelectContent>
-                                    </Select>
+                                        invalid={!!errores.subprogramaId}
+                                        describedBy={
+                                            errores.subprogramaId
+                                                ? "subprogramaId-error"
+                                                : undefined
+                                        }
+                                    />
                                 </Campo>
 
                                 <Campo
@@ -877,48 +823,23 @@ function NuevoDocumentoPage() {
                                     error={errores.tipoDocumentoId}
                                     campoRef={registrarRefCampo("tipoDocumentoId")}
                                 >
-                                    <Select
+                                    <SelectorTipoDocumento
+                                        id="tipoDocumentoId"
+                                        tipos={tiposActivos}
                                         value={form.tipoDocumentoId}
                                         onValueChange={(tipoDocumentoId) => {
                                             setForm((prev) => ({ ...prev, tipoDocumentoId }));
                                             limpiarError("tipoDocumentoId");
                                         }}
+                                        placeholder="Seleccionar…"
                                         disabled={formularioDeshabilitado}
-                                    >
-                                        <SelectTrigger
-                                            className={cn(
-                                                SELECT_TRIGGER_CLASS,
-                                                errores.tipoDocumentoId && "border-destructive",
-                                            )}
-                                            aria-invalid={!!errores.tipoDocumentoId}
-                                            aria-describedby={
-                                                errores.tipoDocumentoId
-                                                    ? "tipoDocumentoId-error"
-                                                    : undefined
-                                            }
-                                        >
-                                            <SelectValue placeholder="Seleccionar…" />
-                                        </SelectTrigger>
-                                        <SelectContent className={SELECT_CONTENT_CLASS}>
-                                            {tiposActivos.map((tipo) => {
-                                                const { icono: Icono, color } = obtenerIconoFormato(
-                                                    tipo.nombre,
-                                                );
-                                                return (
-                                                    <SelectItem
-                                                        className={SELECT_ITEM_CLASS}
-                                                        key={tipo.id}
-                                                        value={tipo.id}
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <Icono className={`size-4 ${color}`} />
-                                                            <span>{tipo.nombre}</span>
-                                                        </div>
-                                                    </SelectItem>
-                                                );
-                                            })}
-                                        </SelectContent>
-                                    </Select>
+                                        invalid={!!errores.tipoDocumentoId}
+                                        describedBy={
+                                            errores.tipoDocumentoId
+                                                ? "tipoDocumentoId-error"
+                                                : undefined
+                                        }
+                                    />
                                 </Campo>
                             </div>
 

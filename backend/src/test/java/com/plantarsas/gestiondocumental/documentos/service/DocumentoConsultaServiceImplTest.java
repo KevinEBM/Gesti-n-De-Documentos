@@ -909,6 +909,21 @@ class DocumentoConsultaServiceImplTest {
     }
 
     @Test
+    void listar_conAlcanceAreasEspecificasParaJefe_debeAplicarloSinLanzarExcepcion() {
+        Pageable pageable = PageRequest.of(0, 20);
+        when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of(10L));
+        when(documentoRepository.findAll(any(Specification.class), any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        DocumentoFiltroRequest filtro = new DocumentoFiltroRequest(
+                null, null, null, null, null, null, null, null, AlcanceConsulta.AREAS_ESPECIFICAS
+        );
+
+        assertThatCode(() -> documentoConsultaServiceImpl.listar(jefeArea(), filtro, pageable))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void listar_conAlcanceGlobalesParaAdministrativo_debeAplicarloSinLanzarExcepcion() {
         Pageable pageable = PageRequest.of(0, 20);
         when(usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(any())).thenReturn(Set.of(10L));
