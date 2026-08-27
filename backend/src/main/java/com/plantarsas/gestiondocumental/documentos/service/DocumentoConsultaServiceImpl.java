@@ -74,6 +74,9 @@ public class DocumentoConsultaServiceImpl implements DocumentoConsultaService {
         if (alcanceConsulta == AlcanceConsulta.GLOBALES) {
             return base.and(DocumentoSpecifications.conAlcanceGlobal());
         }
+        if (alcanceConsulta == AlcanceConsulta.AREAS_ESPECIFICAS) {
+            return base.and(DocumentoSpecifications.conAlcanceAreasEspecificas());
+        }
         if (rol == RolEnum.ADMINISTRADOR) {
             return base;
         }

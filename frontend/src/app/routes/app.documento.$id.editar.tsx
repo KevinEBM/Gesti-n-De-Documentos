@@ -11,6 +11,9 @@ import {
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/AppShell";
+import { SelectorAreaResponsable } from "@/components/selector-area-responsable";
+import { SelectorSubproceso } from "@/components/selector-subproceso";
+import { SelectorTipoDocumento } from "@/components/selector-tipo-documento";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -42,8 +45,6 @@ import {
     type DocumentoDetalle,
 } from "@/lib/documentos-api";
 import { obtenerIconoArea } from "@/lib/iconos-areas";
-import { obtenerIconoFormato } from "@/lib/iconos-formatos";
-import { obtenerIconoSubProceso } from "@/lib/iconos-subprocesos";
 import { listarSubprogramas, type SubprogramaCatalogo } from "@/lib/subprogramas-api";
 import { useIntranet } from "@/lib/store";
 import { listarTiposDocumento, type TipoDocumentoCatalogo } from "@/lib/tipos-documento-api";
@@ -111,7 +112,7 @@ function incluirSubprogramaCatalogo(
 
 function incluirTipoCatalogo(tipos: TipoDocumentoCatalogo[], id: string, nombre: string): TipoDocumentoCatalogo[] {
     if (!id || tipos.some((tipo) => tipo.id === id)) return tipos;
-    return [...tipos, { id, nombre, descripcion: "", activo: false }];
+    return [...tipos, { id, codigo: "", nombre, descripcion: "", activo: false }];
 }
 
 function validarFormulario(
@@ -527,102 +528,45 @@ function EditarDocumentoPage() {
 
                         <div className="grid gap-4 md:grid-cols-2">
                             <Campo label="Área responsable" obligatorio error={errores.areaId}>
-                                <Select
+                                <SelectorAreaResponsable
+                                    areas={areasActivas}
                                     value={form.areaId}
                                     onValueChange={cambiarArea}
+                                    formato="nombre"
+                                    placeholder="Seleccionar área…"
                                     disabled={guardando}
-                                >
-                                    <SelectTrigger className={SELECT_TRIGGER_CLASS}>
-                                        <SelectValue placeholder="Seleccionar área…" />
-                                    </SelectTrigger>
-                                    <SelectContent className={SELECT_CONTENT_CLASS}>
-                                        {areasActivas.map((area) => {
-                                            const { icono: Icono, color } = obtenerIconoArea(area.nombre);
-                                            return (
-                                                <SelectItem
-                                                    key={area.id}
-                                                    value={area.id}
-                                                    className={SELECT_ITEM_CLASS}
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <Icono className={`size-4 ${color}`} />
-                                                        <span>{area.nombre}</span>
-                                                    </div>
-                                                </SelectItem>
-                                            );
-                                        })}
-                                    </SelectContent>
-                                </Select>
+                                    invalid={!!errores.areaId}
+                                />
                             </Campo>
 
                             <Campo label="Subproceso" obligatorio error={errores.subprogramaId}>
-                                <Select
+                                <SelectorSubproceso
+                                    subprogramas={subprogramasArea}
                                     value={form.subprogramaId}
                                     onValueChange={(subprogramaId) =>
                                         setForm((prev) => (prev ? { ...prev, subprogramaId } : prev))
                                     }
+                                    placeholder={
+                                        form.areaId
+                                            ? "Seleccionar subproceso…"
+                                            : "Seleccione primero un área"
+                                    }
                                     disabled={guardando || !form.areaId}
-                                >
-                                    <SelectTrigger className={SELECT_TRIGGER_CLASS}>
-                                        <SelectValue
-                                            placeholder={
-                                                form.areaId
-                                                    ? "Seleccionar subproceso…"
-                                                    : "Seleccione primero un área"
-                                            }
-                                        />
-                                    </SelectTrigger>
-                                    <SelectContent className={SELECT_CONTENT_CLASS}>
-                                        {subprogramasArea.map((item) => {
-                                            const { icono: Icono, color } = obtenerIconoSubProceso(
-                                                item.nombre,
-                                            );
-                                            return (
-                                                <SelectItem
-                                                    key={item.id}
-                                                    value={item.id}
-                                                    className={SELECT_ITEM_CLASS}
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <Icono className={`size-4 ${color}`} />
-                                                        <span>{item.nombre}</span>
-                                                    </div>
-                                                </SelectItem>
-                                            );
-                                        })}
-                                    </SelectContent>
-                                </Select>
+                                    invalid={!!errores.subprogramaId}
+                                />
                             </Campo>
 
                             <Campo label="Tipo de documento" obligatorio error={errores.tipoDocumentoId}>
-                                <Select
+                                <SelectorTipoDocumento
+                                    tipos={tiposDisponibles}
                                     value={form.tipoDocumentoId}
                                     onValueChange={(tipoDocumentoId) =>
                                         setForm((prev) => (prev ? { ...prev, tipoDocumentoId } : prev))
                                     }
+                                    placeholder="Seleccionar tipo…"
                                     disabled={guardando}
-                                >
-                                    <SelectTrigger className={SELECT_TRIGGER_CLASS}>
-                                        <SelectValue placeholder="Seleccionar tipo…" />
-                                    </SelectTrigger>
-                                    <SelectContent className={SELECT_CONTENT_CLASS}>
-                                        {tiposDisponibles.map((tipo) => {
-                                            const { icono: Icono, color } = obtenerIconoFormato(tipo.nombre);
-                                            return (
-                                                <SelectItem
-                                                    key={tipo.id}
-                                                    value={tipo.id}
-                                                    className={SELECT_ITEM_CLASS}
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <Icono className={`size-4 ${color}`} />
-                                                        <span>{tipo.nombre}</span>
-                                                    </div>
-                                                </SelectItem>
-                                            );
-                                        })}
-                                    </SelectContent>
-                                </Select>
+                                    invalid={!!errores.tipoDocumentoId}
+                                />
                             </Campo>
 
                             <Campo label="Alcance" obligatorio error={errores.alcance}>

@@ -217,6 +217,30 @@ class SubprogramaControllerSecurityTest {
 
     @Test
     @WithMockUser(roles = "ADMINISTRATIVO")
+    void listarParaConsulta_conAdministrativo_debeResponder200YUsarCatalogoCompleto() throws Exception {
+        when(subprogramaService.listar()).thenReturn(List.of(respuestaDePrueba(1L)));
+
+        mockMvc.perform(get("/api/subprogramas/consulta"))
+                .andExpect(status().isOk());
+
+        verify(subprogramaService).listar();
+        verify(subprogramaService, never()).listarParaUsuario(any());
+    }
+
+    @Test
+    @WithMockUser(roles = "JEFE_AREA")
+    void listarParaConsulta_conJefeArea_debeResponder200YUsarCatalogoCompleto() throws Exception {
+        when(subprogramaService.listar()).thenReturn(List.of(respuestaDePrueba(1L)));
+
+        mockMvc.perform(get("/api/subprogramas/consulta"))
+                .andExpect(status().isOk());
+
+        verify(subprogramaService).listar();
+        verify(subprogramaService, never()).listarParaUsuario(any());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMINISTRATIVO")
     void obtenerPorId_conAdministrativo_debeResponder403() throws Exception {
         mockMvc.perform(get("/api/subprogramas/1"))
                 .andExpect(status().isForbidden());

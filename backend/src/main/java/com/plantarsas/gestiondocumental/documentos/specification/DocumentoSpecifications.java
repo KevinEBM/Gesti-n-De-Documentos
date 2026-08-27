@@ -68,19 +68,39 @@ public final class DocumentoSpecifications {
     }
 
     /**
-     * "Asociado estructuralmente a esta área" mediante documento_area (principal o
-     * adicional). NO equivale a "visible desde esta área": un documento GLOBAL solo
-     * aparece aquí si esta área es, en concreto, su área principal registrada en la
-     * publicación. La autorización sigue siendo exclusivamente visiblePara(...); este
-     * predicado es un filtro de búsqueda adicional, compuesto con AND sobre ella.
+     * Filtro de "Área responsable": únicamente {@code documento_area.es_principal = true}.
+     * Las áreas adicionales no son responsables. La autorización sigue siendo
+     * exclusivamente {@link #visiblePara}; este predicado se compone con AND sobre ella.
      */
     public static Specification<Documento> deArea(Long areaId) {
-        return asociadoAAreas(Set.of(areaId));
+        return deAreaResponsable(areaId);
+    }
+
+    public static Specification<Documento> deAreaResponsable(Long areaId) {
+        return (root, query, criteriaBuilder) -> {
+            Subquery<Long> subconsulta = query.subquery(Long.class);
+            Root<DocumentoArea> documentoArea = subconsulta.from(DocumentoArea.class);
+            subconsulta.select(documentoArea.get("idDocumentoArea"));
+            subconsulta.where(
+                    criteriaBuilder.equal(documentoArea.get("documento").get("id"), root.get("id")),
+                    criteriaBuilder.equal(documentoArea.get("area").get("id"), areaId),
+                    criteriaBuilder.isTrue(documentoArea.get("esPrincipal"))
+            );
+            return criteriaBuilder.exists(subconsulta);
+        };
+    }
+
+    public static Specification<Documento> conAlcance(DocumentoAlcance alcance) {
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.equal(root.get("alcance"), alcance);
     }
 
     public static Specification<Documento> conAlcanceGlobal() {
-        return (root, query, criteriaBuilder) ->
-                criteriaBuilder.equal(root.get("alcance"), DocumentoAlcance.GLOBAL);
+        return conAlcance(DocumentoAlcance.GLOBAL);
+    }
+
+    public static Specification<Documento> conAlcanceAreasEspecificas() {
+        return conAlcance(DocumentoAlcance.AREAS_ESPECIFICAS);
     }
 
     public static Specification<Documento> sinAlcanceGlobal() {

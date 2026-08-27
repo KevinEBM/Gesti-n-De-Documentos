@@ -15,6 +15,7 @@ import {
     subprocesoConsultaDeshabilitado,
     textoRetencionObsoleto,
     TODOS,
+    type FiltrosDocumentos,
 } from "./documentos-consulta-shared";
 
 const areasApi = [
@@ -95,7 +96,7 @@ describe("resolverAreaIdEfectivaConsulta", () => {
         ).toBe(TODOS);
     });
 
-    it("JEFE con API cargada usa asignación y no sesión stale", () => {
+    it("JEFE con Área TODOS no fuerza su área asignada", () => {
         expect(
             resolverAreaIdEfectivaConsulta({
                 esAdmin: false,
@@ -105,10 +106,21 @@ describe("resolverAreaIdEfectivaConsulta", () => {
                 sesionAreaId: "2",
                 sesionAreaNombre: "Calidad",
             }),
-        ).toBe("1");
+        ).toBe(TODOS);
     });
 
-    it("JEFE con API [] devuelve TODOS aunque sesión tenga área", () => {
+    it("JEFE con Área seleccionada usa el filtro, aunque no sea la suya", () => {
+        expect(
+            resolverAreaIdEfectivaConsulta({
+                esAdmin: false,
+                filtroArea: "8",
+                areasUsuario: [{ id: "1", nombre: "Producción", activo: true }],
+                areasApiCargadas: true,
+            }),
+        ).toBe("8");
+    });
+
+    it("JEFE con API [] y filtro TODOS permanece en TODOS", () => {
         expect(
             resolverAreaIdEfectivaConsulta({
                 esAdmin: false,
@@ -120,24 +132,11 @@ describe("resolverAreaIdEfectivaConsulta", () => {
             }),
         ).toBe(TODOS);
     });
-
-    it("JEFE antes de API usa sesión temporalmente", () => {
-        expect(
-            resolverAreaIdEfectivaConsulta({
-                esAdmin: false,
-                filtroArea: TODOS,
-                areasUsuario: [],
-                areasApiCargadas: false,
-                sesionAreaId: "2",
-                sesionAreaNombre: "Calidad",
-            }),
-        ).toBe("2");
-    });
 });
 
 describe("areaConsultaNoAdminBloqueada", () => {
-    it("JEFE siempre bloquea el selector de Área", () => {
-        expect(areaConsultaNoAdminBloqueada(false)).toBe(true);
+    it("JEFE no bloquea el selector de Área responsable", () => {
+        expect(areaConsultaNoAdminBloqueada(false)).toBe(false);
     });
 
     it("ADMIN no bloquea el selector", () => {
@@ -164,15 +163,19 @@ describe("filtrarSubprogramasConsulta", () => {
 });
 
 describe("subprocesoConsultaDeshabilitado", () => {
-    it("JEFE sin área resuelta queda disabled", () => {
-        expect(subprocesoConsultaDeshabilitado(false, TODOS, false, null)).toBe(true);
+    it("queda disabled solo mientras cargan catálogos", () => {
+        expect(subprocesoConsultaDeshabilitado(false, TODOS, true, null)).toBe(true);
     });
 
-    it("JEFE con área resuelta queda habilitado", () => {
-        expect(subprocesoConsultaDeshabilitado(false, "1", false, null)).toBe(false);
+    it("queda disabled si fallaron los catálogos", () => {
+        expect(subprocesoConsultaDeshabilitado(false, TODOS, false, "error")).toBe(true);
     });
 
-    it("Tipo/ADMIN: ADMIN nunca disabled por área", () => {
+    it("JEFE sin área de filtro permanece habilitado", () => {
+        expect(subprocesoConsultaDeshabilitado(false, TODOS, false, null)).toBe(false);
+    });
+
+    it("ADMIN nunca disabled por área", () => {
         expect(subprocesoConsultaDeshabilitado(true, TODOS, false, null)).toBe(false);
     });
 });
@@ -203,20 +206,20 @@ describe("etiquetaCatalogoConsulta", () => {
 });
 
 describe("construirFiltrosBaseConsulta", () => {
-    it("JEFE con API cargada preselecciona área asignada", () => {
+    it("JEFE no preselecciona área asignada", () => {
         expect(
             construirFiltrosBaseConsulta(
                 false,
                 [{ id: "1", nombre: "Producción", activo: true }],
                 true,
             ),
-        ).toEqual(expect.objectContaining({ area: "1" }));
+        ).toEqual(expect.objectContaining({ area: TODOS, alcance: TODOS }));
     });
 
-    it("JEFE con API [] no preselecciona área stale de sesión", () => {
+    it("JEFE con API [] inicia en Área Todos y Alcance Todos", () => {
         expect(
             construirFiltrosBaseConsulta(false, [], true, "2", "Calidad"),
-        ).toEqual(expect.objectContaining({ area: TODOS, soloGlobales: false }));
+        ).toEqual(expect.objectContaining({ area: TODOS, alcance: TODOS }));
     });
 });
 
@@ -233,43 +236,45 @@ describe("formatFechaDocumento", () => {
     });
 });
 
-describe("construirFiltrosApi — solo globales", () => {
-    const filtrosBase = {
+describe("construirFiltrosApi — alcance", () => {
+    const filtrosBase: FiltrosDocumentos = {
         codigo: "",
         titulo: "",
         area: "1",
         subprograma: TODOS,
         tipo: TODOS,
         estado: TODOS,
-        soloGlobales: false,
+        alcance: TODOS,
         fechaDesde: "",
         fechaHasta: "",
     };
 
-    it("casilla desmarcada no agrega alcanceConsulta", () => {
-        expect(construirFiltrosApi(filtrosBase, 0, { incluirAreaEnConsulta: false })).not.toHaveProperty(
-            "alcanceConsulta",
-        );
+    it("Todos no agrega alcanceConsulta", () => {
+        expect(construirFiltrosApi(filtrosBase, 0)).not.toHaveProperty("alcanceConsulta");
     });
 
-    it("casilla marcada agrega alcanceConsulta=GLOBALES", () => {
-        expect(
-            construirFiltrosApi(
-                { ...filtrosBase, soloGlobales: true },
-                0,
-                { incluirAreaEnConsulta: false },
-            ),
-        ).toMatchObject({ alcanceConsulta: "GLOBALES" });
+    it("Global agrega alcanceConsulta=GLOBALES", () => {
+        expect(construirFiltrosApi({ ...filtrosBase, alcance: "GLOBALES" }, 0)).toMatchObject({
+            alcanceConsulta: "GLOBALES",
+        });
     });
 
-    it("Solo globales + Tipo compone ambos filtros", () => {
+    it("Áreas específicas agrega alcanceConsulta=AREAS_ESPECIFICAS", () => {
         expect(
-            construirFiltrosApi(
-                { ...filtrosBase, soloGlobales: true, tipo: "5" },
-                0,
-                { incluirAreaEnConsulta: false },
-            ),
+            construirFiltrosApi({ ...filtrosBase, alcance: "AREAS_ESPECIFICAS" }, 0),
+        ).toMatchObject({ alcanceConsulta: "AREAS_ESPECIFICAS" });
+    });
+
+    it("Global + Tipo compone ambos filtros", () => {
+        expect(
+            construirFiltrosApi({ ...filtrosBase, alcance: "GLOBALES", tipo: "5" }, 0),
         ).toMatchObject({ alcanceConsulta: "GLOBALES", tipoDocumentoId: 5 });
+    });
+
+    it("no-admin también envía areaId cuando filtra por Área responsable", () => {
+        expect(construirFiltrosApi(filtrosBase, 0, { incluirAreaEnConsulta: true })).toMatchObject({
+            areaId: 1,
+        });
     });
 });
 

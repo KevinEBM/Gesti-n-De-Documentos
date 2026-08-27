@@ -9,6 +9,9 @@ import {
     DocumentoEstadoBadge,
     DocumentoFiltroSelect,
 } from "@/components/documentos-consulta-ui";
+import { SelectorAreaResponsable } from "@/components/selector-area-responsable";
+import { SelectorSubproceso } from "@/components/selector-subproceso";
+import { SelectorTipoDocumento } from "@/components/selector-tipo-documento";
 import { AppShell } from "@/components/AppShell";
 import {
     AlertDialog,
@@ -36,12 +39,12 @@ import {
     ALERT_DIALOG_TITLE_DESACTIVAR_CLASS,
     construirFiltrosApi,
     dispararDescargaEnNavegador,
-    etiquetaCatalogoConsulta,
     etiquetasAlcance,
     filtrarSubprogramasConsulta,
     filtrosVacios,
     formatFechaDocumento,
     hayFiltrosActivos,
+    opcionesAlcanceConsulta,
     resolverAreaIdEfectivaConsulta,
     TODOS,
     type FiltrosDocumentos,
@@ -168,33 +171,6 @@ function GestionDocumentos() {
                 areaIdEfectiva,
             }),
         [subprogramasCatalogo, areaIdEfectiva],
-    );
-
-    const opcionesAreasFiltro = useMemo(
-        () =>
-            areasCatalogo.map((area) => ({
-                v: area.id,
-                l: etiquetaCatalogoConsulta(area.nombre, area.activo, "femenino"),
-            })),
-        [areasCatalogo],
-    );
-
-    const opcionesSubprogramasFiltro = useMemo(
-        () =>
-            subprogramasFiltro.map((item) => ({
-                v: item.id,
-                l: etiquetaCatalogoConsulta(item.nombre ?? "", item.activo ?? true, "masculino"),
-            })),
-        [subprogramasFiltro],
-    );
-
-    const opcionesTiposFiltro = useMemo(
-        () =>
-            tiposCatalogo.map((tipo) => ({
-                v: tipo.id,
-                l: etiquetaCatalogoConsulta(tipo.nombre, tipo.activo, "masculino"),
-            })),
-        [tiposCatalogo],
     );
 
     const filtrosAplicadosActivos = useMemo(
@@ -596,34 +572,44 @@ function GestionDocumentos() {
                     ) : null}
 
                     <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1.15fr)_minmax(8.5rem,0.65fr)_minmax(10rem,0.85fr)_minmax(10rem,0.85fr)]">
-                        <DocumentoFiltroSelect
-                            label="Área"
-                            value={filtrosFormulario.area}
-                            onChange={cambiarArea}
-                            opciones={opcionesAreasFiltro}
-                            tipoFiltro="area"
-                            disabled={cargandoCatalogos || !!errorCatalogos}
-                        />
-                        <DocumentoFiltroSelect
-                            label="Subproceso"
-                            value={filtrosFormulario.subprograma}
-                            onChange={(subprograma) =>
-                                setFiltrosFormulario((prev) => ({ ...prev, subprograma }))
-                            }
-                            opciones={opcionesSubprogramasFiltro}
-                            tipoFiltro="subproceso"
-                            disabled={cargandoCatalogos || !!errorCatalogos}
-                        />
-                        <DocumentoFiltroSelect
-                            label="Tipo"
-                            value={filtrosFormulario.tipo}
-                            onChange={(tipo) =>
-                                setFiltrosFormulario((prev) => ({ ...prev, tipo }))
-                            }
-                            opciones={opcionesTiposFiltro}
-                            tipoFiltro="tipo"
-                            disabled={cargandoCatalogos || !!errorCatalogos}
-                        />
+                        <div className="min-w-0 space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Área responsable</Label>
+                            <SelectorAreaResponsable
+                                areas={areasCatalogo}
+                                value={filtrosFormulario.area}
+                                onValueChange={cambiarArea}
+                                formato="codigo-nombre"
+                                placeholder="Todos"
+                                disabled={cargandoCatalogos || !!errorCatalogos}
+                                opcionTodos={{ value: TODOS, label: "Todos" }}
+                            />
+                        </div>
+                        <div className="min-w-0 space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Subproceso</Label>
+                            <SelectorSubproceso
+                                subprogramas={subprogramasFiltro}
+                                value={filtrosFormulario.subprograma}
+                                onValueChange={(subprograma) =>
+                                    setFiltrosFormulario((prev) => ({ ...prev, subprograma }))
+                                }
+                                placeholder="Todos"
+                                disabled={cargandoCatalogos || !!errorCatalogos}
+                                opcionTodos={{ value: TODOS, label: "Todos" }}
+                            />
+                        </div>
+                        <div className="min-w-0 space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Tipo</Label>
+                            <SelectorTipoDocumento
+                                tipos={tiposCatalogo}
+                                value={filtrosFormulario.tipo}
+                                onValueChange={(tipo) =>
+                                    setFiltrosFormulario((prev) => ({ ...prev, tipo }))
+                                }
+                                placeholder="Todos"
+                                disabled={cargandoCatalogos || !!errorCatalogos}
+                                opcionTodos={{ value: TODOS, label: "Todos" }}
+                            />
+                        </div>
                         <DocumentoFiltroSelect
                             label="Estado"
                             value={filtrosFormulario.estado}
@@ -664,13 +650,29 @@ function GestionDocumentos() {
                         <p className="text-sm text-destructive">{errorFechas}</p>
                     ) : null}
 
-                    <div className="flex justify-end gap-2">
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                        <div className="w-full min-w-0 max-w-56">
+                            <DocumentoFiltroSelect
+                                label="Alcance"
+                                value={filtrosFormulario.alcance}
+                                onChange={(alcance) =>
+                                    setFiltrosFormulario((prev) => ({
+                                        ...prev,
+                                        alcance: alcance as typeof prev.alcance,
+                                    }))
+                                }
+                                opciones={opcionesAlcanceConsulta}
+                                todosLabel="Todos"
+                            />
+                        </div>
+                        <div className="flex justify-end gap-2">
                         <Button variant="ghost" size="sm" onClick={limpiarFiltros} className="gap-1.5">
                             <X className="size-4" /> Limpiar
                         </Button>
                         <Button size="sm" onClick={aplicarFiltros} className="gap-1.5">
                             <Search className="size-4" /> Buscar
                         </Button>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

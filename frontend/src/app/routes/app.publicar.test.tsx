@@ -82,8 +82,11 @@ const subprogramas: SubprogramaCatalogo[] = [
 ];
 
 const tipos: TipoDocumentoCatalogo[] = [
-    { id: "7", nombre: "Programa", descripcion: "", activo: true },
-    { id: "8", nombre: "Formato", descripcion: "", activo: true },
+    { id: "7", codigo: "PG", nombre: "Programa", descripcion: "", activo: true },
+    { id: "8", codigo: "FO", nombre: "Formato", descripcion: "", activo: true },
+    { id: "9", codigo: "ODE", nombre: "Plantilla", descripcion: "", activo: true },
+    { id: "10", codigo: "ODE", nombre: "Documentos Externos", descripcion: "", activo: true },
+    { id: "11", codigo: "ODE", nombre: "Imágenes", descripcion: "", activo: true },
 ];
 
 const NOMBRE_ARCHIVO = "PR-L&D-PG-01 PROGRAMA LIMPIEZA Y DESINFECCIÓN V5.docx";
@@ -148,7 +151,7 @@ async function cargarArchivo(usuario: Usuario) {
 async function elegirOpcion(usuario: Usuario, campo: string, opcion: string) {
     await usuario.click(selectDe(campo));
     const listado = await screen.findByRole("listbox");
-    await usuario.click(within(listado).getByRole("option", { name: opcion }));
+    await usuario.click(within(listado).getByRole("option", { name: new RegExp(opcion, "i") }));
 }
 
 describe("Publicar documento — autocompletado de área y subproceso", () => {
@@ -200,5 +203,61 @@ describe("Publicar documento — autocompletado de área y subproceso", () => {
         await elegirOpcion(usuario, "Subproceso", "Control de Residuos Sólidos");
 
         expect(textoDe("Subproceso")).toContain("Control de Residuos Sólidos");
+    });
+
+    it("encuentra un área por fragmento del nombre sin distinguir mayúsculas", async () => {
+        const usuario = userEvent.setup();
+        await renderizarFormulario();
+
+        await usuario.click(selectDe("Área responsable"));
+        await usuario.type(screen.getByPlaceholderText("Buscar área..."), "cal");
+        const listado = await screen.findByRole("listbox");
+
+        expect(within(listado).getByRole("option", { name: /Gestión de la Calidad/ })).toBeTruthy();
+        expect(within(listado).queryByRole("option", { name: /Gestión Ambiental/ })).toBeNull();
+    });
+
+    it("encuentra un subproceso por código", async () => {
+        const usuario = userEvent.setup();
+        await renderizarFormulario();
+
+        await elegirOpcion(usuario, "Área responsable", "Gestión Ambiental");
+        await usuario.click(selectDe("Subproceso"));
+        await usuario.type(screen.getByPlaceholderText("Buscar subproceso..."), "sst");
+        expect(screen.getByText("No se encontraron subprocesos.")).toBeTruthy();
+
+        await usuario.clear(screen.getByPlaceholderText("Buscar subproceso..."));
+        await usuario.type(screen.getByPlaceholderText("Buscar subproceso..."), "l&d");
+        const listado = await screen.findByRole("listbox");
+        expect(within(listado).getByRole("option", { name: /Limpieza y Desinfección/ })).toBeTruthy();
+    });
+
+    it("restringe subprocesos al área elegida", async () => {
+        const usuario = userEvent.setup();
+        await renderizarFormulario();
+
+        await elegirOpcion(usuario, "Área responsable", "Gestión de la Calidad");
+        await usuario.click(selectDe("Subproceso"));
+        const listado = await screen.findByRole("listbox");
+
+        expect(within(listado).getByRole("option", { name: /Auditoría Interna/ })).toBeTruthy();
+        expect(within(listado).queryByRole("option", { name: /Limpieza y Desinfección/ })).toBeNull();
+    });
+
+    it("muestra los tres tipos ODE y selecciona por id", async () => {
+        const usuario = userEvent.setup();
+        await renderizarFormulario();
+
+        await usuario.click(selectDe("Tipo de documento"));
+        await usuario.type(screen.getByPlaceholderText("Buscar tipo..."), "ode");
+        const listado = await screen.findByRole("listbox");
+
+        expect(within(listado).getByRole("option", { name: /Plantilla/ })).toBeTruthy();
+        expect(within(listado).getByRole("option", { name: /Documentos Externos/ })).toBeTruthy();
+        expect(within(listado).getByRole("option", { name: /Imágenes/ })).toBeTruthy();
+
+        await usuario.click(within(listado).getByRole("option", { name: /Documentos Externos/ }));
+        expect(textoDe("Tipo de documento")).toContain("Documentos Externos");
+        expect(textoDe("Tipo de documento")).toContain("ODE");
     });
 });

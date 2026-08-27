@@ -1,4 +1,4 @@
-import type { DocumentoAlcance, DocumentoEstado, DocumentoFiltros } from "@/lib/documentos-api";
+import type { AlcanceConsulta, DocumentoAlcance, DocumentoEstado, DocumentoFiltros } from "@/lib/documentos-api";
 
 export const etiquetasAlcance: Record<DocumentoAlcance, string> = {
     AREA_RESPONSABLE: "Área responsable",
@@ -20,6 +20,8 @@ export const SELECT_TRIGGER_CLASS = "w-full !bg-white !text-slate-900";
 export const SELECT_ITEM_CLASS =
     "!text-slate-900 focus:!bg-slate-100 focus:!text-slate-900 data-[highlighted]:!bg-slate-100 data-[highlighted]:!text-slate-900";
 
+export type FiltroAlcanceConsulta = typeof TODOS | Extract<AlcanceConsulta, "GLOBALES" | "AREAS_ESPECIFICAS">;
+
 export interface FiltrosDocumentos {
     codigo: string;
     titulo: string;
@@ -27,7 +29,7 @@ export interface FiltrosDocumentos {
     subprograma: string;
     tipo: string;
     estado: string;
-    soloGlobales: boolean;
+    alcance: FiltroAlcanceConsulta;
     fechaDesde: string;
     fechaHasta: string;
 }
@@ -39,13 +41,18 @@ export const filtrosVacios: FiltrosDocumentos = {
     subprograma: TODOS,
     tipo: TODOS,
     estado: TODOS,
-    soloGlobales: false,
+    alcance: TODOS,
     fechaDesde: "",
     fechaHasta: "",
 };
 
+export const opcionesAlcanceConsulta: { v: FiltroAlcanceConsulta; l: string }[] = [
+    { v: "GLOBALES", l: "Global" },
+    { v: "AREAS_ESPECIFICAS", l: "Áreas específicas" },
+];
+
 export interface ConstruirFiltrosApiOpciones {
-    /** Solo ADMIN debe enviar areaId como filtro de consulta. No-admin: visiblePara en backend. */
+    /** Si es false, no envía areaId. La visibilidad documental sigue en visiblePara. */
     incluirAreaEnConsulta?: boolean;
 }
 
@@ -148,7 +155,7 @@ export function hayFiltrosActivos(
         filtros.subprograma !== TODOS ||
         filtros.tipo !== TODOS ||
         filtros.estado !== TODOS ||
-        filtros.soloGlobales ||
+        filtros.alcance !== TODOS ||
         !!filtros.fechaDesde ||
         !!filtros.fechaHasta
     );
@@ -228,30 +235,7 @@ export interface ResolverAreaIdEfectivaOpciones {
 export function resolverAreaIdEfectivaConsulta(
     opciones: ResolverAreaIdEfectivaOpciones,
 ): string {
-    const {
-        esAdmin,
-        filtroArea,
-        areasUsuario,
-        areasApiCargadas,
-        sesionAreaId,
-        sesionAreaNombre,
-    } = opciones;
-
-    if (esAdmin) {
-        return filtroArea !== TODOS ? filtroArea : TODOS;
-    }
-
-    const asignada = resolverAreaAsignadaNoAdmin({
-        areasUsuario,
-        areasApiCargadas,
-        sesionAreaId,
-        sesionAreaNombre,
-    });
-    if (asignada) {
-        return asignada.areaId;
-    }
-
-    return TODOS;
+    return opciones.filtroArea !== TODOS ? opciones.filtroArea : TODOS;
 }
 
 export function resolverAreaObligatoriaNoAdmin(
@@ -273,28 +257,18 @@ export function resolverAreaObligatoriaNoAdmin(
 }
 
 export function construirFiltrosBaseConsulta(
-    esAdmin: boolean,
-    areasUsuario: AreaCatalogoConsulta[],
-    areasApiCargadas: boolean,
-    sesionAreaId?: string,
-    sesionAreaNombre?: string | null,
+    _esAdmin: boolean,
+    _areasUsuario: AreaCatalogoConsulta[],
+    _areasApiCargadas: boolean,
+    _sesionAreaId?: string,
+    _sesionAreaNombre?: string | null,
 ): FiltrosDocumentos {
-    const areaObligatoria = resolverAreaObligatoriaNoAdmin(
-        esAdmin,
-        areasUsuario,
-        areasApiCargadas,
-        sesionAreaId,
-        sesionAreaNombre,
-    );
-    if (areaObligatoria) {
-        return { ...filtrosVacios, area: areaObligatoria };
-    }
     return filtrosVacios;
 }
 
-/** El selector de Área queda fijo para no-admin (con o sin asignación resuelta). */
-export function areaConsultaNoAdminBloqueada(esAdmin: boolean): boolean {
-    return !esAdmin;
+/** El selector de Área responsable queda disponible para todos los roles. */
+export function areaConsultaNoAdminBloqueada(_esAdmin: boolean): boolean {
+    return false;
 }
 
 export function resolverAreaPrincipalDesdeCatalogo(
@@ -314,32 +288,23 @@ export function resolverAreaPrincipalDesdeCatalogo(
     };
 }
 
-export function filtrarSubprogramasConsulta(
-    subprogramas: SubprogramaCatalogoConsulta[],
+export function filtrarSubprogramasConsulta<T extends SubprogramaCatalogoConsulta>(
+    subprogramas: T[],
     opciones: { esAdmin: boolean; areaIdEfectiva: string },
-): SubprogramaCatalogoConsulta[] {
-    if (opciones.esAdmin && opciones.areaIdEfectiva === TODOS) {
-        return subprogramas;
-    }
+): T[] {
     if (opciones.areaIdEfectiva === TODOS) {
-        return [];
+        return subprogramas;
     }
     return subprogramas.filter((item) => item.areaId === opciones.areaIdEfectiva);
 }
 
 export function subprocesoConsultaDeshabilitado(
-    esAdmin: boolean,
-    areaIdEfectiva: string,
+    _esAdmin: boolean,
+    _areaIdEfectiva: string,
     cargandoCatalogos: boolean,
     errorCatalogos: string | null | undefined,
 ): boolean {
-    if (cargandoCatalogos || !!errorCatalogos) {
-        return true;
-    }
-    if (esAdmin) {
-        return false;
-    }
-    return areaIdEfectiva === TODOS;
+    return cargandoCatalogos || !!errorCatalogos;
 }
 
 export function construirFiltrosApi(
@@ -361,8 +326,10 @@ export function construirFiltrosApi(
     if (filtros.estado !== TODOS) api.estado = filtros.estado as DocumentoEstado;
     if (filtros.fechaDesde) api.fechaDesde = filtros.fechaDesde;
     if (filtros.fechaHasta) api.fechaHasta = filtros.fechaHasta;
-    if (filtros.soloGlobales) {
+    if (filtros.alcance === "GLOBALES") {
         api.alcanceConsulta = "GLOBALES";
+    } else if (filtros.alcance === "AREAS_ESPECIFICAS") {
+        api.alcanceConsulta = "AREAS_ESPECIFICAS";
     }
 
     return api;

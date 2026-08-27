@@ -43,6 +43,12 @@ public class AreaController {
         return ApiResponse.exitosa(areaService.listarParaUsuario(usuarioAutenticado));
     }
 
+    @GetMapping("/consulta")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'JEFE_AREA', 'ADMINISTRATIVO')")
+    public ApiResponse<List<AreaResponse>> listarParaConsulta() {
+        return ApiResponse.exitosa(areaService.listar());
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ApiResponse<AreaResponse> obtenerPorId(@PathVariable Long id) {

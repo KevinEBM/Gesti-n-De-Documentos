@@ -24,13 +24,18 @@ const subprogramasMock: SubprogramaCatalogo[] = [
     subprograma({ id: "10", codigo: "L&D", nombre: "Limpieza y Desinfección" }),
 ];
 
-const tiposMock: TipoDocumentoCatalogo[] = [
-    {
-        id: "20",
-        nombre: "Programa",
+function tipo(
+    valores: Partial<TipoDocumentoCatalogo> & Pick<TipoDocumentoCatalogo, "id" | "codigo" | "nombre">,
+): TipoDocumentoCatalogo {
+    return {
         descripcion: "",
         activo: true,
-    },
+        ...valores,
+    };
+}
+
+const tiposMock: TipoDocumentoCatalogo[] = [
+    tipo({ id: "20", codigo: "PG", nombre: "Programa" }),
 ];
 
 describe("resolver metadatos publicación — condición de carrera M4", () => {
@@ -208,5 +213,76 @@ describe("resolución del subproceso por código del catálogo", () => {
         expect(resultado.actualizaciones.subprogramaId).toBe("99");
         expect(resultado.actualizaciones.areaId).toBe("7");
         expect(resultado.actualizaciones.tipoDocumentoId).toBe("20");
+    });
+});
+
+describe("resolución del tipo por código del catálogo", () => {
+    it("autocompleta PD cuando hay un único Procedimiento", () => {
+        const catalogo = [tipo({ id: "30", codigo: "PD", nombre: "Procedimiento" })];
+
+        const resultado = resolverMetadatosCatalogoDesdeArchivo(
+            "PR-GDO-PD-01 Control documental V1.pdf",
+            subprogramasMock,
+            catalogo,
+        );
+
+        expect(resultado.actualizaciones.tipoDocumentoId).toBe("30");
+    });
+
+    it("no autocompleta ODE cuando hay Plantilla, Documentos Externos e Imágenes", () => {
+        const catalogo = [
+            tipo({ id: "40", codigo: "ODE", nombre: "Plantilla" }),
+            tipo({ id: "41", codigo: "ODE", nombre: "Documentos Externos" }),
+            tipo({ id: "42", codigo: "ODE", nombre: "Imágenes" }),
+        ];
+
+        const resultado = resolverMetadatosCatalogoDesdeArchivo(
+            "PR-GDO-ODE-01 Archivo institucional V1.pdf",
+            subprogramasMock,
+            catalogo,
+        );
+
+        expect(resultado.actualizaciones.tipoDocumentoId).toBeUndefined();
+        expect(resultado.avisos.some((aviso) => aviso.includes("varios registros"))).toBe(true);
+    });
+
+    it("no autocompleta un código inexistente", () => {
+        const resultado = resolverMetadatosCatalogoDesdeArchivo(
+            "PR-GDO-XYZ-01 Documento V1.pdf",
+            subprogramasMock,
+            tiposMock,
+        );
+
+        expect(resultado.actualizaciones.tipoDocumentoId).toBeUndefined();
+        expect(
+            resultado.avisos.some((aviso) => aviso.includes("no se encontró en los catálogos activos")),
+        ).toBe(true);
+    });
+
+    it("reconoce un tipo creado posteriormente con código ABC", () => {
+        const catalogo = [tipo({ id: "99", codigo: "ABC", nombre: "Tipo paramétrico" })];
+
+        const resultado = resolverMetadatosCatalogoDesdeArchivo(
+            "PR-GDO-ABC-01 Documento nuevo V1.pdf",
+            subprogramasMock,
+            catalogo,
+        );
+
+        expect(resultado.actualizaciones.tipoDocumentoId).toBe("99");
+    });
+
+    it("sigue el catálogo actual y no fuerza MA si Manual ahora es MN", () => {
+        const catalogo = [tipo({ id: "1", codigo: "MN", nombre: "Manual" })];
+
+        const resultado = resolverMetadatosCatalogoDesdeArchivo(
+            "PR-GDO-MA-01 Manual de calidad V1.pdf",
+            subprogramasMock,
+            catalogo,
+        );
+
+        expect(resultado.actualizaciones.tipoDocumentoId).toBeUndefined();
+        expect(
+            resultado.avisos.some((aviso) => aviso.includes("no se encontró en los catálogos activos")),
+        ).toBe(true);
     });
 });

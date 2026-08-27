@@ -52,6 +52,7 @@ class TipoDocumentoServiceImplTest {
     private TipoDocumentoResponse respuestaDePrueba(Long id) {
         return new TipoDocumentoResponse(
                 id,
+                "TA",
                 "Tipo de prueba",
                 "Descripcion de prueba",
                 true,
@@ -62,7 +63,7 @@ class TipoDocumentoServiceImplTest {
 
     @Test
     void crear_debeCrearConNombreYDescripcionNormalizadosYRetornarRespuesta() {
-        TipoDocumentoRequest request = new TipoDocumentoRequest("  Tipo A  ", "  Descripcion de prueba  ");
+        TipoDocumentoRequest request = new TipoDocumentoRequest("  ma  ", "  Tipo A  ", "  Descripcion de prueba  ");
         TipoDocumentoResponse respuestaEsperada = respuestaDePrueba(1L);
 
         when(tipoDocumentoRepository.existsByNombreIgnoreCase("Tipo A")).thenReturn(false);
@@ -76,6 +77,7 @@ class TipoDocumentoServiceImplTest {
         verify(tipoDocumentoRepository).save(captor.capture());
         TipoDocumento capturado = captor.getValue();
 
+        assertThat(capturado.getCodigo()).isEqualTo("MA");
         assertThat(capturado.getNombre()).isEqualTo("Tipo A");
         assertThat(capturado.getDescripcion()).isEqualTo("Descripcion de prueba");
         assertThat(capturado.isActivo()).isTrue();
@@ -88,7 +90,7 @@ class TipoDocumentoServiceImplTest {
 
     @Test
     void crear_debeConvertirDescripcionVaciaEnNull() {
-        TipoDocumentoRequest request = new TipoDocumentoRequest("Tipo A", "   ");
+        TipoDocumentoRequest request = new TipoDocumentoRequest("TA", "Tipo A", "   ");
         TipoDocumentoResponse respuestaEsperada = respuestaDePrueba(1L);
 
         when(tipoDocumentoRepository.existsByNombreIgnoreCase("Tipo A")).thenReturn(false);
@@ -106,7 +108,7 @@ class TipoDocumentoServiceImplTest {
 
     @Test
     void crear_debeRechazarNombreDuplicadoIgnorandoMayusculasYEspacios() {
-        TipoDocumentoRequest request = new TipoDocumentoRequest("  tipo a  ", "Descripcion");
+        TipoDocumentoRequest request = new TipoDocumentoRequest("TA", "  tipo a  ", "Descripcion");
         when(tipoDocumentoRepository.existsByNombreIgnoreCase("tipo a")).thenReturn(true);
 
         assertThatThrownBy(() -> tipoDocumentoServiceImpl.crear(request))
@@ -184,8 +186,8 @@ class TipoDocumentoServiceImplTest {
 
     @Test
     void actualizar_debeActualizarNombreYDescripcionConservandoElEstado() {
-        TipoDocumento tipoDocumento = new TipoDocumento("Nombre original", "Descripcion original");
-        TipoDocumentoUpdateRequest request = new TipoDocumentoUpdateRequest("  Nombre nuevo  ", "  Descripcion nueva  ");
+        TipoDocumento tipoDocumento = new TipoDocumento("NO", "Nombre original", "Descripcion original");
+        TipoDocumentoUpdateRequest request = new TipoDocumentoUpdateRequest("  nn  ", "  Nombre nuevo  ", "  Descripcion nueva  ");
         TipoDocumentoResponse respuestaEsperada = respuestaDePrueba(1L);
 
         when(tipoDocumentoRepository.findById(1L)).thenReturn(Optional.of(tipoDocumento));
@@ -194,6 +196,7 @@ class TipoDocumentoServiceImplTest {
 
         TipoDocumentoResponse resultado = tipoDocumentoServiceImpl.actualizar(1L, request);
 
+        assertThat(tipoDocumento.getCodigo()).isEqualTo("NN");
         assertThat(tipoDocumento.getNombre()).isEqualTo("Nombre nuevo");
         assertThat(tipoDocumento.getDescripcion()).isEqualTo("Descripcion nueva");
         assertThat(tipoDocumento.isActivo()).isTrue();
@@ -208,9 +211,9 @@ class TipoDocumentoServiceImplTest {
 
     @Test
     void actualizar_debePermitirActualizarUnTipoInactivo() {
-        TipoDocumento tipoDocumento = new TipoDocumento("Nombre original", "Descripcion original");
+        TipoDocumento tipoDocumento = new TipoDocumento("NO", "Nombre original", "Descripcion original");
         tipoDocumento.desactivar();
-        TipoDocumentoUpdateRequest request = new TipoDocumentoUpdateRequest("Nombre nuevo", "Descripcion nueva");
+        TipoDocumentoUpdateRequest request = new TipoDocumentoUpdateRequest("NN", "Nombre nuevo", "Descripcion nueva");
         TipoDocumentoResponse respuestaEsperada = respuestaDePrueba(1L);
 
         when(tipoDocumentoRepository.findById(1L)).thenReturn(Optional.of(tipoDocumento));
@@ -229,8 +232,8 @@ class TipoDocumentoServiceImplTest {
 
     @Test
     void actualizar_debePermitirConservarElMismoNombre() {
-        TipoDocumento tipoDocumento = new TipoDocumento("Tipo A", "Descripcion");
-        TipoDocumentoUpdateRequest request = new TipoDocumentoUpdateRequest("Tipo A", "Descripcion actualizada");
+        TipoDocumento tipoDocumento = new TipoDocumento("TA", "Tipo A", "Descripcion");
+        TipoDocumentoUpdateRequest request = new TipoDocumentoUpdateRequest("TA", "Tipo A", "Descripcion actualizada");
         TipoDocumentoResponse respuestaEsperada = respuestaDePrueba(1L);
 
         when(tipoDocumentoRepository.findById(1L)).thenReturn(Optional.of(tipoDocumento));
@@ -249,7 +252,7 @@ class TipoDocumentoServiceImplTest {
     @Test
     void actualizar_debeRechazarNombreDuplicado() {
         TipoDocumento tipoDocumento = mock(TipoDocumento.class);
-        TipoDocumentoUpdateRequest request = new TipoDocumentoUpdateRequest("Nombre repetido", "Descripcion");
+        TipoDocumentoUpdateRequest request = new TipoDocumentoUpdateRequest("NR", "Nombre repetido", "Descripcion");
 
         when(tipoDocumentoRepository.findById(1L)).thenReturn(Optional.of(tipoDocumento));
         when(tipoDocumentoRepository.existsByNombreIgnoreCaseAndIdNot("Nombre repetido", 1L)).thenReturn(true);
@@ -259,14 +262,14 @@ class TipoDocumentoServiceImplTest {
                 .hasMessage("Ya existe un tipo de documento con el nombre 'Nombre repetido'")
                 .satisfies(ex -> assertThat(((BusinessException) ex).getStatus()).isEqualTo(HttpStatus.CONFLICT));
 
-        verify(tipoDocumento, never()).actualizarDatos(any(), any());
+        verify(tipoDocumento, never()).actualizarDatos(any(), any(), any());
         verify(tipoDocumentoRepository, never()).save(any());
         verifyNoInteractions(tipoDocumentoMapper);
     }
 
     @Test
     void actualizar_debeLanzarResourceNotFoundSiNoExisteAntesDeValidarDuplicado() {
-        TipoDocumentoUpdateRequest request = new TipoDocumentoUpdateRequest("Nombre", "Descripcion");
+        TipoDocumentoUpdateRequest request = new TipoDocumentoUpdateRequest("NM", "Nombre", "Descripcion");
         when(tipoDocumentoRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> tipoDocumentoServiceImpl.actualizar(99L, request))
@@ -412,5 +415,96 @@ class TipoDocumentoServiceImplTest {
         verify(tipoDocumentoRepository).findById(99L);
         verifyNoMoreInteractions(tipoDocumentoRepository);
         verifyNoInteractions(tipoDocumentoMapper);
+    }
+
+    @Test
+    void crear_debePermitirElMismoCodigoEnTiposDistintos() {
+        TipoDocumentoRequest plantilla = new TipoDocumentoRequest("ode", "Plantilla", null);
+        TipoDocumentoRequest imagenes = new TipoDocumentoRequest("ODE", "Imágenes", null);
+        TipoDocumentoResponse respuestaPlantilla = new TipoDocumentoResponse(
+                1L, "ODE", "Plantilla", null, true, null, null
+        );
+        TipoDocumentoResponse respuestaImagenes = new TipoDocumentoResponse(
+                2L, "ODE", "Imágenes", null, true, null, null
+        );
+
+        when(tipoDocumentoRepository.existsByNombreIgnoreCase("Plantilla")).thenReturn(false);
+        when(tipoDocumentoRepository.existsByNombreIgnoreCase("Imágenes")).thenReturn(false);
+        when(tipoDocumentoRepository.save(any(TipoDocumento.class)))
+                .thenAnswer(invocacion -> invocacion.getArgument(0));
+        when(tipoDocumentoMapper.toResponse(any(TipoDocumento.class)))
+                .thenReturn(respuestaPlantilla, respuestaImagenes);
+
+        TipoDocumentoResponse creadoPlantilla = tipoDocumentoServiceImpl.crear(plantilla);
+        TipoDocumentoResponse creadoImagenes = tipoDocumentoServiceImpl.crear(imagenes);
+
+        ArgumentCaptor<TipoDocumento> captor = ArgumentCaptor.forClass(TipoDocumento.class);
+        verify(tipoDocumentoRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+        assertThat(captor.getAllValues())
+                .extracting(TipoDocumento::getCodigo)
+                .containsExactly("ODE", "ODE");
+        assertThat(captor.getAllValues())
+                .extracting(TipoDocumento::getNombre)
+                .containsExactly("Plantilla", "Imágenes");
+        assertThat(creadoPlantilla.codigo()).isEqualTo("ODE");
+        assertThat(creadoImagenes.codigo()).isEqualTo("ODE");
+        assertThat(creadoPlantilla.id()).isNotEqualTo(creadoImagenes.id());
+    }
+
+    @Test
+    void crear_debePermitirOdeEnPlantillaDocumentosExternosEImagenes() {
+        TipoDocumentoRequest plantilla = new TipoDocumentoRequest("ODE", "Plantilla", null);
+        TipoDocumentoRequest externos = new TipoDocumentoRequest("ODE", "Documentos Externos", null);
+        TipoDocumentoRequest imagenes = new TipoDocumentoRequest("ODE", "Imágenes", null);
+        TipoDocumentoResponse respuestaPlantilla = new TipoDocumentoResponse(
+                1L, "ODE", "Plantilla", null, true, null, null
+        );
+        TipoDocumentoResponse respuestaExternos = new TipoDocumentoResponse(
+                2L, "ODE", "Documentos Externos", null, true, null, null
+        );
+        TipoDocumentoResponse respuestaImagenes = new TipoDocumentoResponse(
+                3L, "ODE", "Imágenes", null, true, null, null
+        );
+
+        when(tipoDocumentoRepository.existsByNombreIgnoreCase("Plantilla")).thenReturn(false);
+        when(tipoDocumentoRepository.existsByNombreIgnoreCase("Documentos Externos")).thenReturn(false);
+        when(tipoDocumentoRepository.existsByNombreIgnoreCase("Imágenes")).thenReturn(false);
+        when(tipoDocumentoRepository.save(any(TipoDocumento.class)))
+                .thenAnswer(invocacion -> invocacion.getArgument(0));
+        when(tipoDocumentoMapper.toResponse(any(TipoDocumento.class)))
+                .thenReturn(respuestaPlantilla, respuestaExternos, respuestaImagenes);
+
+        TipoDocumentoResponse creadoPlantilla = tipoDocumentoServiceImpl.crear(plantilla);
+        TipoDocumentoResponse creadoExternos = tipoDocumentoServiceImpl.crear(externos);
+        TipoDocumentoResponse creadoImagenes = tipoDocumentoServiceImpl.crear(imagenes);
+
+        assertThat(List.of(creadoPlantilla, creadoExternos, creadoImagenes))
+                .extracting(TipoDocumentoResponse::codigo)
+                .containsOnly("ODE");
+        assertThat(List.of(creadoPlantilla, creadoExternos, creadoImagenes))
+                .extracting(TipoDocumentoResponse::id)
+                .containsExactly(1L, 2L, 3L);
+        assertThat(List.of(creadoPlantilla, creadoExternos, creadoImagenes))
+                .extracting(TipoDocumentoResponse::nombre)
+                .containsExactly("Plantilla", "Documentos Externos", "Imágenes");
+    }
+
+    @Test
+    void actualizar_debePermitirCambiarElCodigoSinValidarUnicidadDeCodigo() {
+        TipoDocumento tipoDocumento = new TipoDocumento("MA", "Manual", "Descripcion");
+        TipoDocumentoUpdateRequest request = new TipoDocumentoUpdateRequest("mn", "Manual", "Descripcion");
+        TipoDocumentoResponse respuestaEsperada = new TipoDocumentoResponse(
+                1L, "MN", "Manual", "Descripcion", true, null, null
+        );
+
+        when(tipoDocumentoRepository.findById(1L)).thenReturn(Optional.of(tipoDocumento));
+        when(tipoDocumentoRepository.existsByNombreIgnoreCaseAndIdNot("Manual", 1L)).thenReturn(false);
+        when(tipoDocumentoMapper.toResponse(tipoDocumento)).thenReturn(respuestaEsperada);
+
+        TipoDocumentoResponse resultado = tipoDocumentoServiceImpl.actualizar(1L, request);
+
+        assertThat(tipoDocumento.getCodigo()).isEqualTo("MN");
+        assertThat(resultado.codigo()).isEqualTo("MN");
+        verify(tipoDocumentoRepository, never()).save(any());
     }
 }

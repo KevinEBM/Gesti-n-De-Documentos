@@ -13,6 +13,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 @Entity
 @Table(name = "tipos_documento")
@@ -23,6 +24,9 @@ public class TipoDocumento {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false, length = 20)
+    private String codigo;
 
     @Column(nullable = false, length = 100)
     private String nombre;
@@ -39,13 +43,15 @@ public class TipoDocumento {
     @Column(name = "fecha_actualizacion", nullable = false)
     private LocalDateTime fechaActualizacion;
 
-    public TipoDocumento(String nombre, String descripcion) {
+    public TipoDocumento(String codigo, String nombre, String descripcion) {
+        this.codigo = normalizarCodigo(codigo);
         this.nombre = normalizarTexto(nombre);
         this.descripcion = normalizarTextoOpcional(descripcion);
         this.activo = true;
     }
 
-    public void actualizarDatos(String nombre, String descripcion) {
+    public void actualizarDatos(String codigo, String nombre, String descripcion) {
+        this.codigo = normalizarCodigo(codigo);
         this.nombre = normalizarTexto(nombre);
         this.descripcion = normalizarTextoOpcional(descripcion);
     }
@@ -56,6 +62,16 @@ public class TipoDocumento {
 
     public void desactivar() {
         this.activo = false;
+    }
+
+    /**
+     * El código puede repetirse entre tipos distintos (p. ej. ODE). La unicidad
+     * del registro sigue siendo el id. Misma normalización que {@link com.plantarsas.gestiondocumental.subprogramas.entity.Subprograma}.
+     */
+    public static String normalizarCodigo(String codigo) {
+        return codigo == null
+                ? null
+                : codigo.trim().toUpperCase(Locale.ROOT);
     }
 
     private String normalizarTexto(String valor) {

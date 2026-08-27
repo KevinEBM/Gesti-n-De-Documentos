@@ -10,6 +10,7 @@ public class TipoDocumentoMapper {
     public TipoDocumentoResponse toResponse(TipoDocumento tipoDocumento) {
         return new TipoDocumentoResponse(
                 tipoDocumento.getId(),
+                tipoDocumento.getCodigo(),
                 tipoDocumento.getNombre(),
                 tipoDocumento.getDescripcion(),
                 tipoDocumento.isActivo(),

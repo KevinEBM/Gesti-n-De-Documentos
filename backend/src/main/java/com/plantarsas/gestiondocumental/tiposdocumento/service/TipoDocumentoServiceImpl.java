@@ -34,7 +34,7 @@ public class TipoDocumentoServiceImpl implements TipoDocumentoService, TipoDocum
             );
         }
 
-        TipoDocumento tipoDocumento = new TipoDocumento(request.nombre(), request.descripcion());
+        TipoDocumento tipoDocumento = new TipoDocumento(request.codigo(), request.nombre(), request.descripcion());
         return tipoDocumentoMapper.toResponse(tipoDocumentoRepository.save(tipoDocumento));
     }
 
@@ -65,7 +65,7 @@ public class TipoDocumentoServiceImpl implements TipoDocumentoService, TipoDocum
             );
         }
 
-        tipoDocumento.actualizarDatos(request.nombre(), request.descripcion());
+        tipoDocumento.actualizarDatos(request.codigo(), request.nombre(), request.descripcion());
         return tipoDocumentoMapper.toResponse(tipoDocumento);
     }
 

@@ -238,6 +238,38 @@ class AreaControllerSecurityTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMINISTRATIVO")
+    void listarParaConsulta_conAdministrativo_debeResponder200YUsarCatalogoCompleto() throws Exception {
+        when(areaService.listar()).thenReturn(List.of(respuestaDePrueba(1L)));
+
+        mockMvc.perform(get("/api/areas/consulta"))
+                .andExpect(status().isOk());
+
+        verify(areaService).listar();
+        verify(areaService, never()).listarParaUsuario(any());
+    }
+
+    @Test
+    @WithMockUser(roles = "JEFE_AREA")
+    void listarParaConsulta_conJefeArea_debeResponder200YUsarCatalogoCompleto() throws Exception {
+        when(areaService.listar()).thenReturn(List.of(respuestaDePrueba(1L)));
+
+        mockMvc.perform(get("/api/areas/consulta"))
+                .andExpect(status().isOk());
+
+        verify(areaService).listar();
+        verify(areaService, never()).listarParaUsuario(any());
+    }
+
+    @Test
+    void listarParaConsulta_sinAutenticacion_debeResponder401() throws Exception {
+        mockMvc.perform(get("/api/areas/consulta"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(areaService);
+    }
+
+    @Test
     void obtenerPorId_sinAutenticacion_debeResponder401() throws Exception {
         mockMvc.perform(get("/api/areas/1"))
                 .andExpect(status().isUnauthorized());

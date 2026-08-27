@@ -46,6 +46,12 @@ public class SubprogramaController {
         return ApiResponse.exitosa(subprogramaService.listarParaUsuario(usuarioAutenticado));
     }
 
+    @GetMapping("/consulta")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'JEFE_AREA', 'ADMINISTRATIVO')")
+    public ApiResponse<List<SubprogramaResponse>> listarParaConsulta() {
+        return ApiResponse.exitosa(subprogramaService.listar());
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ApiResponse<SubprogramaResponse> obtenerPorId(@PathVariable Long id) {

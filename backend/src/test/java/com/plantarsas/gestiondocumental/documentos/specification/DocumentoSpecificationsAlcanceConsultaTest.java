@@ -32,6 +32,18 @@ class DocumentoSpecificationsAlcanceConsultaTest {
     }
 
     @Test
+    void conAlcanceAreasEspecificas_debeConstruirSpecification() {
+        Specification<?> spec = DocumentoSpecifications.conAlcanceAreasEspecificas();
+        assertThat(spec).isNotNull();
+    }
+
+    @Test
+    void deAreaResponsable_debeConstruirSpecification() {
+        Specification<?> spec = DocumentoSpecifications.deAreaResponsable(10L);
+        assertThat(spec).isNotNull();
+    }
+
+    @Test
     void asociadoAAreas_conIdsVacios_debeSerRestrictivo() {
         Specification<?> spec = DocumentoSpecifications.asociadoAAreas(Set.of());
         assertThat(spec).isNotNull();
