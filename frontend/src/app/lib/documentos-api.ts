@@ -1,4 +1,5 @@
 import { API_BASE_URL, ApiError, type ApiResponse, apiFetch } from "./api";
+import { invalidarSesionSiNoAutorizada } from "./auth-sesion-invalida";
 import { getToken } from "./auth-storage";
 import { DOCUMENTOS_PAGE_SIZE } from "./documentos-consulta-shared";
 
@@ -450,6 +451,7 @@ async function descargarArchivoDocumento(path: string): Promise<DocumentoDescarg
     });
 
     if (!response.ok) {
+        invalidarSesionSiNoAutorizada(response.status, path);
         await lanzarApiErrorDesdeRespuesta(response);
     }
 

@@ -31,7 +31,7 @@ export const Route = createFileRoute("/app/inicio")({
 });
 
 function Inicio() {
-    const { sesion, refrescarPerfil, cerrarSesion } = useIntranet();
+    const { sesion, refrescarPerfil } = useIntranet();
     const [intento, setIntento] = useState(0);
     const [areaSinConfirmar, setAreaSinConfirmar] = useState(false);
 
@@ -49,7 +49,6 @@ function Inicio() {
             } catch (err) {
                 if (!activo) return;
                 if (err instanceof ApiError && err.status === 401) {
-                    cerrarSesion();
                     return;
                 }
                 setAreaSinConfirmar(true);
@@ -61,7 +60,7 @@ function Inicio() {
         return () => {
             activo = false;
         };
-    }, [sesion, refrescarPerfil, cerrarSesion, intento]);
+    }, [sesion, refrescarPerfil, intento]);
 
     useEffect(() => {
         const alVolverVisible = () => {

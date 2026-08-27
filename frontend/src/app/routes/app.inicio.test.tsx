@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import type { PerfilUsuarioResponseDto } from "@/lib/api";
 import { saveSession, type AuthSession } from "@/lib/auth-storage";
 import { IntranetProvider } from "@/lib/store";
@@ -76,6 +76,7 @@ beforeEach(() => {
 afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
 });
 
 function renderizarInicio() {
@@ -196,8 +197,20 @@ describe("Inicio — área del usuario", () => {
 
     it("cierra la sesión si el perfil responde 401", async () => {
         saveSession(sesionDe("jefe_area", { id: "3", nombre: AREA_ANTERIOR }));
-        vi.mocked(obtenerPerfilActual).mockRejectedValue(
-            new ApiError(401, "Credenciales inválidas"),
+        vi.mocked(obtenerPerfilActual).mockImplementation(() => apiFetch("/api/auth/me"));
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => ({
+                ok: false,
+                status: 401,
+                json: async () => ({
+                    exito: false,
+                    mensaje: "Autenticación requerida",
+                    datos: null,
+                    errores: null,
+                    fechaHora: "",
+                }),
+            })),
         );
 
         renderizarInicio();

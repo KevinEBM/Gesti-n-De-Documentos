@@ -1,4 +1,5 @@
-﻿import { getToken } from "./auth-storage";
+﻿import { invalidarSesionSiNoAutorizada } from "./auth-sesion-invalida";
+import { getToken } from "./auth-storage";
 
 export const API_BASE_URL =
     import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -45,6 +46,17 @@ export class ApiError extends Error {
     }
 }
 
+function lanzarApiError(
+    status: number,
+    path: string,
+    method: string | undefined,
+    mensaje: string,
+    errores?: Record<string, string>,
+): never {
+    invalidarSesionSiNoAutorizada(status, path, method);
+    throw new ApiError(status, mensaje, errores);
+}
+
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     const headers = new Headers(init.headers);
     const token = getToken();
@@ -71,22 +83,26 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
         payload = (await response.json()) as ApiResponse<T>;
     } catch {
         if (!response.ok) {
-            throw new ApiError(response.status, `Error HTTP ${response.status}`);
+            lanzarApiError(response.status, path, init.method, `Error HTTP ${response.status}`);
         }
         throw new ApiError(response.status, "La respuesta del servidor no es JSON valido");
     }
 
     if (!response.ok) {
-        throw new ApiError(
+        lanzarApiError(
             response.status,
+            path,
+            init.method,
             payload?.mensaje ?? `Error HTTP ${response.status}`,
             payload?.errores ?? undefined,
         );
     }
 
     if (!payload.exito) {
-        throw new ApiError(
+        lanzarApiError(
             response.status,
+            path,
+            init.method,
             payload.mensaje ?? "La operacion no fue exitosa",
             payload.errores ?? undefined,
         );

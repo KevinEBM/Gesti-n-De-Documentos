@@ -1,6 +1,7 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { apiFetch, ApiError, type LoginResponseDto } from "./api";
 import { obtenerPerfilActual } from "./auth-api";
+import { suscribirSesionInvalidada } from "./auth-sesion-invalida";
 import {
     clearSession,
     getSession,
@@ -78,6 +79,12 @@ export function IntranetProvider({ children }: { children: ReactNode }) {
     const [sesion, setSesion] = useState<Usuario | null>(
         () => getSession()?.usuario ?? null,
     );
+
+    useEffect(() => {
+        return suscribirSesionInvalidada(() => {
+            setSesion(null);
+        });
+    }, []);
 
     const value = useMemo<IntranetContextValue>(() => {
         const permisos = permisosDe(sesion);

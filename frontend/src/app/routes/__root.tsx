@@ -10,7 +10,6 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 import { IntranetProvider } from "@/lib/store";
 import { Toaster } from "@/components/ui/sonner";
 import ico from "../../MONOGRAMA PLANTAR-ORIGINAL.webp";
@@ -40,9 +39,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     console.error(error);
     const router = useRouter();
-    useEffect(() => {
-        reportLovableError(error, { boundary: "tanstack_root_error_component" });
-    }, [error]);
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -92,11 +88,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
             },
             { property: "og:type", content: "website" },
             { name: "twitter:card", content: "summary_large_image" },
-            { name: "twitter:site", content: "@Lovable" },
             { name: "twitter:title", content: "Iniciar sesión — Intranet documental Grupo Andina" },
             { name: "twitter:description", content: "Acceso privado para trabajadores autorizados de Grupo Andina a la intranet de documentos internos." },
-            { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2617cdd5-3b7e-46ad-9e69-5aabf702680f/id-preview-a81ac949--959f2ef0-0b74-4c12-9d4c-1d8d8e74e1a6.lovable.app-1785360031962.png" },
-            { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2617cdd5-3b7e-46ad-9e69-5aabf702680f/id-preview-a81ac949--959f2ef0-0b74-4c12-9d4c-1d8d8e74e1a6.lovable.app-1785360031962.png" },
         ],
         links: [
             {

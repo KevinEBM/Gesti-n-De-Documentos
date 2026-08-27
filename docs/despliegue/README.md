@@ -24,6 +24,14 @@ El backend y el frontend pueden ejecutarse en un servidor si se configuran las v
 | `JWT_EXPIRATION_MS` | Expiración del token en milisegundos |
 | `CORS_ALLOWED_ORIGINS` | Origen(es) del frontend (sin `*`; separar por coma si hay varios) |
 | `STORAGE_LOCATION` | Ruta absoluta persistente para archivos (ej. `/var/lib/gestion-documental/uploads`) |
+| `TZ` | Zona horaria del proceso. En producción **debe** ser `UTC` |
+
+**Zona horaria (obligatorio en producción):** el proceso backend **debe** ejecutarse en UTC.
+
+- Preferencia: `TZ=UTC`
+- Alternativa si el entorno no permite `TZ`: `JAVA_TOOL_OPTIONS=-Duser.timezone=UTC`
+
+El módulo documental ya usa `Clock`/`UTC`. Todavía hay `LocalDateTime.now()` naive en catálogos, usuarios y `ApiResponse.fechaHora`. Fijar la timezone de la JVM evita depender de la zona del host. PostgreSQL y Flyway V1–V11 no necesitan cambios por esto.
 
 **Perfil `prod`** (`application-prod.properties`):
 
