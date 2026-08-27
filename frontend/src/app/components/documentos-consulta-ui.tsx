@@ -222,10 +222,15 @@ export function DocumentoFiltroSelect({
     ocultarTodos?: boolean;
 }) {
     return (
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
             <Label className="text-xs text-muted-foreground">{label}</Label>
             <Select value={value} onValueChange={onChange} disabled={disabled}>
-                <SelectTrigger className={SELECT_TRIGGER_CLASS}>
+                <SelectTrigger
+                    className={cn(
+                        SELECT_TRIGGER_CLASS,
+                        "min-w-0 [&>span]:flex [&>span]:min-w-0 [&>span]:items-center [&>span]:overflow-hidden [&>svg]:shrink-0 [&_svg]:size-4 [&_svg]:shrink-0",
+                    )}
+                >
                     <SelectValue placeholder={placeholder} />
                 </SelectTrigger>
                 <SelectContent className={SELECT_CONTENT_CLASS}>
@@ -254,9 +259,11 @@ export function DocumentoFiltroSelect({
 
                         return (
                             <SelectItem key={opcion.v} value={opcion.v} className={SELECT_ITEM_CLASS}>
-                                <div className="flex items-center gap-2">
-                                    {Icono ? <Icono className={`size-4 ${color}`} /> : null}
-                                    <span>{opcion.l}</span>
+                                <div className="flex min-w-0 items-center gap-2">
+                                    {Icono ? (
+                                        <Icono className={`size-4 shrink-0 ${color}`} />
+                                    ) : null}
+                                    <span className="min-w-0 truncate">{opcion.l}</span>
                                 </div>
                             </SelectItem>
                         );

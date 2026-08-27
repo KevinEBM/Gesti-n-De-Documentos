@@ -9,6 +9,7 @@ import { ApiError } from "@/lib/api";
 import { etiquetaAreaPrincipal } from "@/lib/auth-storage";
 import { descripcionRolInicio, etiquetaRol } from "@/lib/data";
 import { obtenerIconoArea } from "@/lib/iconos-areas";
+import { obtenerIconoRol } from "@/lib/iconos-roles";
 import { useIntranet } from "@/lib/store";
 
 export const Route = createFileRoute("/app/inicio")({
@@ -85,6 +86,7 @@ function Inicio() {
     const etiquetaArea = etiquetaAreaPrincipal(sesion);
     const tieneAreaAsignada = Boolean(sesion.areaPrincipalNombre?.trim());
     const { icono: IconoArea, color: colorArea } = obtenerIconoArea(etiquetaArea);
+    const { icono: IconoRol, color: colorRol } = obtenerIconoRol(etiquetaRol[sesion.rol]);
 
     return (
         <AppShell titulo={`Bienvenido, ${nombreSaludo}`}>
@@ -105,7 +107,10 @@ function Inicio() {
                                 <dt className="text-xs uppercase tracking-wide text-muted-foreground">
                                     Rol
                                 </dt>
-                                <dd className="mt-1 text-sm font-medium">{etiquetaRol[sesion.rol]}</dd>
+                                <dd className="mt-1 flex items-center gap-2 text-sm font-medium">
+                                    <IconoRol className={`size-4 shrink-0 ${colorRol}`} />
+                                    {etiquetaRol[sesion.rol]}
+                                </dd>
                             </div>
                             <div className="sm:col-span-2">
                                 <dt className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -167,7 +172,10 @@ function Inicio() {
                                     <UserRound className="size-4 shrink-0 text-muted-foreground" />
                                     <h3 className="text-sm font-semibold">Tu rol</h3>
                                 </div>
-                                <p className="text-sm font-medium">{etiquetaRol[sesion.rol]}</p>
+                                <p className="flex items-center gap-2 text-sm font-medium">
+                                    <IconoRol className={`size-4 shrink-0 ${colorRol}`} />
+                                    {etiquetaRol[sesion.rol]}
+                                </p>
                                 <p className="text-sm leading-relaxed text-muted-foreground">
                                     {descripcionRolInicio[sesion.rol]}
                                 </p>
