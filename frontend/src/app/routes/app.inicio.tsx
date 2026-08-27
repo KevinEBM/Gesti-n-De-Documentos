@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { listarAreas } from "@/lib/areas-api";
+import { ApiError } from "@/lib/api";
 import { etiquetaAreaPrincipal } from "@/lib/auth-storage";
 import { descripcionRolInicio, etiquetaRol } from "@/lib/data";
 import { obtenerIconoArea } from "@/lib/iconos-areas";
@@ -30,37 +30,54 @@ export const Route = createFileRoute("/app/inicio")({
 });
 
 function Inicio() {
-    const { sesion, sincronizarAreaDesdeCatalogo } = useIntranet();
+    const { sesion, refrescarPerfil, cerrarSesion } = useIntranet();
     const [intento, setIntento] = useState(0);
     const [areaSinConfirmar, setAreaSinConfirmar] = useState(false);
 
     useEffect(() => {
-        if (!sesion || sesion.rol === "administrador") {
+        if (!sesion) {
             return;
         }
 
         let activo = true;
 
-        const refrescarArea = async () => {
+        const refrescar = async () => {
             try {
-                const areas = await listarAreas();
+                await refrescarPerfil();
+                if (activo) setAreaSinConfirmar(false);
+            } catch (err) {
                 if (!activo) return;
-                sincronizarAreaDesdeCatalogo(areas);
-                setAreaSinConfirmar(false);
-            } catch {
-                // La sesión sigue siendo válida, así que se conserva el último
-                // dato conocido; pero puede ser anterior a una reasignación de
-                // área, y el usuario debe poder detectarlo y reintentar.
-                if (activo) setAreaSinConfirmar(true);
+                if (err instanceof ApiError && err.status === 401) {
+                    cerrarSesion();
+                    return;
+                }
+                setAreaSinConfirmar(true);
             }
         };
 
-        void refrescarArea();
+        void refrescar();
 
         return () => {
             activo = false;
         };
-    }, [sesion, sincronizarAreaDesdeCatalogo, intento]);
+    }, [sesion, refrescarPerfil, cerrarSesion, intento]);
+
+    useEffect(() => {
+        const alVolverVisible = () => {
+            if (document.visibilityState === "visible") {
+                setIntento((valor) => valor + 1);
+            }
+        };
+        const alEnfocar = () => setIntento((valor) => valor + 1);
+
+        document.addEventListener("visibilitychange", alVolverVisible);
+        window.addEventListener("focus", alEnfocar);
+
+        return () => {
+            document.removeEventListener("visibilitychange", alVolverVisible);
+            window.removeEventListener("focus", alEnfocar);
+        };
+    }, []);
 
     if (!sesion) return null;
 

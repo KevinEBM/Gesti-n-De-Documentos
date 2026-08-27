@@ -1,4 +1,4 @@
-﻿import type { LoginResponseDto } from "./api";
+﻿import type { LoginResponseDto, PerfilUsuarioResponseDto } from "./api";
 import type { Rol, Usuario } from "./data";
 
 const AUTH_SESSION_KEY = "intranet.auth.session";
@@ -27,7 +27,7 @@ export function mapRolBackend(rol: string): Rol {
     return mapeado;
 }
 
-export function loginResponseToUsuario(datos: LoginResponseDto): Usuario {
+export function perfilResponseToUsuario(datos: PerfilUsuarioResponseDto): Usuario {
     return {
         id: String(datos.id),
         nombre: `${datos.nombres} ${datos.apellidos}`.trim(),
@@ -37,6 +37,22 @@ export function loginResponseToUsuario(datos: LoginResponseDto): Usuario {
         areaId: datos.areaPrincipalId != null ? String(datos.areaPrincipalId) : undefined,
         areaPrincipalNombre: datos.areaPrincipalNombre,
     };
+}
+
+export function loginResponseToUsuario(datos: LoginResponseDto): Usuario {
+    return perfilResponseToUsuario(datos);
+}
+
+export function mismoUsuarioSesion(a: Usuario, b: Usuario): boolean {
+    return (
+        a.id === b.id &&
+        a.nombre === b.nombre &&
+        a.correo === b.correo &&
+        a.rol === b.rol &&
+        a.activo === b.activo &&
+        a.areaId === b.areaId &&
+        a.areaPrincipalNombre === b.areaPrincipalNombre
+    );
 }
 
 export function etiquetaAreaPrincipal(usuario: Usuario): string {

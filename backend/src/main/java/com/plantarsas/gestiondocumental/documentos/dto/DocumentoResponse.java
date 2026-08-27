@@ -28,6 +28,9 @@ public record DocumentoResponse(
         Instant fechaPublicacionVersion,
         Instant fechaCreacion,
         Instant fechaActualizacion,
+        Instant fechaObsolescencia,
+        Instant fechaDisponibleEliminacion,
+        boolean aptoParaEliminacion,
         DocumentoAlcance alcance,
         List<AreaResumenResponse> areasAdicionales
 ) {

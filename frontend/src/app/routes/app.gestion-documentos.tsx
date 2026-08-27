@@ -111,7 +111,10 @@ function mensajeConfirmacionEstado(destino: DocumentoEstado): { titulo: string; 
     return { titulo: "", descripcion: "" };
 }
 
-function mensajeExitoEstado(destino: DocumentoEstado): string {
+function mensajeExitoEstado(origen: DocumentoEstado, destino: DocumentoEstado): string {
+    if (origen === "OBSOLETO" && destino === "PUBLICADO") {
+        return "Documento reactivado correctamente.";
+    }
     switch (destino) {
         case "PUBLICADO":
             return "Publicación activada correctamente.";
@@ -155,6 +158,7 @@ function GestionDocumentos() {
         esAdmin: true,
         filtroArea: filtrosFormulario.area,
         areasUsuario: areasCatalogo,
+        areasApiCargadas: true,
     });
 
     const subprogramasFiltro = useMemo(
@@ -179,7 +183,7 @@ function GestionDocumentos() {
         () =>
             subprogramasFiltro.map((item) => ({
                 v: item.id,
-                l: etiquetaCatalogoConsulta(item.nombre, item.activo, "masculino"),
+                l: etiquetaCatalogoConsulta(item.nombre ?? "", item.activo ?? true, "masculino"),
             })),
         [subprogramasFiltro],
     );
@@ -360,7 +364,7 @@ function GestionDocumentos() {
                             : item,
                     ),
                 );
-                toast.success(mensajeExitoEstado(destino));
+                toast.success(mensajeExitoEstado(documento.estado, destino));
             } catch (err) {
                 const mensaje =
                     err instanceof ApiError

@@ -2,9 +2,11 @@ package com.plantarsas.gestiondocumental.auth.service;
 
 import com.plantarsas.gestiondocumental.auth.dto.LoginRequest;
 import com.plantarsas.gestiondocumental.auth.dto.LoginResponse;
+import com.plantarsas.gestiondocumental.auth.dto.PerfilUsuarioResponse;
 import com.plantarsas.gestiondocumental.exception.AuthenticationFailedException;
 import com.plantarsas.gestiondocumental.areas.entity.Area;
 import com.plantarsas.gestiondocumental.roles.entity.Rol;
+import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 import com.plantarsas.gestiondocumental.security.JwtService;
 import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
 import com.plantarsas.gestiondocumental.usuarios.entity.EstadoUsuario;
@@ -477,5 +479,65 @@ class AuthServiceImplTest {
 
         assertThat(respuesta.areaPrincipalId()).isNull();
         assertThat(respuesta.areaPrincipalNombre()).isNull();
+    }
+
+    @Test
+    void obtenerPerfilActual_jefeArea_devuelveAreaVigenteDeBd() {
+        Usuario usuario = mock(Usuario.class);
+        when(usuario.getId()).thenReturn(9L);
+        when(usuario.getCorreo()).thenReturn("juan@ejemplo.com");
+        when(usuario.getNombres()).thenReturn("Juan");
+        when(usuario.getApellidos()).thenReturn("Pérez");
+        when(usuario.getEstado()).thenReturn(EstadoUsuario.ACTIVO);
+        Rol rol = mockRolConNombre(RolEnum.JEFE_AREA);
+        when(usuario.getRol()).thenReturn(rol);
+        when(usuarioRepository.findById(9L)).thenReturn(Optional.of(usuario));
+
+        UsuarioArea asignacion = mock(UsuarioArea.class);
+        Area area = mock(Area.class);
+        when(asignacion.getArea()).thenReturn(area);
+        when(area.getId()).thenReturn(7L);
+        when(area.getNombre()).thenReturn("Gestión de la Calidad");
+        when(usuarioAreaRepository.findFirstByUsuario_IdAndEsPrincipalTrue(9L))
+                .thenReturn(Optional.of(asignacion));
+
+        PerfilUsuarioResponse perfil = authService.obtenerPerfilActual(
+                new AuthenticatedUser(9L, "juan@ejemplo.com", RolEnum.JEFE_AREA)
+        );
+
+        assertThat(perfil.areaPrincipalId()).isEqualTo(7L);
+        assertThat(perfil.areaPrincipalNombre()).isEqualTo("Gestión de la Calidad");
+        assertThat(perfil.nombres()).isEqualTo("Juan");
+        assertThat(perfil.rol()).isEqualTo(RolEnum.JEFE_AREA);
+        verifyNoInteractions(jwtService);
+    }
+
+    @Test
+    void obtenerPerfilActual_administrador_devuelveAreaNula() {
+        Usuario usuario = mockUsuarioValido();
+        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
+
+        PerfilUsuarioResponse perfil = authService.obtenerPerfilActual(
+                new AuthenticatedUser(1L, "correo@ejemplo.com", RolEnum.ADMINISTRADOR)
+        );
+
+        assertThat(perfil.areaPrincipalId()).isNull();
+        assertThat(perfil.areaPrincipalNombre()).isNull();
+        verify(usuarioAreaRepository, never()).findFirstByUsuario_IdAndEsPrincipalTrue(any());
+    }
+
+    @Test
+    void obtenerPerfilActual_usuarioInactivo_lanzaAuthenticationFailed() {
+        Usuario usuario = mock(Usuario.class);
+        when(usuario.getEstado()).thenReturn(EstadoUsuario.INACTIVO);
+        when(usuarioRepository.findById(9L)).thenReturn(Optional.of(usuario));
+
+        assertThatThrownBy(() ->
+                authService.obtenerPerfilActual(
+                        new AuthenticatedUser(9L, "juan@ejemplo.com", RolEnum.JEFE_AREA)
+                )
+        ).isInstanceOf(AuthenticationFailedException.class);
+
+        verifyNoInteractions(jwtService);
     }
 }

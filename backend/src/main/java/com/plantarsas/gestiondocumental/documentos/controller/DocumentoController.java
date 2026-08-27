@@ -33,6 +33,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -146,6 +147,16 @@ public class DocumentoController {
         return ApiResponse.exitosa(
                 documentoService.cambiarEstado(id, request, usuarioAutenticado)
         );
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ApiResponse<Void> eliminarDefinitivamente(
+            @PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser usuarioAutenticado
+    ) {
+        documentoService.eliminarDefinitivamente(id, usuarioAutenticado);
+        return ApiResponse.exitosa(null);
     }
 
     @GetMapping

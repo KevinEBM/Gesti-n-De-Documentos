@@ -120,6 +120,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -327,6 +328,7 @@ class DocumentoControllerSecurityTest {
                 1L, "Area", 2L, "Subprograma", 3L, "TipoDocumento",
                 1L, 1, "documento.pdf", "application/pdf", 9L,
                 "Publicacion inicial", 1L, ahora, ahora, ahora,
+                null, null, false,
                 DocumentoAlcance.AREA_RESPONSABLE, List.of()
         );
     }
@@ -1349,6 +1351,40 @@ class DocumentoControllerSecurityTest {
                 .andExpect(status().isBadRequest());
 
         verify(documentoService, never()).cambiarEstado(anyLong(), any(), any());
+    }
+
+    @Test
+    void eliminarDefinitivamente_sinAutenticacion_debeResponder401() throws Exception {
+        mockMvc.perform(delete(URL_ACTUALIZACION))
+                .andExpect(status().isUnauthorized());
+
+        verify(documentoService, never()).eliminarDefinitivamente(anyLong(), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "JEFE_AREA")
+    void eliminarDefinitivamente_conJefeArea_debeResponder403() throws Exception {
+        mockMvc.perform(delete(URL_ACTUALIZACION))
+                .andExpect(status().isForbidden());
+
+        verify(documentoService, never()).eliminarDefinitivamente(anyLong(), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMINISTRATIVO")
+    void eliminarDefinitivamente_conAdministrativo_debeResponder403() throws Exception {
+        mockMvc.perform(delete(URL_ACTUALIZACION))
+                .andExpect(status().isForbidden());
+
+        verify(documentoService, never()).eliminarDefinitivamente(anyLong(), any());
+    }
+
+    @Test
+    void eliminarDefinitivamente_conAdministrador_debePermitirAcceso() throws Exception {
+        mockMvc.perform(delete(URL_ACTUALIZACION).with(administradorAutenticado()))
+                .andExpect(status().isOk());
+
+        verify(documentoService).eliminarDefinitivamente(eq(DOCUMENTO_ID), any());
     }
 
     @Configuration

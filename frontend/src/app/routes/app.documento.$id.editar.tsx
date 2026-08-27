@@ -83,7 +83,7 @@ interface FormularioEdicion {
 
 function incluirAreaCatalogo(areas: AreaCatalogo[], id: string, nombre: string): AreaCatalogo[] {
     if (!id || areas.some((area) => area.id === id)) return areas;
-    return [...areas, { id, nombre, descripcion: "", activo: false }];
+    return [...areas, { id, nombre, codigo: "", descripcion: "", activo: false }];
 }
 
 function incluirSubprogramaCatalogo(

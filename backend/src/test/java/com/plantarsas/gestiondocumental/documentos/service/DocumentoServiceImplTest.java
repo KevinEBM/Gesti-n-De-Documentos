@@ -85,6 +85,7 @@ class DocumentoServiceImplTest {
     private static final Long AREA_ADICIONAL_2_ID = 102L;
     private static final Long AREA_ADICIONAL_3_ID = 103L;
     private static final Instant INSTANTE_FIJO = Instant.parse("2026-08-25T13:21:57Z");
+    private static final LocalDateTime AHORA_UTC = LocalDateTime.ofInstant(INSTANTE_FIJO, ZoneOffset.UTC);
 
     @Mock
     private DocumentoRepository documentoRepository;
@@ -1162,7 +1163,7 @@ class DocumentoServiceImplTest {
     @Test
     void publicarNuevaVersion_conDocumentoInactivo_debePermitirNuevaVersionYConservarEstado() throws IOException {
         Documento documento = documentoPublicadoDePrueba();
-        documento.cambiarEstado(DocumentoEstado.INACTIVO);
+        documento.cambiarEstado(DocumentoEstado.INACTIVO, AHORA_UTC);
         DocumentoArea documentoArea = documentoAreaDePrueba(documento);
         VersionDocumento vigenteActual = versionVigenteDePrueba(documento);
         Usuario usuarioPersistido = usuarioPersistidoMock();
@@ -1181,7 +1182,7 @@ class DocumentoServiceImplTest {
     @Test
     void publicarNuevaVersion_debeLanzarBusinessExceptionSiDocumentoObsoleto() {
         Documento documento = documentoPublicadoDePrueba();
-        documento.cambiarEstado(DocumentoEstado.OBSOLETO);
+        documento.cambiarEstado(DocumentoEstado.OBSOLETO, AHORA_UTC);
         when(documentoRepository.buscarPorIdConBloqueoPesimista(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
 
         assertThatThrownBy(() -> documentoServiceImpl.publicarNuevaVersion(
@@ -1796,7 +1797,7 @@ class DocumentoServiceImplTest {
     @Test
     void actualizarMetadatos_conDocumentoObsoleto_debeRechazar() {
         Documento documento = documentoPersistidoDePrueba();
-        documento.cambiarEstado(DocumentoEstado.OBSOLETO);
+        documento.cambiarEstado(DocumentoEstado.OBSOLETO, AHORA_UTC);
         when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
 
         assertThatThrownBy(() -> documentoServiceImpl.actualizarMetadatos(
@@ -1816,7 +1817,7 @@ class DocumentoServiceImplTest {
     @Test
     void actualizarMetadatos_conDocumentoInactivo_debePermitir() {
         Documento documento = documentoPersistidoDePrueba();
-        documento.cambiarEstado(DocumentoEstado.INACTIVO);
+        documento.cambiarEstado(DocumentoEstado.INACTIVO, AHORA_UTC);
         Area area = areaActivaMock();
         Subprograma subprograma = subprogramaActivoMock(area);
         TipoDocumento tipoDocumento = tipoDocumentoActivoMock();
@@ -2544,12 +2545,13 @@ class DocumentoServiceImplTest {
         );
 
         assertThat(documento.getEstado()).isEqualTo(DocumentoEstado.OBSOLETO);
+        assertThat(documento.getFechaObsolescencia()).isEqualTo(AHORA_UTC);
     }
 
     @Test
-    void cambiarEstado_deInactivoAPublicado_debeReactivarSinNuevaVersion() {
+    void cambiarEstado_deInactivoAPublicado_debeActualizarEstado() {
         Documento documento = documentoPersistidoDePrueba();
-        documento.cambiarEstado(DocumentoEstado.INACTIVO);
+        documento.cambiarEstado(DocumentoEstado.INACTIVO, AHORA_UTC);
         VersionDocumento versionVigente = versionVigenteDePrueba(documento);
         stubCambioEstadoExitoso(documento, versionVigente);
 
@@ -2566,7 +2568,7 @@ class DocumentoServiceImplTest {
     @Test
     void cambiarEstado_deObsoletoAPublicado_debeReactivar() {
         Documento documento = documentoPersistidoDePrueba();
-        documento.cambiarEstado(DocumentoEstado.OBSOLETO);
+        documento.cambiarEstado(DocumentoEstado.OBSOLETO, AHORA_UTC);
         VersionDocumento versionVigente = versionVigenteDePrueba(documento);
         stubCambioEstadoExitoso(documento, versionVigente);
 
@@ -2577,12 +2579,13 @@ class DocumentoServiceImplTest {
         );
 
         assertThat(documento.getEstado()).isEqualTo(DocumentoEstado.PUBLICADO);
+        assertThat(documento.getFechaObsolescencia()).isNull();
     }
 
     @Test
-    void cambiarEstado_deObsoletoAInactivo_debeRechazarTransicion() {
+    void cambiarEstado_deObsoletoAInactivo_debeRechazar() {
         Documento documento = documentoPersistidoDePrueba();
-        documento.cambiarEstado(DocumentoEstado.OBSOLETO);
+        documento.cambiarEstado(DocumentoEstado.OBSOLETO, AHORA_UTC);
         when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
 
         assertThatThrownBy(() -> documentoServiceImpl.cambiarEstado(
@@ -2639,5 +2642,111 @@ class DocumentoServiceImplTest {
         assertThat(versionVigente.getRutaArchivo()).isEqualTo(rutaOriginal);
         assertThat(versionVigente.getNombreArchivoOriginal()).isEqualTo(nombreOriginal);
         verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void cambiarEstado_permanecerObsoleto_noReiniciaFechaObsolescencia() {
+        Documento documento = documentoPersistidoDePrueba();
+        documento.cambiarEstado(DocumentoEstado.OBSOLETO, AHORA_UTC.minusYears(1));
+        LocalDateTime fechaOriginal = documento.getFechaObsolescencia();
+        VersionDocumento versionVigente = versionVigenteDePrueba(documento);
+        stubCambioEstadoExitoso(documento, versionVigente);
+
+        documentoServiceImpl.cambiarEstado(
+                DOCUMENTO_ID,
+                new DocumentoEstadoActualizacionRequest(DocumentoEstado.OBSOLETO),
+                usuarioAdministrador()
+        );
+
+        assertThat(documento.getFechaObsolescencia()).isEqualTo(fechaOriginal);
+        verify(documentoRepository, never()).save(any(Documento.class));
+    }
+
+    @Test
+    void cambiarEstado_obsoletoTrasReactivar_registraFechaNueva() {
+        Documento documento = documentoPersistidoDePrueba();
+        documento.cambiarEstado(DocumentoEstado.OBSOLETO, AHORA_UTC.minusYears(3));
+        documento.cambiarEstado(DocumentoEstado.PUBLICADO, AHORA_UTC.minusDays(1));
+        VersionDocumento versionVigente = versionVigenteDePrueba(documento);
+        stubCambioEstadoExitoso(documento, versionVigente);
+
+        documentoServiceImpl.cambiarEstado(
+                DOCUMENTO_ID,
+                new DocumentoEstadoActualizacionRequest(DocumentoEstado.OBSOLETO),
+                usuarioAdministrador()
+        );
+
+        assertThat(documento.getEstado()).isEqualTo(DocumentoEstado.OBSOLETO);
+        assertThat(documento.getFechaObsolescencia()).isEqualTo(AHORA_UTC);
+        assertThat(documento.esAptoParaEliminacion(AHORA_UTC)).isFalse();
+    }
+
+    @Test
+    void eliminarDefinitivamente_antesDeDosAnos_debeRechazar() {
+        Documento documento = documentoPersistidoDePrueba();
+        documento.cambiarEstado(DocumentoEstado.OBSOLETO, AHORA_UTC.minusYears(2).plusNanos(1));
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+
+        assertThatThrownBy(() -> documentoServiceImpl.eliminarDefinitivamente(
+                DOCUMENTO_ID, usuarioAdministrador()
+        ))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("aún no cumple");
+
+        verify(documentoRepository, never()).delete(any(Documento.class));
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void eliminarDefinitivamente_alCumplirDosAnos_adminPuedeEliminarVersionesYArchivos() throws IOException {
+        Documento documento = documentoPersistidoDePrueba();
+        documento.cambiarEstado(DocumentoEstado.OBSOLETO, AHORA_UTC.minusYears(2));
+        VersionDocumento vigente = versionVigenteDePrueba(documento);
+        VersionDocumento historica = new VersionDocumento(
+                documento, 2, "v2.pdf", RUTA_ARCHIVO_NUEVO, RUTA_ARCHIVO_NUEVO,
+                "application/pdf", 20L, "Cambio", usuarioPersistidoMock()
+        );
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+        when(versionDocumentoRepository.findByDocumento_IdOrderByNumeroVersionDesc(DOCUMENTO_ID))
+                .thenReturn(List.of(vigente, historica));
+
+        documentoServiceImpl.eliminarDefinitivamente(DOCUMENTO_ID, usuarioAdministrador());
+
+        InOrder orden = inOrder(versionDocumentoRepository, documentoAreaRepository, documentoRepository, storageService);
+        orden.verify(versionDocumentoRepository).deleteAll(List.of(vigente, historica));
+        orden.verify(documentoAreaRepository).deleteAllByDocumento_Id(DOCUMENTO_ID);
+        orden.verify(documentoRepository).delete(documento);
+        verify(storageService).eliminar(RUTA_ARCHIVO_ANTERIOR);
+        verify(storageService).eliminar(RUTA_ARCHIVO_NUEVO);
+    }
+
+    @Test
+    void eliminarDefinitivamente_debeRechazarJefeArea() {
+        assertThatThrownBy(() -> documentoServiceImpl.eliminarDefinitivamente(
+                DOCUMENTO_ID, new AuthenticatedUser(USUARIO_ID, "jefe", RolEnum.JEFE_AREA)
+        )).isInstanceOf(UnauthorizedException.class);
+
+        verifyNoInteractions(documentoRepository, storageService);
+    }
+
+    @Test
+    void eliminarDefinitivamente_debeRechazarAdministrativo() {
+        assertThatThrownBy(() -> documentoServiceImpl.eliminarDefinitivamente(
+                DOCUMENTO_ID, new AuthenticatedUser(USUARIO_ID, "adminivo", RolEnum.ADMINISTRATIVO)
+        )).isInstanceOf(UnauthorizedException.class);
+
+        verifyNoInteractions(documentoRepository, storageService);
+    }
+
+    @Test
+    void eliminarDefinitivamente_documentoNoObsoleto_debeRechazar() {
+        Documento documento = documentoPersistidoDePrueba();
+        when(documentoRepository.findById(DOCUMENTO_ID)).thenReturn(Optional.of(documento));
+
+        assertThatThrownBy(() -> documentoServiceImpl.eliminarDefinitivamente(
+                DOCUMENTO_ID, usuarioAdministrador()
+        )).isInstanceOf(BusinessException.class);
+
+        verify(documentoRepository, never()).delete(any(Documento.class));
     }
 }

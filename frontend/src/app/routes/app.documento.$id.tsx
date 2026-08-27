@@ -1,27 +1,44 @@
-import { Link, createFileRoute, useParams } from "@tanstack/react-router";
+import { Link, createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
 import type { Icon } from "@tabler/icons-react";
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeft, Download, History, Pencil, Upload } from "lucide-react";
+import { ArrowLeft, Download, History, Pencil, RotateCcw, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { DocumentoEstadoBadge } from "@/components/documentos-consulta-ui";
 import { AppShell } from "@/components/AppShell";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ApiError } from "@/lib/api";
 import {
+    ALERT_DIALOG_CANCEL_CLASS,
+    ALERT_DIALOG_CONTENT_CLASS,
+    ALERT_DIALOG_DESCRIPTION_CLASS,
+    ALERT_DIALOG_TITLE_DESACTIVAR_CLASS,
     dispararDescargaEnNavegador,
     etiquetasAlcance,
     formatFechaDocumento,
+    textoRetencionObsoleto,
 } from "@/lib/documentos-consulta-shared";
 import { obtenerIconoFormato } from "@/lib/iconos-formatos";
 import { obtenerIconoArea } from "@/lib/iconos-areas";
 import { obtenerIconoSubProceso } from "@/lib/iconos-subprocesos";
 import {
+    actualizarEstadoDocumento,
     descargarVersionVigente,
+    eliminarDocumentoDefinitivo,
     obtenerDocumento,
     type DocumentoDetalle,
 } from "@/lib/documentos-api";
@@ -47,6 +64,7 @@ export const Route = createFileRoute("/app/documento/$id")({
 
 function DetalleDocumento() {
     const { id } = useParams({ from: "/app/documento/$id" });
+    const navigate = useNavigate();
     const { permisos } = useIntranet();
 
     const [documento, setDocumento] = useState<DocumentoDetalle | null>(null);
@@ -54,6 +72,9 @@ function DetalleDocumento() {
     const [noDisponible, setNoDisponible] = useState(false);
     const [errorCarga, setErrorCarga] = useState<string | null>(null);
     const [descargando, setDescargando] = useState(false);
+    const [reactivando, setReactivando] = useState(false);
+    const [eliminando, setEliminando] = useState(false);
+    const [confirmacionEliminar, setConfirmacionEliminar] = useState(false);
     const requestIdRef = useRef(0);
 
     const cargarDocumento = useCallback(async () => {
@@ -108,6 +129,45 @@ function DetalleDocumento() {
             toast.error(mensaje);
         } finally {
             setDescargando(false);
+        }
+    };
+
+    const reactivarDocumento = async () => {
+        if (!documento) return;
+
+        setReactivando(true);
+        try {
+            const actualizado = await actualizarEstadoDocumento(documento.id, "PUBLICADO");
+            setDocumento(actualizado);
+            toast.success("Documento reactivado correctamente.");
+        } catch (err) {
+            const mensaje =
+                err instanceof ApiError
+                    ? err.message
+                    : "No fue posible reactivar el documento.";
+            toast.error(mensaje);
+        } finally {
+            setReactivando(false);
+        }
+    };
+
+    const eliminarDocumento = async () => {
+        if (!documento) return;
+
+        setEliminando(true);
+        try {
+            await eliminarDocumentoDefinitivo(documento.id);
+            toast.success("Documento eliminado definitivamente.");
+            setConfirmacionEliminar(false);
+            await navigate({ to: "/app/gestion-documentos" });
+        } catch (err) {
+            const mensaje =
+                err instanceof ApiError
+                    ? err.message
+                    : "No fue posible eliminar el documento.";
+            toast.error(mensaje);
+        } finally {
+            setEliminando(false);
         }
     };
 
@@ -170,9 +230,11 @@ function DetalleDocumento() {
     const { icono: IconoSub, color: colorSub } = obtenerIconoSubProceso(
         documento.subprogramaNombre,
     );
+    const esAdmin = permisos.administrarEstados;
+    const esObsoleto = documento.estado === "OBSOLETO";
 
     return (
-        <AppShell titulo="Detalle del documento" descripcion={documento.codigo}>
+        <AppShell titulo="Detalle del documento">
             <Button asChild variant="ghost" size="sm" className="-ml-2 gap-1.5">
                 <Link to="/app/documentos">
                     <ArrowLeft className="size-4" /> Volver
@@ -190,12 +252,20 @@ function DetalleDocumento() {
                                 <CardTitle className="text-lg leading-snug break-words">
                                     {documento.titulo}
                                 </CardTitle>
-                                <p className="mt-1 font-mono text-xs text-muted-foreground">
+                                <p className="mt-1.5 font-mono text-sm font-semibold tracking-wide text-foreground">
                                     {documento.codigo}
+                                </p>
+                                <p className="mt-0.5 text-sm text-muted-foreground">
+                                    Versión vigente: {documento.numeroVersionActual}
                                 </p>
                             </div>
                         </div>
-                        <DocumentoEstadoBadge estado={documento.estado} />
+                        <div className="flex shrink-0 flex-col items-end gap-2">
+                            <DocumentoEstadoBadge estado={documento.estado} />
+                            {esAdmin && documento.aptoParaEliminacion ? (
+                                <Badge variant="destructive">Apto para eliminación</Badge>
+                            ) : null}
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-5">
                         <p className="text-sm leading-relaxed text-muted-foreground break-words">
@@ -231,10 +301,6 @@ function DetalleDocumento() {
                                 colorIcono={colorTipo}
                             />
                             <Campo k="Alcance" v={etiquetasAlcance[documento.alcance]} />
-                            <Campo
-                                k="Versión vigente"
-                                v={String(documento.numeroVersionActual)}
-                            />
                             <Campo
                                 k="Fecha de publicación"
                                 v={formatFechaDocumento(documento.fechaPublicacionVersion)}
@@ -287,9 +353,71 @@ function DetalleDocumento() {
                                 </Link>
                             </Button>
                         ) : null}
+                        {esAdmin && esObsoleto ? (
+                            <>
+                                <Button
+                                    variant="outline"
+                                    className="w-full justify-between"
+                                    disabled={reactivando || eliminando}
+                                    onClick={() => void reactivarDocumento()}
+                                >
+                                    {reactivando ? "Reactivando..." : "Reactivar documento"}
+                                    <RotateCcw className="size-4" />
+                                </Button>
+                                {documento.aptoParaEliminacion ? (
+                                    <Button
+                                        variant="destructive"
+                                        className="w-full justify-between"
+                                        disabled={reactivando || eliminando}
+                                        onClick={() => setConfirmacionEliminar(true)}
+                                    >
+                                        Eliminar definitivamente
+                                        <Trash2 className="size-4" />
+                                    </Button>
+                                ) : (
+                                    <p className="pt-1 text-xs leading-relaxed text-muted-foreground">
+                                        {textoRetencionObsoleto(documento.fechaDisponibleEliminacion)}
+                                    </p>
+                                )}
+                            </>
+                        ) : null}
                     </CardContent>
                 </Card>
             </div>
+
+            <AlertDialog
+                open={confirmacionEliminar}
+                onOpenChange={(abierto) => {
+                    if (!abierto && !eliminando) setConfirmacionEliminar(false);
+                }}
+            >
+                <AlertDialogContent className={ALERT_DIALOG_CONTENT_CLASS}>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className={ALERT_DIALOG_TITLE_DESACTIVAR_CLASS}>
+                            Eliminar documento definitivamente
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className={ALERT_DIALOG_DESCRIPTION_CLASS}>
+                            Esta acción no se puede deshacer. Se eliminarán el documento, su historial
+                            de versiones y los archivos asociados.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className={ALERT_DIALOG_CANCEL_CLASS} disabled={eliminando}>
+                            Cancelar
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            className="!bg-red-600 !text-white hover:!bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600/40 disabled:opacity-50"
+                            disabled={eliminando}
+                            onClick={(evento) => {
+                                evento.preventDefault();
+                                void eliminarDocumento();
+                            }}
+                        >
+                            {eliminando ? "Eliminando..." : "Eliminar definitivamente"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AppShell>
     );
 }

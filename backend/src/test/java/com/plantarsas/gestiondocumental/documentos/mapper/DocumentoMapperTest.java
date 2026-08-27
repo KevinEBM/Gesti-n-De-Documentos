@@ -15,6 +15,7 @@ import com.plantarsas.gestiondocumental.shared.time.FechaHoraUtc;
 import com.plantarsas.gestiondocumental.usuarios.entity.Usuario;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -26,7 +27,7 @@ import static org.mockito.Mockito.when;
 
 class DocumentoMapperTest {
 
-    private final DocumentoMapper documentoMapper = new DocumentoMapper();
+    private final DocumentoMapper documentoMapper = new DocumentoMapper(Clock.systemUTC());
 
     @Test
     void toResponse_debeMapearLosVeintiunCamposEnElOrdenCorrecto() {
@@ -105,6 +106,9 @@ class DocumentoMapperTest {
         assertThat(resultado.fechaPublicacionVersion()).isEqualTo(FechaHoraUtc.aInstant(fechaPublicacionVersion));
         assertThat(resultado.fechaCreacion()).isEqualTo(FechaHoraUtc.aInstant(fechaCreacion));
         assertThat(resultado.fechaActualizacion()).isEqualTo(FechaHoraUtc.aInstant(fechaActualizacion));
+        assertThat(resultado.fechaObsolescencia()).isNull();
+        assertThat(resultado.fechaDisponibleEliminacion()).isNull();
+        assertThat(resultado.aptoParaEliminacion()).isFalse();
         assertThat(resultado.alcance()).isEqualTo(DocumentoAlcance.AREA_RESPONSABLE);
         assertThat(resultado.areasAdicionales()).isEmpty();
     }

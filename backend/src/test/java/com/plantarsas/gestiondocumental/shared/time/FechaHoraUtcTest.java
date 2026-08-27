@@ -43,6 +43,11 @@ class FechaHoraUtcTest {
     }
 
     @Test
+    void aInstantONulo_conNull_devuelveNull() {
+        assertThat(FechaHoraUtc.aInstantONulo(null)).isNull();
+    }
+
+    @Test
     void inicioDiaPresentacionEnAlmacenamiento_convierteDiaColombiaAUtcNaive() {
         LocalDate dia = LocalDate.of(2026, 8, 25);
 

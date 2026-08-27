@@ -31,6 +31,9 @@ import java.time.ZoneOffset;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Documento {
 
+    /** Años completos que un documento debe permanecer OBSOLETO antes de poder eliminarse. */
+    public static final int ANOS_RETENCION_OBSOLETO = 2;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -70,6 +73,10 @@ public class Documento {
     @Column(name = "fecha_actualizacion", nullable = false)
     private LocalDateTime fechaActualizacion;
 
+    /** Instante UTC en que el documento pasó a OBSOLETO; null en cualquier otro estado. */
+    @Column(name = "fecha_obsolescencia")
+    private LocalDateTime fechaObsolescencia;
+
     public Documento(
             String codigo,
             String titulo,
@@ -100,8 +107,35 @@ public class Documento {
         this.alcance = alcance;
     }
 
-    public void cambiarEstado(DocumentoEstado nuevoEstado) {
+    /**
+     * Aplica la transición de estado manteniendo sincronizado el plazo de retención:
+     * entrar en OBSOLETO abre un período nuevo, permanecer en OBSOLETO conserva el
+     * original y salir de OBSOLETO lo descarta. La fecha anterior nunca se reutiliza.
+     */
+    public void cambiarEstado(DocumentoEstado nuevoEstado, LocalDateTime ahoraUtc) {
+        if (nuevoEstado != DocumentoEstado.OBSOLETO) {
+            this.fechaObsolescencia = null;
+        } else if (this.estado != DocumentoEstado.OBSOLETO) {
+            this.fechaObsolescencia = ahoraUtc;
+        }
         this.estado = nuevoEstado;
+    }
+
+    /** Fecha a partir de la cual un documento obsoleto puede eliminarse; null si no aplica. */
+    public LocalDateTime fechaDisponibleEliminacion() {
+        if (fechaObsolescencia == null) {
+            return null;
+        }
+        return fechaObsolescencia.plusYears(ANOS_RETENCION_OBSOLETO);
+    }
+
+    /** Cierto solo si el documento lleva el plazo completo de retención en OBSOLETO. */
+    public boolean esAptoParaEliminacion(LocalDateTime ahoraUtc) {
+        if (estado != DocumentoEstado.OBSOLETO) {
+            return false;
+        }
+        LocalDateTime disponibleDesde = fechaDisponibleEliminacion();
+        return disponibleDesde != null && !ahoraUtc.isBefore(disponibleDesde);
     }
 
     public void actualizarMetadatos(

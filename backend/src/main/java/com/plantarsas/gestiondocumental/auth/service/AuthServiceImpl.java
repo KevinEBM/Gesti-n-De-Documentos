@@ -2,7 +2,9 @@ package com.plantarsas.gestiondocumental.auth.service;
 
 import com.plantarsas.gestiondocumental.auth.dto.LoginRequest;
 import com.plantarsas.gestiondocumental.auth.dto.LoginResponse;
+import com.plantarsas.gestiondocumental.auth.dto.PerfilUsuarioResponse;
 import com.plantarsas.gestiondocumental.exception.AuthenticationFailedException;
+import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 import com.plantarsas.gestiondocumental.security.JwtService;
 import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
 import com.plantarsas.gestiondocumental.usuarios.entity.EstadoUsuario;
@@ -83,15 +85,7 @@ public class AuthServiceImpl implements AuthService {
                 rol
         );
 
-        Long areaPrincipalId = null;
-        String areaPrincipalNombre = null;
-        var areaPrincipal = usuarioAreaRepository
-                .findFirstByUsuario_IdAndEsPrincipalTrue(usuario.getId());
-        if (areaPrincipal.isPresent()) {
-            UsuarioArea asignacion = areaPrincipal.get();
-            areaPrincipalId = asignacion.getArea().getId();
-            areaPrincipalNombre = asignacion.getArea().getNombre();
-        }
+        UsuarioArea areaPrincipal = buscarAreaPrincipal(usuario.getId());
 
         return new LoginResponse(
                 token,
@@ -101,8 +95,50 @@ public class AuthServiceImpl implements AuthService {
                 usuario.getNombres(),
                 usuario.getApellidos(),
                 rol,
-                areaPrincipalId,
-                areaPrincipalNombre
+                areaPrincipal == null ? null : areaPrincipal.getArea().getId(),
+                areaPrincipal == null ? null : areaPrincipal.getArea().getNombre()
         );
+    }
+
+    @Override
+    public PerfilUsuarioResponse obtenerPerfilActual(AuthenticatedUser usuarioAutenticado) {
+        if (usuarioAutenticado == null || usuarioAutenticado.id() == null) {
+            throw credencialesInvalidas();
+        }
+
+        Usuario usuario = usuarioRepository.findById(usuarioAutenticado.id())
+                .orElseThrow(this::credencialesInvalidas);
+
+        // El token sobrevive a la desactivación de la cuenta; login ya rechaza usuarios
+        // inactivos y el perfil debe aplicar el mismo criterio para no prolongar la sesión.
+        if (usuario.getEstado() != EstadoUsuario.ACTIVO
+                || usuario.getRol() == null
+                || usuario.getRol().getNombre() == null) {
+            throw credencialesInvalidas();
+        }
+
+        RolEnum rol = usuario.getRol().getNombre();
+
+        // El administrador no pertenece a un área concreta: su alcance es toda la
+        // organización y la interfaz lo presenta como "No aplica".
+        UsuarioArea areaPrincipal = rol == RolEnum.ADMINISTRADOR
+                ? null
+                : buscarAreaPrincipal(usuario.getId());
+
+        return new PerfilUsuarioResponse(
+                usuario.getId(),
+                usuario.getCorreo(),
+                usuario.getNombres(),
+                usuario.getApellidos(),
+                rol,
+                areaPrincipal == null ? null : areaPrincipal.getArea().getId(),
+                areaPrincipal == null ? null : areaPrincipal.getArea().getNombre()
+        );
+    }
+
+    private UsuarioArea buscarAreaPrincipal(Long usuarioId) {
+        return usuarioAreaRepository
+                .findFirstByUsuario_IdAndEsPrincipalTrue(usuarioId)
+                .orElse(null);
     }
 }
