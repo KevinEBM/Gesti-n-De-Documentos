@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
@@ -36,6 +37,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -58,6 +60,7 @@ class LoginRateLimitFilterTest {
 
     private static final String URL_LOGIN = "/api/auth/login";
     private static final String URL_OTRA = "/api/prueba/otra";
+    private static final String HEADER_STATUS = "X-Test-Status";
 
     @MockitoBean
     private JwtService jwtService;
@@ -74,11 +77,15 @@ class LoginRateLimitFilterTest {
     @Autowired
     private RelojAjustable reloj;
 
+    @Autowired
+    private LoginRateLimiter loginRateLimiter;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         reloj.reiniciar();
+        PruebaController.llamadasLogin.set(0);
         mockMvc = MockMvcBuilders
                 .webAppContextSetup(webApplicationContext)
                 .apply(springSecurity())
@@ -86,25 +93,23 @@ class LoginRateLimitFilterTest {
     }
 
     @Test
-    void primerIntentoPostLogin_noDebeResponder429() throws Exception {
-        mockMvc.perform(post(URL_LOGIN).with(ipDe("203.0.113.10")))
-                .andExpect(status().isOk());
-    }
+    void cinco401_debenRegistrarCincoFallosYPermitirse() throws Exception {
+        String ip = "203.0.113.10";
 
-    @Test
-    void cincoIntentosPostLoginDentroDeLaVentana_debenPermitirse() throws Exception {
         for (int intento = 1; intento <= 5; intento++) {
-            mockMvc.perform(post(URL_LOGIN).with(ipDe("203.0.113.11")))
-                    .andExpect(status().isOk());
+            postLogin(ip, 401);
         }
+
+        assertThat(PruebaController.llamadasLogin.get()).isEqualTo(5);
+        assertThat(loginRateLimiter.estaBloqueado(ip)).isTrue();
     }
 
     @Test
-    void sextoIntentoPostLoginDesdeLaMismaIp_debeResponder429() throws Exception {
-        String ip = "203.0.113.12";
+    void sextoIntentoTrasCinco401_debeResponder429SinLlamarAlLogin() throws Exception {
+        String ip = "203.0.113.11";
 
         for (int intento = 0; intento < 5; intento++) {
-            mockMvc.perform(post(URL_LOGIN).with(ipDe(ip))).andExpect(status().isOk());
+            postLogin(ip, 401);
         }
 
         MvcResult result = mockMvc.perform(post(URL_LOGIN).with(ipDe(ip)))
@@ -112,22 +117,89 @@ class LoginRateLimitFilterTest {
                 .andReturn();
 
         assertRespuestaRateLimit(result);
+        assertThat(PruebaController.llamadasLogin.get()).isEqualTo(5);
     }
 
     @Test
-    void otraIp_debeConservarSuPropioContador() throws Exception {
-        String ipBloqueada = "203.0.113.20";
-        String ipLibre = "203.0.113.21";
+    void login2xx_debeLimpiarFallosAnteriores() throws Exception {
+        String ip = "203.0.113.12";
 
-        for (int intento = 0; intento < 5; intento++) {
-            mockMvc.perform(post(URL_LOGIN).with(ipDe(ipBloqueada))).andExpect(status().isOk());
+        for (int intento = 0; intento < 3; intento++) {
+            postLogin(ip, 401);
         }
 
-        mockMvc.perform(post(URL_LOGIN).with(ipDe(ipBloqueada)))
+        postLogin(ip, 200);
+
+        for (int intento = 1; intento <= 5; intento++) {
+            postLogin(ip, 401);
+        }
+
+        mockMvc.perform(post(URL_LOGIN).with(ipDe(ip)))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void variosLoginsExitosos_noDebenGenerarBloqueo() throws Exception {
+        String ip = "203.0.113.13";
+
+        for (int intento = 0; intento < 10; intento++) {
+            postLogin(ip, 200);
+        }
+
+        postLogin(ip, 200);
+        assertThat(loginRateLimiter.estaBloqueado(ip)).isFalse();
+    }
+
+    @Test
+    void respuesta400_noDebeIncrementarElContador() throws Exception {
+        String ip = "203.0.113.14";
+
+        for (int intento = 0; intento < 8; intento++) {
+            postLogin(ip, 400);
+        }
+
+        postLogin(ip, 401);
+        assertThat(loginRateLimiter.estaBloqueado(ip)).isFalse();
+    }
+
+    @Test
+    void respuesta403_noDebeIncrementarElContador() throws Exception {
+        String ip = "203.0.113.15";
+
+        for (int intento = 0; intento < 8; intento++) {
+            postLogin(ip, 403);
+        }
+
+        postLogin(ip, 401);
+        assertThat(loginRateLimiter.estaBloqueado(ip)).isFalse();
+    }
+
+    @Test
+    void respuesta500_noDebeIncrementarElContador() throws Exception {
+        String ip = "203.0.113.16";
+
+        for (int intento = 0; intento < 8; intento++) {
+            postLogin(ip, 500);
+        }
+
+        postLogin(ip, 401);
+        assertThat(loginRateLimiter.estaBloqueado(ip)).isFalse();
+    }
+
+    @Test
+    void ipA_noDebeAfectarIpB() throws Exception {
+        String ipA = "203.0.113.20";
+        String ipB = "203.0.113.21";
+
+        for (int intento = 0; intento < 5; intento++) {
+            postLogin(ipA, 401);
+        }
+
+        mockMvc.perform(post(URL_LOGIN).with(ipDe(ipA)))
                 .andExpect(status().isTooManyRequests());
 
-        mockMvc.perform(post(URL_LOGIN).with(ipDe(ipLibre)))
-                .andExpect(status().isOk());
+        postLogin(ipB, 401);
+        postLogin(ipB, 200);
     }
 
     @Test
@@ -140,13 +212,15 @@ class LoginRateLimitFilterTest {
 
     @Test
     void metodoDistintoSobreLogin_noDebeConsumirElLimite() throws Exception {
+        String ip = "203.0.113.40";
+
         for (int intento = 0; intento < 10; intento++) {
-            mockMvc.perform(get(URL_LOGIN).with(ipDe("203.0.113.40")))
+            mockMvc.perform(get(URL_LOGIN).with(ipDe(ip)))
                     .andExpect(status().isUnauthorized());
         }
 
-        mockMvc.perform(post(URL_LOGIN).with(ipDe("203.0.113.40")))
-                .andExpect(status().isOk());
+        postLogin(ip, 200);
+        assertThat(loginRateLimiter.estaBloqueado(ip)).isFalse();
     }
 
     @Test
@@ -154,7 +228,7 @@ class LoginRateLimitFilterTest {
         String ip = "203.0.113.50";
 
         for (int intento = 0; intento < 5; intento++) {
-            mockMvc.perform(post(URL_LOGIN).with(ipDe(ip))).andExpect(status().isOk());
+            postLogin(ip, 401);
         }
 
         mockMvc.perform(post(URL_LOGIN).with(ipDe(ip)))
@@ -162,8 +236,7 @@ class LoginRateLimitFilterTest {
 
         reloj.avanzar(Duration.ofSeconds(61));
 
-        mockMvc.perform(post(URL_LOGIN).with(ipDe(ip)))
-                .andExpect(status().isOk());
+        postLogin(ip, 401);
     }
 
     @Test
@@ -172,6 +245,13 @@ class LoginRateLimitFilterTest {
                 .andExpect(status().isUnauthorized());
 
         verify(jwtService, never()).esTokenValido(anyString());
+    }
+
+    private void postLogin(String ip, int status) throws Exception {
+        mockMvc.perform(post(URL_LOGIN)
+                        .header(HEADER_STATUS, status)
+                        .with(ipDe(ip)))
+                .andExpect(status().is(status));
     }
 
     private org.springframework.test.web.servlet.request.RequestPostProcessor ipDe(String ip) {
@@ -189,7 +269,7 @@ class LoginRateLimitFilterTest {
         assertThat(json.get("exito").asBoolean()).isFalse();
         assertThat(json.get("mensaje").asText())
                 .isEqualTo(
-                        "Demasiados intentos de inicio de sesión. Intenta nuevamente en unos segundos."
+                        "Demasiados intentos de inicio de sesión. Intenta nuevamente en 5 minutos."
                 );
     }
 
@@ -226,9 +306,14 @@ class LoginRateLimitFilterTest {
     @RestController
     static class PruebaController {
 
+        static final AtomicInteger llamadasLogin = new AtomicInteger();
+
         @PostMapping(URL_LOGIN)
-        public ResponseEntity<Void> login() {
-            return ResponseEntity.ok().build();
+        public ResponseEntity<Void> login(
+                @RequestHeader(value = HEADER_STATUS, defaultValue = "200") int status
+        ) {
+            llamadasLogin.incrementAndGet();
+            return ResponseEntity.status(status).build();
         }
 
         @PostMapping(URL_OTRA)

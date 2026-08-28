@@ -121,4 +121,33 @@ describe("apiFetch — 401/403 y sesión", () => {
         expect(getSession()?.token).toBe("token-prueba");
         expect(avisos).toEqual([]);
     });
+
+    it("429 no invalida sesión", async () => {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () =>
+                respuestaError(
+                    429,
+                    "Demasiados intentos de cambio de contraseña. Intenta nuevamente en 1 hora.",
+                ),
+            ),
+        );
+
+        await expect(
+            apiFetch("/api/auth/contrasena", {
+                method: "PUT",
+                body: JSON.stringify({
+                    contrasenaActual: "a",
+                    nuevaContrasena: "nueva12345",
+                    confirmacionContrasena: "nueva12345",
+                }),
+            }),
+        ).rejects.toMatchObject({
+            name: "ApiError",
+            status: 429,
+        });
+
+        expect(getSession()?.token).toBe("token-prueba");
+        expect(avisos).toEqual([]);
+    });
 });

@@ -25,6 +25,10 @@ El backend y el frontend pueden ejecutarse en un servidor si se configuran las v
 | `CORS_ALLOWED_ORIGINS` | Origen(es) del frontend (sin `*`; separar por coma si hay varios) |
 | `STORAGE_LOCATION` | Ruta absoluta persistente para archivos (ej. `/var/lib/gestion-documental/uploads`) |
 | `TZ` | Zona horaria del proceso. En producción **debe** ser `UTC` |
+| `LOGIN_RATE_LIMIT_MAX_ATTEMPTS` | Intentos de login por IP antes de 429 (recomendado: `5`) |
+| `LOGIN_RATE_LIMIT_WINDOW_SECONDS` | Ventana del rate limit de login en segundos (recomendado: `300`) |
+| `PASSWORD_CHANGE_RATE_LIMIT_MAX_ATTEMPTS` | Fallos de contraseña actual por usuario antes de 429 (recomendado: `5`) |
+| `PASSWORD_CHANGE_RATE_LIMIT_WINDOW_SECONDS` | Ventana del rate limit de cambio de contraseña (recomendado: `3600`) |
 
 **Zona horaria (obligatorio en producción):** el proceso backend **debe** ejecutarse en UTC.
 
@@ -38,7 +42,34 @@ El módulo documental ya usa `Clock`/`UTC`. Todavía hay `LocalDateTime.now()` n
 - CORS y storage **sin** defaults de desarrollo.
 - Logging menos verboso.
 - Respuestas de error sin stack trace al cliente.
-- `server.forward-headers-strategy=framework` para reverse proxy HTTPS (A7).
+- `server.forward-headers-strategy=native` más RemoteIpValve de Tomcat (`server.tomcat.remoteip.*`) para que `request.getRemoteAddr()` sea la IP del cliente detrás de Nginx. No usar `framework` para este fin: el filtro de Spring no reescribe `getRemoteAddr()`.
+
+### Producción detrás de Nginx
+
+El JAR no debe exponerse a Internet. Nginx termina HTTPS y reenvía a Spring Boot en la red interna.
+
+Confiar **únicamente** en el proxy. No leer `X-Forwarded-For` a mano en la aplicación.
+
+Hoy `server.tomcat.remoteip.internal-proxies` **no** se restringe a loopback: el default de Tomcat (localhost + RFC1918) permite probar también detrás de un proxy de plataforma (p. ej. Render). En **producción definitiva** hay que restringir `internal-proxies` a la IP/red del proxy real.
+
+Si Nginx y el JAR están en la misma VM: dejar el proxy confiable en loopback (`127.0.0.1` / `::1`) y **no** exponer el puerto de Spring Boot a Internet.
+
+Encabezados que Nginx debe enviar hacia el backend:
+
+```nginx
+proxy_set_header Host              $host;
+proxy_set_header X-Real-IP         $remote_addr;
+proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+Además:
+
+- PostgreSQL solo en red privada (no público).
+- `STORAGE_LOCATION` en disco privado, no servido por Nginx.
+- HTTPS en el proxy; el backend puede quedar en HTTP interno.
+- `TZ=UTC` en el proceso del JAR.
+- Rate limits recomendados: login `5` intentos / `300` s; cambio de contraseña `5` fallos / `3600` s.
 
 ### Frontend (build estático)
 

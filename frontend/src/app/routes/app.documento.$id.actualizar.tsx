@@ -363,8 +363,8 @@ function ActualizarDocumentoPage() {
                                                         Ningún archivo seleccionado
                                                     </span>
                                                     <span className="text-xs text-muted-foreground">
-                                                        Tamaño máximo: 10 MB. No se permiten
-                                                        archivos APK ni TXT.
+                                                        Tamaño máximo: 10 MB. Formatos: PDF, DOC,
+                                                        DOCX, XLS y XLSX.
                                                     </span>
                                                 </>
                                             )}

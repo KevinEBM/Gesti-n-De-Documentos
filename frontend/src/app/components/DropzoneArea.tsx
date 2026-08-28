@@ -4,8 +4,8 @@ import { useDropzone, type FileRejection } from "react-dropzone";
 
 import { Button } from "@/components/ui/button";
 import {
-    extensionProhibida,
-    mensajeExtensionProhibida,
+    extensionPermitida,
+    MENSAJE_TIPO_NO_PERMITIDO,
     MENSAJE_LIMITE_MB,
 } from "@/lib/validacion-archivo";
 import { cn } from "@/lib/utils";
@@ -44,11 +44,10 @@ export function DropzoneArea({
     onRechazo,
 }: DropzoneAreaProps) {
     const validarArchivo = useCallback((file: File) => {
-        const extension = extensionProhibida(file.name);
-        if (extension) {
+        if (!extensionPermitida(file.name)) {
             return {
                 code: "file-invalid-type",
-                message: mensajeExtensionProhibida(extension),
+                message: MENSAJE_TIPO_NO_PERMITIDO,
             };
         }
         return null;
@@ -172,7 +171,7 @@ export function DropzoneArea({
                     </p>
                     {!arrastrandoValido && !arrastrandoInvalido ? (
                         <p className="text-xs text-muted-foreground">
-                            Tamaño máximo: 10 MB. No se permiten archivos APK ni TXT.
+                            Tamaño máximo: 10 MB. Formatos: PDF, DOC, DOCX, XLS y XLSX.
                         </p>
                     ) : null}
                 </div>

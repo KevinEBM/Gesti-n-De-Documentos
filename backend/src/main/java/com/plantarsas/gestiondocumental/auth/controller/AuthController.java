@@ -6,11 +6,14 @@ import com.plantarsas.gestiondocumental.auth.dto.LoginResponse;
 import com.plantarsas.gestiondocumental.auth.dto.PerfilUsuarioResponse;
 import com.plantarsas.gestiondocumental.auth.service.AuthService;
 import com.plantarsas.gestiondocumental.exception.BusinessException;
+import com.plantarsas.gestiondocumental.exception.ContrasenaActualIncorrectaException;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
+import com.plantarsas.gestiondocumental.security.PasswordChangeRateLimiter;
 import com.plantarsas.gestiondocumental.shared.dto.ApiResponse;
 import com.plantarsas.gestiondocumental.usuarios.service.UsuarioService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,8 +27,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AuthController {
 
+    private static final String MENSAJE_LIMITE_CONTRASENA =
+            "Demasiados intentos de cambio de contraseña. Intenta nuevamente en 1 hora.";
+
     private final AuthService authService;
     private final UsuarioService usuarioService;
+    private final PasswordChangeRateLimiter passwordChangeRateLimiter;
 
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(
@@ -50,11 +57,23 @@ public class AuthController {
             throw new BusinessException("Las contraseñas no coinciden.");
         }
 
-        usuarioService.cambiarContrasena(
-                usuarioAutenticado.id(),
-                request.contrasenaActual(),
-                request.nuevaContrasena()
-        );
+        Long usuarioId = usuarioAutenticado.id();
+        if (passwordChangeRateLimiter.estaBloqueado(usuarioId)) {
+            throw new BusinessException(MENSAJE_LIMITE_CONTRASENA, HttpStatus.TOO_MANY_REQUESTS);
+        }
+
+        try {
+            usuarioService.cambiarContrasena(
+                    usuarioId,
+                    request.contrasenaActual(),
+                    request.nuevaContrasena()
+            );
+        } catch (ContrasenaActualIncorrectaException ex) {
+            passwordChangeRateLimiter.registrarFallo(usuarioId);
+            throw ex;
+        }
+
+        passwordChangeRateLimiter.limpiar(usuarioId);
         return ApiResponse.exitosa(null);
     }
 }

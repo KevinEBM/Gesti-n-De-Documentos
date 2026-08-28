@@ -1,35 +1,38 @@
 export const LIMITE_ARCHIVO_BYTES = 10 * 1024 * 1024;
 
 export const MENSAJE_LIMITE_MB = "El archivo no puede superar los 10 MB.";
-export const MENSAJE_APK = "No se permiten archivos APK.";
-export const MENSAJE_TXT = "No se permiten archivos TXT.";
+export const MENSAJE_TIPO_NO_PERMITIDO =
+    "Solo se permiten archivos PDF, DOC, DOCX, XLS y XLSX.";
 
-const EXTENSIONES_PROHIBIDAS = [".apk", ".txt"] as const;
+const EXTENSIONES_PERMITIDAS = [".pdf", ".doc", ".docx", ".xls", ".xlsx"] as const;
 
-export type ExtensionProhibida = (typeof EXTENSIONES_PROHIBIDAS)[number];
+export type ExtensionPermitida = (typeof EXTENSIONES_PERMITIDAS)[number];
 
-export function extensionProhibida(nombre: string): ExtensionProhibida | null {
-    const lower = nombre.toLowerCase();
-    for (const extension of EXTENSIONES_PROHIBIDAS) {
-        if (lower.endsWith(extension)) {
-            return extension;
-        }
+export function extensionArchivo(nombre: string): string | null {
+    const normalizado = nombre.replaceAll("\\", "/");
+    const nombreBase = normalizado.slice(normalizado.lastIndexOf("/") + 1);
+    const indicePunto = nombreBase.lastIndexOf(".");
+    if (indicePunto <= 0 || indicePunto === nombreBase.length - 1) {
+        return null;
     }
-    return null;
+    const extension = nombreBase.slice(indicePunto).toLowerCase();
+    if (!/^\.[a-z0-9]+$/.test(extension)) {
+        return null;
+    }
+    return extension;
 }
 
-export function mensajeExtensionProhibida(extension: ExtensionProhibida): string {
-    if (extension === ".apk") return MENSAJE_APK;
-    return MENSAJE_TXT;
+export function extensionPermitida(nombre: string): boolean {
+    const extension = extensionArchivo(nombre);
+    return extension !== null && (EXTENSIONES_PERMITIDAS as readonly string[]).includes(extension);
 }
 
 export function validarArchivoSubida(archivo: File): string | null {
     if (archivo.size > LIMITE_ARCHIVO_BYTES) {
         return MENSAJE_LIMITE_MB;
     }
-    const extension = extensionProhibida(archivo.name);
-    if (extension) {
-        return mensajeExtensionProhibida(extension);
+    if (!extensionPermitida(archivo.name)) {
+        return MENSAJE_TIPO_NO_PERMITIDO;
     }
     return null;
 }

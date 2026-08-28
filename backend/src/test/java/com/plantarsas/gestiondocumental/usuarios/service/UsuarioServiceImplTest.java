@@ -3,6 +3,7 @@ package com.plantarsas.gestiondocumental.usuarios.service;
 import com.plantarsas.gestiondocumental.areas.entity.Area;
 import com.plantarsas.gestiondocumental.areas.service.AreaLookupService;
 import com.plantarsas.gestiondocumental.exception.BusinessException;
+import com.plantarsas.gestiondocumental.exception.ContrasenaActualIncorrectaException;
 import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
 import com.plantarsas.gestiondocumental.roles.entity.Rol;
 import com.plantarsas.gestiondocumental.roles.service.RolLookupService;
@@ -517,7 +518,7 @@ class UsuarioServiceImplTest {
         when(usuario.coincideConPassword("actualEquivocada", passwordEncoder)).thenReturn(false);
 
         assertThatThrownBy(() -> usuarioServiceImpl.cambiarContrasena(id, "actualEquivocada", "nueva12345"))
-                .isInstanceOf(BusinessException.class)
+                .isInstanceOf(ContrasenaActualIncorrectaException.class)
                 .hasMessage("La contraseña actual es incorrecta.");
 
         verify(usuario, never()).actualizarPassword(anyString());

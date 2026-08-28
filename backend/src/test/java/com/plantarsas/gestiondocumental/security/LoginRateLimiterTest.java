@@ -28,30 +28,15 @@ class LoginRateLimiterTest {
     }
 
     @Test
-    void primerIntento_debePermitirse() {
-        assertThat(limiter.registrarIntento("192.168.1.1")).isTrue();
-    }
-
-    @Test
-    void cincoIntentosDentroDeLaVentana_debenPermitirse() {
+    void cincoFallos_noDebenBloquearTodavia() {
         String ip = "192.168.1.1";
 
         for (int intento = 1; intento <= MAX_INTENTOS; intento++) {
-            assertThat(limiter.registrarIntento(ip))
-                    .as("intento %d", intento)
-                    .isTrue();
-        }
-    }
-
-    @Test
-    void sextoIntentoDesdeLaMismaIp_debeRechazarse() {
-        String ip = "192.168.1.1";
-
-        for (int intento = 0; intento < MAX_INTENTOS; intento++) {
-            assertThat(limiter.registrarIntento(ip)).isTrue();
+            assertThat(limiter.estaBloqueado(ip)).isFalse();
+            limiter.registrarFallo(ip);
         }
 
-        assertThat(limiter.registrarIntento(ip)).isFalse();
+        assertThat(limiter.estaBloqueado(ip)).isTrue();
     }
 
     @Test
@@ -60,31 +45,48 @@ class LoginRateLimiterTest {
         String ipLibre = "10.0.0.2";
 
         for (int intento = 0; intento < MAX_INTENTOS; intento++) {
-            assertThat(limiter.registrarIntento(ipBloqueada)).isTrue();
+            limiter.registrarFallo(ipBloqueada);
         }
-        assertThat(limiter.registrarIntento(ipBloqueada)).isFalse();
 
-        assertThat(limiter.registrarIntento(ipLibre)).isTrue();
+        assertThat(limiter.estaBloqueado(ipBloqueada)).isTrue();
+        assertThat(limiter.estaBloqueado(ipLibre)).isFalse();
     }
 
     @Test
-    void trasVencerLaVentana_debeVolverAPermitirSolicitudes() {
+    void limpiar_debeReiniciarFallosDeLaIp() {
         String ip = "192.168.1.1";
 
         for (int intento = 0; intento < MAX_INTENTOS; intento++) {
-            assertThat(limiter.registrarIntento(ip)).isTrue();
+            limiter.registrarFallo(ip);
         }
-        assertThat(limiter.registrarIntento(ip)).isFalse();
+        assertThat(limiter.estaBloqueado(ip)).isTrue();
+
+        limiter.limpiar(ip);
+
+        assertThat(limiter.estaBloqueado(ip)).isFalse();
+    }
+
+    @Test
+    void trasVencerLaVentana_debeDejarDeEstarBloqueado() {
+        String ip = "192.168.1.1";
+
+        for (int intento = 0; intento < MAX_INTENTOS; intento++) {
+            limiter.registrarFallo(ip);
+        }
+        assertThat(limiter.estaBloqueado(ip)).isTrue();
 
         reloj.avanzar(Duration.ofSeconds(VENTANA_SEGUNDOS + 1));
 
-        assertThat(limiter.registrarIntento(ip)).isTrue();
+        assertThat(limiter.estaBloqueado(ip)).isFalse();
     }
 
     @Test
     void ipNulaOVacia_debeNormalizarseSinFallar() {
-        assertThat(limiter.registrarIntento(null)).isTrue();
-        assertThat(limiter.registrarIntento("   ")).isTrue();
+        assertThat(limiter.estaBloqueado(null)).isFalse();
+        limiter.registrarFallo(null);
+        limiter.registrarFallo("   ");
+        limiter.limpiar(null);
+        assertThat(limiter.estaBloqueado("   ")).isFalse();
     }
 
     @Test

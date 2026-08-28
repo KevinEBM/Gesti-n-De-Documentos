@@ -27,7 +27,11 @@ public class StorageServiceImpl implements StorageService {
 
     private static final int LONGITUD_MAXIMA_EXTENSION = 10;
     private static final String MIME_TYPE_POR_DEFECTO = "application/octet-stream";
-    private static final Set<String> EXTENSIONES_PROHIBIDAS = Set.of(".apk", ".txt");
+    private static final Set<String> EXTENSIONES_PERMITIDAS = Set.of(
+            ".pdf", ".doc", ".docx", ".xls", ".xlsx"
+    );
+    private static final String MENSAJE_EXTENSION_NO_PERMITIDA =
+            "El tipo de archivo no está permitido. Solo se aceptan PDF, DOC, DOCX, XLS y XLSX.";
 
     private final Path rootLocation;
     private final long maxFileSizeBytes;
@@ -86,8 +90,8 @@ public class StorageServiceImpl implements StorageService {
         }
 
         String extension = extensionDe(nombreOriginal);
-        if (extensionEstaProhibida(extension)) {
-            throw new BusinessException(mensajeExtensionProhibida(extension));
+        if (!extensionPermitida(extension)) {
+            throw new BusinessException(MENSAJE_EXTENSION_NO_PERMITIDA, HttpStatus.BAD_REQUEST);
         }
 
         String nombreAlmacenado = UUID.randomUUID() + extension;
@@ -224,21 +228,11 @@ public class StorageServiceImpl implements StorageService {
         return extension;
     }
 
-    private boolean extensionEstaProhibida(String extension) {
+    private boolean extensionPermitida(String extension) {
         if (extension == null || extension.isBlank()) {
             return false;
         }
-        return EXTENSIONES_PROHIBIDAS.contains(extension.toLowerCase(Locale.ROOT));
-    }
-
-    private String mensajeExtensionProhibida(String extension) {
-        if (".apk".equalsIgnoreCase(extension)) {
-            return "No se permite cargar archivos APK";
-        }
-        if (".txt".equalsIgnoreCase(extension)) {
-            return "No se permiten archivos TXT";
-        }
-        return "El tipo de archivo no está permitido";
+        return EXTENSIONES_PERMITIDAS.contains(extension.toLowerCase(Locale.ROOT));
     }
 
     private void eliminarSilenciosamente(Path destino) {

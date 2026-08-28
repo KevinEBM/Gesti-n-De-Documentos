@@ -76,9 +76,9 @@ class StorageServiceImplTest {
         byte[] contenido = "contenido para hash".getBytes(StandardCharsets.UTF_8);
 
         StoredFile resultado = storageServiceImpl.guardar(
-                "hash.bin",
+                "hash.pdf",
                 new ByteArrayInputStream(contenido),
-                "application/octet-stream",
+                "application/pdf",
                 contenido.length
         );
 
@@ -120,9 +120,9 @@ class StorageServiceImplTest {
         byte[] contenido = new byte[(int) MAX_FILE_SIZE_BYTES];
 
         StoredFile resultado = storageServiceImpl.guardar(
-                "limite.bin",
+                "limite.pdf",
                 new ByteArrayInputStream(contenido),
-                "application/octet-stream",
+                "application/pdf",
                 MAX_FILE_SIZE_BYTES
         );
 
@@ -149,9 +149,9 @@ class StorageServiceImplTest {
         byte[] contenido = "abc".getBytes(StandardCharsets.UTF_8);
 
         assertThatThrownBy(() -> storageServiceImpl.guardar(
-                "inconsistente.bin",
+                "inconsistente.pdf",
                 new ByteArrayInputStream(contenido),
-                "application/octet-stream",
+                "application/pdf",
                 contenido.length + 5))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("El tamaño del archivo no coincide con el tamaño declarado")
@@ -168,9 +168,9 @@ class StorageServiceImplTest {
         byte[] contenido = "contenido".getBytes(StandardCharsets.UTF_8);
 
         StoredFile resultado = storageServiceImpl.guardar(
-                "archivo.bin",
+                "archivo.pdf",
                 new ByteArrayInputStream(contenido),
-                "application/octet-stream",
+                "application/pdf",
                 contenido.length
         );
 
@@ -183,7 +183,7 @@ class StorageServiceImplTest {
         byte[] contenido = "contenido".getBytes(StandardCharsets.UTF_8);
 
         StoredFile resultado = storageServiceImpl.guardar(
-                "archivo.bin",
+                "archivo.pdf",
                 new ByteArrayInputStream(contenido),
                 "",
                 contenido.length
@@ -197,7 +197,7 @@ class StorageServiceImplTest {
         byte[] contenido = "contenido".getBytes(StandardCharsets.UTF_8);
 
         StoredFile resultado = storageServiceImpl.guardar(
-                "archivo.bin",
+                "archivo.pdf",
                 new ByteArrayInputStream(contenido),
                 "esto no es un mime",
                 contenido.length
@@ -223,15 +223,42 @@ class StorageServiceImplTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"archivo.apk", "archivo.APK", "archivo.Apk"})
-    void guardar_debeRechazarArchivoApkSinImportarMayusculasOMinusculas(String nombreOriginal) throws Exception {
+    @ValueSource(strings = {
+            "informe.pdf",
+            "informe.PDF",
+            "manual.doc",
+            "manual.DOC",
+            "reporte.docx",
+            "reporte.DOCX",
+            "datos.xls",
+            "datos.XLS",
+            "tabla.xlsx",
+            "tabla.XLSX"
+    })
+    void guardar_debeAceptarExtensionesPermitidasSinImportarMayusculas(String nombreOriginal) throws Exception {
+        byte[] contenido = "contenido".getBytes(StandardCharsets.UTF_8);
+
+        StoredFile resultado = storageServiceImpl.guardar(
+                nombreOriginal,
+                new ByteArrayInputStream(contenido),
+                "application/octet-stream",
+                contenido.length
+        );
+
+        assertThat(resultado.nombreOriginal()).isEqualTo(nombreOriginal);
+        assertThat(Files.exists(directorioTemporal.resolve(resultado.ruta()))).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"archivo.apk", "archivo.APK", "archivo.txt", "archivo.TXT", "notas.exe", "foto.png"})
+    void guardar_debeRechazarExtensionesNoPermitidas(String nombreOriginal) throws Exception {
         assertThatThrownBy(() -> storageServiceImpl.guardar(
                 nombreOriginal,
                 new ByteArrayInputStream("contenido".getBytes(StandardCharsets.UTF_8)),
-                "application/vnd.android.package-archive",
+                "application/octet-stream",
                 9))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("No se permite cargar archivos APK")
+                .hasMessage("El tipo de archivo no está permitido. Solo se aceptan PDF, DOC, DOCX, XLS y XLSX.")
                 .satisfies(ex -> assertThat(((BusinessException) ex).getStatus())
                         .isEqualTo(HttpStatus.BAD_REQUEST));
 
@@ -240,22 +267,15 @@ class StorageServiceImplTest {
         }
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"archivo.txt", "archivo.TXT", "archivo.TxT"})
-    void guardar_debeRechazarArchivoTxtSinImportarMayusculasOMinusculas(String nombreOriginal) throws Exception {
+    @Test
+    void guardar_debeRechazarArchivoSinExtension() throws Exception {
         assertThatThrownBy(() -> storageServiceImpl.guardar(
-                nombreOriginal,
+                "sin_extension",
                 new ByteArrayInputStream("contenido".getBytes(StandardCharsets.UTF_8)),
-                "text/plain",
+                "application/pdf",
                 9))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("No se permiten archivos TXT")
-                .satisfies(ex -> assertThat(((BusinessException) ex).getStatus())
-                        .isEqualTo(HttpStatus.BAD_REQUEST));
-
-        try (var archivos = Files.list(directorioTemporal)) {
-            assertThat(archivos).isEmpty();
-        }
+                .hasMessage("El tipo de archivo no está permitido. Solo se aceptan PDF, DOC, DOCX, XLS y XLSX.");
     }
 
     @Test
@@ -270,6 +290,17 @@ class StorageServiceImplTest {
         );
 
         assertThat(resultado.ruta()).endsWith(".pdf");
+    }
+
+    @Test
+    void guardar_debeRechazarDobleExtensionCuyaExtensionFinalNoEstaPermitida() {
+        assertThatThrownBy(() -> storageServiceImpl.guardar(
+                "informe.pdf.apk",
+                new ByteArrayInputStream("contenido".getBytes(StandardCharsets.UTF_8)),
+                "application/pdf",
+                9))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("El tipo de archivo no está permitido. Solo se aceptan PDF, DOC, DOCX, XLS y XLSX.");
     }
 
     @Test
@@ -292,9 +323,9 @@ class StorageServiceImplTest {
     void eliminar_debeEliminarArchivoExistente() throws Exception {
         byte[] contenido = "a borrar".getBytes(StandardCharsets.UTF_8);
         StoredFile guardado = storageServiceImpl.guardar(
-                "borrar.bin",
+                "borrar.pdf",
                 new ByteArrayInputStream(contenido),
-                "application/octet-stream",
+                "application/pdf",
                 contenido.length
         );
 
@@ -322,9 +353,9 @@ class StorageServiceImplTest {
     void existe_debeRetornarTrueParaArchivoRegularExistente() throws Exception {
         byte[] contenido = "existente".getBytes(StandardCharsets.UTF_8);
         StoredFile guardado = storageServiceImpl.guardar(
-                "existente.bin",
+                "existente.pdf",
                 new ByteArrayInputStream(contenido),
-                "application/octet-stream",
+                "application/pdf",
                 contenido.length
         );
 

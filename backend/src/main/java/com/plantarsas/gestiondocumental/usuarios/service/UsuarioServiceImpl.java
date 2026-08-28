@@ -3,6 +3,7 @@ package com.plantarsas.gestiondocumental.usuarios.service;
 import com.plantarsas.gestiondocumental.areas.entity.Area;
 import com.plantarsas.gestiondocumental.areas.service.AreaLookupService;
 import com.plantarsas.gestiondocumental.exception.BusinessException;
+import com.plantarsas.gestiondocumental.exception.ContrasenaActualIncorrectaException;
 import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
 import com.plantarsas.gestiondocumental.roles.entity.Rol;
 import com.plantarsas.gestiondocumental.roles.service.RolLookupService;
@@ -130,7 +131,7 @@ public class UsuarioServiceImpl implements UsuarioService {
         Usuario usuario = obtenerEntidadPorId(usuarioId);
 
         if (!usuario.coincideConPassword(contrasenaActual, passwordEncoder)) {
-            throw new BusinessException("La contraseña actual es incorrecta.");
+            throw new ContrasenaActualIncorrectaException();
         }
 
         if (usuario.coincideConPassword(nuevaContrasena, passwordEncoder)) {

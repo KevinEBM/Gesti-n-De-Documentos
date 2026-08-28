@@ -23,9 +23,9 @@ import java.time.Instant;
  * Limita intentos de {@code POST /api/auth/login} por IP del cliente.
  * <p>
  * La IP se obtiene con {@link HttpServletRequest#getRemoteAddr()}. En producción,
- * con {@code server.forward-headers-strategy=framework}, Spring resuelve la IP real
- * del cliente a partir de cabeceras de proxy confiables (p. ej. detrás de Nginx/Render),
- * sin leer {@code X-Forwarded-For} directamente en aplicación.
+ * {@code server.forward-headers-strategy=native} activa el RemoteIpValve de Tomcat,
+ * que reescribe {@code getRemoteAddr()} a partir de cabeceras del proxy confiable
+ * (Nginx), sin leer {@code X-Forwarded-For} a mano en la aplicación.
  */
 @Slf4j
 @Component
@@ -34,7 +34,7 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
 
     private static final String LOGIN_PATH = "/api/auth/login";
     private static final String MENSAJE_LIMITE =
-            "Demasiados intentos de inicio de sesión. Intenta nuevamente en unos segundos.";
+            "Demasiados intentos de inicio de sesión. Intenta nuevamente en 5 minutos.";
 
     private final LoginRateLimiter loginRateLimiter;
     private final ObjectMapper objectMapper;
@@ -51,7 +51,7 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
         }
 
         String clientIp = request.getRemoteAddr();
-        if (!loginRateLimiter.registrarIntento(clientIp)) {
+        if (loginRateLimiter.estaBloqueado(clientIp)) {
             log.warn(
                     "Rate limit de login excedido: ip={}, ruta={}, momento={}",
                     clientIp,
@@ -63,6 +63,13 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+
+        int status = response.getStatus();
+        if (status == HttpStatus.UNAUTHORIZED.value()) {
+            loginRateLimiter.registrarFallo(clientIp);
+        } else if (status >= 200 && status < 300) {
+            loginRateLimiter.limpiar(clientIp);
+        }
     }
 
     private boolean esLoginPost(HttpServletRequest request) {

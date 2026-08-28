@@ -29,12 +29,14 @@ package com.plantarsas.gestiondocumental.auth.controller;
 import com.plantarsas.gestiondocumental.auth.service.AuthService;
 import com.plantarsas.gestiondocumental.config.SecurityTestConfiguration;
 import com.plantarsas.gestiondocumental.exception.BusinessException;
+import com.plantarsas.gestiondocumental.exception.ContrasenaActualIncorrectaException;
 import com.plantarsas.gestiondocumental.exception.GlobalExceptionHandler;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 import com.plantarsas.gestiondocumental.security.JwtAccessDeniedHandler;
 import com.plantarsas.gestiondocumental.security.JwtAuthenticationEntryPoint;
 import com.plantarsas.gestiondocumental.security.JwtAuthenticationFilter;
 import com.plantarsas.gestiondocumental.security.JwtService;
+import com.plantarsas.gestiondocumental.security.PasswordChangeRateLimiter;
 import com.plantarsas.gestiondocumental.shared.enums.RolEnum;
 import com.plantarsas.gestiondocumental.usuarios.repository.UsuarioRepository;
 import com.plantarsas.gestiondocumental.usuarios.service.UsuarioService;
@@ -56,6 +58,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -70,6 +73,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -86,6 +90,8 @@ class AuthControllerSecurityTest {
     private static final String URL_CAMBIAR_CONTRASENA = "/api/auth/contrasena";
 
     private static final Long USUARIO_ID = 7L;
+
+    private static final Long OTRO_USUARIO_ID = 8L;
 
     private static final String REQUEST_VALIDO_JSON =
             "{\"contrasenaActual\":\"actual123\",\"nuevaContrasena\":\"nueva12345\",\"confirmacionContrasena\":\"nueva12345\"}";
@@ -117,10 +123,15 @@ class AuthControllerSecurityTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private PasswordChangeRateLimiter passwordChangeRateLimiter;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
+        passwordChangeRateLimiter.limpiar(USUARIO_ID);
+        passwordChangeRateLimiter.limpiar(OTRO_USUARIO_ID);
         mockMvc = MockMvcBuilders
                 .webAppContextSetup(webApplicationContext)
                 .apply(springSecurity())
@@ -133,7 +144,11 @@ class AuthControllerSecurityTest {
     }
 
     private RequestPostProcessor usuarioAutenticado(RolEnum rol) {
-        AuthenticatedUser usuario = new AuthenticatedUser(USUARIO_ID, "usuario@plantarsas.com", rol);
+        return usuarioAutenticado(rol, USUARIO_ID);
+    }
+
+    private RequestPostProcessor usuarioAutenticado(RolEnum rol, Long usuarioId) {
+        AuthenticatedUser usuario = new AuthenticatedUser(usuarioId, "usuario@plantarsas.com", rol);
         UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(
                 usuario, null, List.of(new SimpleGrantedAuthority("ROLE_" + rol.name()))
         );
@@ -238,7 +253,158 @@ class AuthControllerSecurityTest {
 
     @Test
     void cambiarContrasena_conContrasenaActualIncorrectaSegunElServicio_debeResponder400() throws Exception {
-        doThrow(new BusinessException("La contraseña actual es incorrecta."))
+        doThrow(new ContrasenaActualIncorrectaException())
+                .when(usuarioService).cambiarContrasena(eq(USUARIO_ID), anyString(), anyString());
+
+        mockMvc.perform(put(URL_CAMBIAR_CONTRASENA)
+                        .contentType("application/json")
+                        .content(REQUEST_VALIDO_JSON)
+                        .with(usuarioAutenticado(RolEnum.ADMINISTRADOR)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void cambiarContrasena_cincoFallosDeContrasenaActual_debenPermitirse() throws Exception {
+        doThrow(new ContrasenaActualIncorrectaException())
+                .when(usuarioService).cambiarContrasena(eq(USUARIO_ID), anyString(), anyString());
+
+        for (int intento = 1; intento <= 5; intento++) {
+            mockMvc.perform(put(URL_CAMBIAR_CONTRASENA)
+                            .contentType("application/json")
+                            .content(REQUEST_VALIDO_JSON)
+                            .with(usuarioAutenticado(RolEnum.ADMINISTRADOR)))
+                    .andExpect(status().isBadRequest());
+        }
+
+        verify(usuarioService, times(5)).cambiarContrasena(eq(USUARIO_ID), anyString(), anyString());
+    }
+
+    @Test
+    void cambiarContrasena_sextoFalloDeContrasenaActual_debeResponder429() throws Exception {
+        doThrow(new ContrasenaActualIncorrectaException())
+                .when(usuarioService).cambiarContrasena(eq(USUARIO_ID), anyString(), anyString());
+
+        for (int intento = 0; intento < 5; intento++) {
+            mockMvc.perform(put(URL_CAMBIAR_CONTRASENA)
+                            .contentType("application/json")
+                            .content(REQUEST_VALIDO_JSON)
+                            .with(usuarioAutenticado(RolEnum.ADMINISTRADOR)))
+                    .andExpect(status().isBadRequest());
+        }
+
+        MvcResult result = mockMvc.perform(put(URL_CAMBIAR_CONTRASENA)
+                        .contentType("application/json")
+                        .content(REQUEST_VALIDO_JSON)
+                        .with(usuarioAutenticado(RolEnum.ADMINISTRADOR)))
+                .andExpect(status().isTooManyRequests())
+                .andReturn();
+
+        var json = objectMapper.readTree(result.getResponse().getContentAsString());
+        assertThat(json.get("exito").asBoolean()).isFalse();
+        assertThat(json.get("mensaje").asText())
+                .isEqualTo("Demasiados intentos de cambio de contraseña. Intenta nuevamente en 1 hora.");
+
+        verify(usuarioService, times(5)).cambiarContrasena(eq(USUARIO_ID), anyString(), anyString());
+    }
+
+    @Test
+    void cambiarContrasena_bloqueoDeUsuarioA_noAfectaUsuarioB() throws Exception {
+        doThrow(new ContrasenaActualIncorrectaException())
+                .when(usuarioService).cambiarContrasena(any(), anyString(), anyString());
+
+        for (int intento = 0; intento < 5; intento++) {
+            mockMvc.perform(put(URL_CAMBIAR_CONTRASENA)
+                            .contentType("application/json")
+                            .content(REQUEST_VALIDO_JSON)
+                            .with(usuarioAutenticado(RolEnum.ADMINISTRADOR, USUARIO_ID)))
+                    .andExpect(status().isBadRequest());
+        }
+
+        mockMvc.perform(put(URL_CAMBIAR_CONTRASENA)
+                        .contentType("application/json")
+                        .content(REQUEST_VALIDO_JSON)
+                        .with(usuarioAutenticado(RolEnum.ADMINISTRADOR, USUARIO_ID)))
+                .andExpect(status().isTooManyRequests());
+
+        mockMvc.perform(put(URL_CAMBIAR_CONTRASENA)
+                        .contentType("application/json")
+                        .content(REQUEST_VALIDO_JSON)
+                        .with(usuarioAutenticado(RolEnum.JEFE_AREA, OTRO_USUARIO_ID)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void cambiarContrasena_exito_limpiaElContador() throws Exception {
+        doThrow(new ContrasenaActualIncorrectaException())
+                .doThrow(new ContrasenaActualIncorrectaException())
+                .doThrow(new ContrasenaActualIncorrectaException())
+                .doNothing()
+                .when(usuarioService).cambiarContrasena(eq(USUARIO_ID), anyString(), anyString());
+
+        for (int intento = 0; intento < 3; intento++) {
+            mockMvc.perform(put(URL_CAMBIAR_CONTRASENA)
+                            .contentType("application/json")
+                            .content(REQUEST_VALIDO_JSON)
+                            .with(usuarioAutenticado(RolEnum.ADMINISTRADOR)))
+                    .andExpect(status().isBadRequest());
+        }
+
+        mockMvc.perform(put(URL_CAMBIAR_CONTRASENA)
+                        .contentType("application/json")
+                        .content(REQUEST_VALIDO_JSON)
+                        .with(usuarioAutenticado(RolEnum.ADMINISTRADOR)))
+                .andExpect(status().isOk());
+
+        reset(usuarioService);
+        doThrow(new ContrasenaActualIncorrectaException())
+                .when(usuarioService).cambiarContrasena(eq(USUARIO_ID), anyString(), anyString());
+
+        for (int intento = 1; intento <= 5; intento++) {
+            mockMvc.perform(put(URL_CAMBIAR_CONTRASENA)
+                            .contentType("application/json")
+                            .content(REQUEST_VALIDO_JSON)
+                            .with(usuarioAutenticado(RolEnum.ADMINISTRADOR)))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Test
+    void cambiarContrasena_errorDistintoAContrasenaActual_noIncrementaContador() throws Exception {
+        doThrow(new BusinessException("La nueva contraseña debe ser diferente a la actual"))
+                .when(usuarioService).cambiarContrasena(eq(USUARIO_ID), anyString(), anyString());
+
+        for (int intento = 0; intento < 8; intento++) {
+            mockMvc.perform(put(URL_CAMBIAR_CONTRASENA)
+                            .contentType("application/json")
+                            .content(REQUEST_VALIDO_JSON)
+                            .with(usuarioAutenticado(RolEnum.ADMINISTRADOR)))
+                    .andExpect(status().isBadRequest());
+        }
+
+        reset(usuarioService);
+        doThrow(new ContrasenaActualIncorrectaException())
+                .when(usuarioService).cambiarContrasena(eq(USUARIO_ID), anyString(), anyString());
+
+        mockMvc.perform(put(URL_CAMBIAR_CONTRASENA)
+                        .contentType("application/json")
+                        .content(REQUEST_VALIDO_JSON)
+                        .with(usuarioAutenticado(RolEnum.ADMINISTRADOR)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void cambiarContrasena_validacionDeFormato_noIncrementaContador() throws Exception {
+        for (int intento = 0; intento < 8; intento++) {
+            mockMvc.perform(put(URL_CAMBIAR_CONTRASENA)
+                            .contentType("application/json")
+                            .content(REQUEST_NUEVA_CONTRASENA_CORTA_JSON)
+                            .with(usuarioAutenticado(RolEnum.ADMINISTRADOR)))
+                    .andExpect(status().isBadRequest());
+        }
+
+        verifyNoInteractions(usuarioService);
+
+        doThrow(new ContrasenaActualIncorrectaException())
                 .when(usuarioService).cambiarContrasena(eq(USUARIO_ID), anyString(), anyString());
 
         mockMvc.perform(put(URL_CAMBIAR_CONTRASENA)
