@@ -171,7 +171,7 @@ export function DropzoneArea({
                     </p>
                     {!arrastrandoValido && !arrastrandoInvalido ? (
                         <p className="text-xs text-muted-foreground">
-                            Tamaño máximo: 10 MB. Formatos: PDF, DOC, DOCX, XLS y XLSX.
+                            Tamaño máximo: 10 MB. Formatos: PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG y PNG.
                         </p>
                     ) : null}
                 </div>

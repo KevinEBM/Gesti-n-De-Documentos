@@ -2,9 +2,18 @@ export const LIMITE_ARCHIVO_BYTES = 10 * 1024 * 1024;
 
 export const MENSAJE_LIMITE_MB = "El archivo no puede superar los 10 MB.";
 export const MENSAJE_TIPO_NO_PERMITIDO =
-    "Solo se permiten archivos PDF, DOC, DOCX, XLS y XLSX.";
+    "Solo se permiten archivos PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG y PNG.";
 
-const EXTENSIONES_PERMITIDAS = [".pdf", ".doc", ".docx", ".xls", ".xlsx"] as const;
+const EXTENSIONES_PERMITIDAS = [
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".jpg",
+    ".jpeg",
+    ".png",
+] as const;
 
 export type ExtensionPermitida = (typeof EXTENSIONES_PERMITIDAS)[number];
 

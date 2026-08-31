@@ -364,7 +364,7 @@ function ActualizarDocumentoPage() {
                                                     </span>
                                                     <span className="text-xs text-muted-foreground">
                                                         Tamaño máximo: 10 MB. Formatos: PDF, DOC,
-                                                        DOCX, XLS y XLSX.
+                                                        DOCX, XLS, XLSX, JPG, JPEG y PNG.
                                                     </span>
                                                 </>
                                             )}

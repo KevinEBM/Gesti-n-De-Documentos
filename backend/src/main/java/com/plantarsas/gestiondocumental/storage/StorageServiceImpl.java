@@ -28,10 +28,10 @@ public class StorageServiceImpl implements StorageService {
     private static final int LONGITUD_MAXIMA_EXTENSION = 10;
     private static final String MIME_TYPE_POR_DEFECTO = "application/octet-stream";
     private static final Set<String> EXTENSIONES_PERMITIDAS = Set.of(
-            ".pdf", ".doc", ".docx", ".xls", ".xlsx"
+            ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".jpg", ".jpeg", ".png"
     );
     private static final String MENSAJE_EXTENSION_NO_PERMITIDA =
-            "El tipo de archivo no está permitido. Solo se aceptan PDF, DOC, DOCX, XLS y XLSX.";
+            "El tipo de archivo no está permitido. Solo se aceptan PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG y PNG.";
 
     private final Path rootLocation;
     private final long maxFileSizeBytes;

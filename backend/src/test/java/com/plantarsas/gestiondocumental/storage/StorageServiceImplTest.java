@@ -233,7 +233,13 @@ class StorageServiceImplTest {
             "datos.xls",
             "datos.XLS",
             "tabla.xlsx",
-            "tabla.XLSX"
+            "tabla.XLSX",
+            "foto.jpg",
+            "imagen.JPG",
+            "foto.jpeg",
+            "foto.JPEG",
+            "imagen.png",
+            "imagen.PNG"
     })
     void guardar_debeAceptarExtensionesPermitidasSinImportarMayusculas(String nombreOriginal) throws Exception {
         byte[] contenido = "contenido".getBytes(StandardCharsets.UTF_8);
@@ -250,7 +256,10 @@ class StorageServiceImplTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"archivo.apk", "archivo.APK", "archivo.txt", "archivo.TXT", "notas.exe", "foto.png"})
+    @ValueSource(strings = {
+            "archivo.apk", "archivo.APK", "archivo.txt", "archivo.TXT",
+            "archivo.exe", "archivo.zip", "archivo.jpg.exe"
+    })
     void guardar_debeRechazarExtensionesNoPermitidas(String nombreOriginal) throws Exception {
         assertThatThrownBy(() -> storageServiceImpl.guardar(
                 nombreOriginal,
@@ -258,7 +267,7 @@ class StorageServiceImplTest {
                 "application/octet-stream",
                 9))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("El tipo de archivo no está permitido. Solo se aceptan PDF, DOC, DOCX, XLS y XLSX.")
+                .hasMessage("El tipo de archivo no está permitido. Solo se aceptan PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG y PNG.")
                 .satisfies(ex -> assertThat(((BusinessException) ex).getStatus())
                         .isEqualTo(HttpStatus.BAD_REQUEST));
 
@@ -275,7 +284,21 @@ class StorageServiceImplTest {
                 "application/pdf",
                 9))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("El tipo de archivo no está permitido. Solo se aceptan PDF, DOC, DOCX, XLS y XLSX.");
+                .hasMessage("El tipo de archivo no está permitido. Solo se aceptan PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG y PNG.");
+    }
+
+    @Test
+    void guardar_debeAceptarDobleExtensionCuandoLaExtensionFinalEsJpg() throws Exception {
+        byte[] contenido = "contenido".getBytes(StandardCharsets.UTF_8);
+
+        StoredFile resultado = storageServiceImpl.guardar(
+                "archivo.exe.jpg",
+                new ByteArrayInputStream(contenido),
+                "image/jpeg",
+                contenido.length
+        );
+
+        assertThat(resultado.ruta()).endsWith(".jpg");
     }
 
     @Test
@@ -300,7 +323,7 @@ class StorageServiceImplTest {
                 "application/pdf",
                 9))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("El tipo de archivo no está permitido. Solo se aceptan PDF, DOC, DOCX, XLS y XLSX.");
+                .hasMessage("El tipo de archivo no está permitido. Solo se aceptan PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG y PNG.");
     }
 
     @Test
