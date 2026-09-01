@@ -7,7 +7,9 @@ logs/
 *.log
 .env
 .env.local
+!.env.example
 application-local.properties
+/backend/claude-jwt-auth.txt
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/

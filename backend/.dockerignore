@@ -1,0 +1,11 @@
+target/
+uploads/
+.env
+.env.*
+*.log
+.git
+.idea
+.vscode
+.claude
+*.md
+HELP.md

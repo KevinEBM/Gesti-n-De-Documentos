@@ -1,0 +1,197 @@
+package com.plantarsas.gestiondocumental.subprogramas.service;
+
+import com.plantarsas.gestiondocumental.areas.entity.Area;
+import com.plantarsas.gestiondocumental.areas.service.AreaLookupService;
+import com.plantarsas.gestiondocumental.documentos.repository.DocumentoRepository;
+import com.plantarsas.gestiondocumental.exception.BusinessException;
+import com.plantarsas.gestiondocumental.exception.ResourceNotFoundException;
+import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
+import com.plantarsas.gestiondocumental.security.UsuarioAreaAutorizacionService;
+import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaEstadoRequest;
+import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaRequest;
+import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaResponse;
+import com.plantarsas.gestiondocumental.subprogramas.dto.SubprogramaUpdateRequest;
+import com.plantarsas.gestiondocumental.subprogramas.entity.Subprograma;
+import com.plantarsas.gestiondocumental.subprogramas.mapper.SubprogramaMapper;
+import com.plantarsas.gestiondocumental.subprogramas.repository.SubprogramaRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class SubprogramaServiceImpl implements SubprogramaService, SubprogramaLookupService {
+
+    private final SubprogramaRepository subprogramaRepository;
+    private final DocumentoRepository documentoRepository;
+    private final AreaLookupService areaLookupService;
+    private final SubprogramaMapper subprogramaMapper;
+    private final UsuarioAreaAutorizacionService usuarioAreaAutorizacionService;
+
+    @Override
+    @Transactional
+    public SubprogramaResponse crear(SubprogramaRequest request) {
+        Area area = areaLookupService.obtenerActivaPorId(request.areaId());
+
+        String nombreNormalizado = normalizarTexto(request.nombre());
+        if (subprogramaRepository.existsByAreaIdAndNombreIgnoreCase(area.getId(), nombreNormalizado)) {
+            throw new BusinessException(
+                    "Ya existe un subprograma con el nombre '" + nombreNormalizado + "' en esa área",
+                    HttpStatus.CONFLICT
+            );
+        }
+
+        validarCodigoUnico(request.codigo(), null);
+
+        Subprograma subprograma = new Subprograma(
+                request.codigo(),
+                request.nombre(),
+                request.descripcion(),
+                area
+        );
+        return subprogramaMapper.toResponse(subprogramaRepository.save(subprograma));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SubprogramaResponse> listar() {
+        return subprogramaRepository.findAll().stream()
+                .map(subprogramaMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SubprogramaResponse> listarParaUsuario(AuthenticatedUser usuario) {
+        if (usuarioAreaAutorizacionService.esAdministrador(usuario)) {
+            return listar();
+        }
+
+        var areaIds = usuarioAreaAutorizacionService.obtenerAreaIdsAutorizadas(usuario);
+        if (areaIds.isEmpty()) {
+            return List.of();
+        }
+
+        return subprogramaRepository.findByArea_IdInOrderByNombreAsc(areaIds).stream()
+                .map(subprogramaMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SubprogramaResponse obtenerPorId(Long id) {
+        return subprogramaMapper.toResponse(obtenerEntidadPorId(id));
+    }
+
+    @Override
+    @Transactional
+    public SubprogramaResponse actualizar(Long id, SubprogramaUpdateRequest request) {
+        Subprograma subprograma = obtenerEntidadPorId(id);
+
+        String nombreNormalizado = normalizarTexto(request.nombre());
+        Long areaIdActual = subprograma.getArea().getId();
+        Area areaObjetivo;
+
+        if (!areaIdActual.equals(request.areaId())) {
+            if (documentoRepository.existsBySubprograma_Id(id)) {
+                throw new BusinessException(
+                        "No se puede cambiar el área responsable porque el subproceso ya está asociado a documentos."
+                );
+            }
+            areaObjetivo = areaLookupService.obtenerActivaPorId(request.areaId());
+        } else {
+            areaObjetivo = subprograma.getArea();
+        }
+
+        if (subprogramaRepository.existsByAreaIdAndNombreIgnoreCaseAndIdNot(
+                areaObjetivo.getId(), nombreNormalizado, id)) {
+            throw new BusinessException(
+                    "Ya existe un subprograma con el nombre '" + nombreNormalizado + "' en esa área",
+                    HttpStatus.CONFLICT
+            );
+        }
+
+        validarCodigoUnico(request.codigo(), id);
+
+        subprograma.actualizarDatos(
+                request.codigo(),
+                request.nombre(),
+                request.descripcion(),
+                areaObjetivo
+        );
+        return subprogramaMapper.toResponse(subprograma);
+    }
+
+    @Override
+    @Transactional
+    public SubprogramaResponse cambiarEstado(Long id, SubprogramaEstadoRequest request) {
+        Subprograma subprograma = obtenerEntidadPorId(id);
+        if (Boolean.TRUE.equals(request.activo())) {
+            subprograma.activar();
+        } else {
+            subprograma.desactivar();
+        }
+        return subprogramaMapper.toResponse(subprograma);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SubprogramaResponse> listarActivosPorArea(Long areaId, AuthenticatedUser usuario) {
+        usuarioAreaAutorizacionService.validarAccesoArea(usuario, areaId);
+        areaLookupService.obtenerActivaPorId(areaId);
+        return subprogramaRepository.findByAreaIdAndActivoTrueOrderByNombreAsc(areaId).stream()
+                .map(subprogramaMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Subprograma obtenerEntidadPorId(Long id) {
+        return buscarSubprogramaPorId(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Subprograma obtenerActivoPorId(Long id) {
+        Subprograma subprograma = buscarSubprogramaPorId(id);
+        if (!subprograma.isActivo()) {
+            throw new BusinessException(
+                    "El subprograma '" + subprograma.getNombre() + "' está inactivo y no puede utilizarse"
+            );
+        }
+        return subprograma;
+    }
+
+    private Subprograma buscarSubprogramaPorId(Long id) {
+        return subprogramaRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No existe un subprograma con id " + id
+                ));
+    }
+
+    /**
+     * El código identifica al subproceso dentro del código documental, que no
+     * incluye el área. Por eso la unicidad es global y no por área.
+     */
+    private void validarCodigoUnico(String codigo, Long idExcluido) {
+        String codigoNormalizado = Subprograma.normalizarCodigo(codigo);
+
+        boolean duplicado = idExcluido == null
+                ? subprogramaRepository.existsByCodigoIgnoreCase(codigoNormalizado)
+                : subprogramaRepository.existsByCodigoIgnoreCaseAndIdNot(codigoNormalizado, idExcluido);
+
+        if (duplicado) {
+            throw new BusinessException(
+                    "Ya existe un subprograma con el código '" + codigoNormalizado + "'",
+                    HttpStatus.CONFLICT
+            );
+        }
+    }
+
+    private String normalizarTexto(String valor) {
+        return valor == null ? null : valor.trim();
+    }
+}
