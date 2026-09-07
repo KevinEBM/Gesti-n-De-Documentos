@@ -1,0 +1,51 @@
+# Producción en VM (Google Cloud). Nginx corre en el host, no en este compose.
+# Uso: copiar .env.production.example -> .env.production
+#      docker compose --env-file .env.production up -d
+# No publicar 0.0.0.0:8080. Nginx hace proxy_pass a http://127.0.0.1:8080.
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: gestion_documental
+      TZ: ${TZ}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - interna
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Sin ports: solo accesible dentro de la red Docker.
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - backend_uploads:/var/lib/gestion-documental/uploads
+    networks:
+      - interna
+
+volumes:
+  postgres_data:
+  backend_uploads:
+
+networks:
+  interna:
+    driver: bridge
