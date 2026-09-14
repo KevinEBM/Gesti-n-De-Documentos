@@ -245,8 +245,8 @@ function DetalleDocumento() {
                 <Card className="lg:col-span-2">
                     <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
                         <div className="flex min-w-0 items-start gap-3">
-                            <div className="flex size-11 shrink-0 items-center justify-center rounded-md bg-secondary">
-                                <IconoTipo className={`size-5 ${colorTipo}`} />
+                            <div className="flex size-16 shrink-0 items-center justify-center rounded-md bg-secondary">
+                                <IconoTipo className={`size-10 ${colorTipo}`} />
                             </div>
                             <div className="min-w-0">
                                 <div className="flex flex-wrap items-baseline gap-x-8 gap-y-1">
