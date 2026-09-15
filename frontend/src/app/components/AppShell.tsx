@@ -71,7 +71,7 @@ export function AppShell({
 
             <aside
                 className={cn(
-                    "fixed inset-y-0 left-0 z-40 flex w-73 flex-col bg-[#e5e8d3] text-sidebar-foreground transition-transform lg:fixed lg:translate-x-0 relative after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:z-0 after:w-[2px] after:bg-[#d59a2a] after:content-['']", abierto ? "translate-x-0" : "-translate-x-full")}
+                    "fixed inset-y-0 left-0 z-40 flex w-73 flex-col bg-[#e5e8d3] text-sidebar-foreground transition-transform lg:fixed lg:translate-x-0 after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:z-0 after:w-[2px] after:bg-[#d59a2a] after:content-['']", abierto ? "translate-x-0" : "-translate-x-full")}
             >
                 <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-4">
 
