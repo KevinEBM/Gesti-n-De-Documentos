@@ -94,7 +94,7 @@ function Login() {
 
                 <div className="max-w-md space-y-5">
                     <p className="text-sm font-semibold uppercase tracking-wide opacity-80">
-                        SIG Plantar S.A.S.
+                        SIGD Plantar S.A.S.
                     </p>
                     <h2 className="text-4xl font-semibold leading-tight">
                         Un solo lugar para la documentación interna de la empresa.

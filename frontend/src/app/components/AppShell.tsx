@@ -71,7 +71,7 @@ export function AppShell({
 
             <aside
                 className={cn(
-                    "fixed inset-y-0 left-0 z-40 flex w-73 flex-col bg-[#e5e8d3] border-r-2 border-[#d59a2a] text-sidebar-foreground transition-transform lg:fixed lg:translate-x-0", abierto ? "translate-x-0" : "-translate-x-full")}
+                    "fixed inset-y-0 left-0 z-40 flex w-73 flex-col bg-[#e5e8d3] text-sidebar-foreground transition-transform lg:fixed lg:translate-x-0 relative after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:z-0 after:w-[2px] after:bg-[#d59a2a] after:content-['']", abierto ? "translate-x-0" : "-translate-x-full")}
             >
                 <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-4">
 
@@ -83,10 +83,10 @@ export function AppShell({
 
                     <div className="min-w-0">
                         <p className="truncate text-base font-bold text-black">
-                            SIG Plantar S.A.S.
+                            SIGD Plantar S.A.S.
                         </p>
-                        <p className="truncate text-xs text-black/70">
-                            Sistema Integrado de Gestión
+                        <p className="text-xs text-black/70">
+                            Sistema Integrado de Gestión Documental
                         </p>
                     </div>
 
@@ -210,10 +210,10 @@ function NavItem({
             to={to}
             onClick={onClick}
             className={cn(
-                "flex items-center gap-3 rounded-none px-6 py-2 text-sm transition-all duration-200",
+                "flex items-center gap-3 px-6 py-2 text-sm transition-all duration-200",
                 activo
-                    ? "bg-white font-bold text-black shadow-sm"
-                    : "text-sidebar-foreground/80 hover:bg-white/70 hover:text-black hover:font-bold",
+                    ? "relative z-10 rounded-none bg-white font-bold text-black"
+                    : "rounded-none text-sidebar-foreground/80 hover:bg-white/70 hover:text-black hover:font-bold",
             )}
         >
             <Icon
