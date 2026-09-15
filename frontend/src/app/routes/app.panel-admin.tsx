@@ -23,6 +23,7 @@ import {
 } from "@/lib/dashboard-api";
 import { formatFechaDocumento } from "@/lib/documentos-consulta-shared";
 import { useIntranet } from "@/lib/store";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/panel-admin")({
     head: () => ({
@@ -134,12 +135,22 @@ function PanelAdmin() {
                     icono={Files}
                     etiqueta="Documentos publicados"
                     valor={metricas.documentosPublicados}
+                    colorIcono="text-[#289248]"
+                    colorNumero="text-green-400"
                 />
-                <Metrica icono={Users} etiqueta="Usuarios activos" valor={metricas.usuariosActivos} />
+                <Metrica
+                    icono={Users}
+                    etiqueta="Usuarios activos"
+                    valor={metricas.usuariosActivos}
+                    colorIcono="text-blue-800"
+                    colorNumero="text-blue-400"
+                />
                 <Metrica
                     icono={Building2}
                     etiqueta="Áreas registradas"
                     valor={metricas.areasRegistradas}
+                    colorIcono="text-[#B57F22]"
+                    colorNumero="text-[#d59a2a]"
                 />
             </div>
 
@@ -197,15 +208,27 @@ function PanelAdmin() {
     );
 }
 
-function Metrica({ icono: Icono, etiqueta, valor }: { icono: typeof Files; etiqueta: string; valor: number }) {
+function Metrica({
+    icono: Icono,
+    etiqueta,
+    valor,
+    colorIcono,
+    colorNumero,
+}: {
+    icono: typeof Files;
+    etiqueta: string;
+    valor: number;
+    colorIcono?: string;
+    colorNumero?: string;
+}) {
     return (
         <Card>
             <CardContent className="flex items-center gap-4 py-6">
                 <div className="flex size-12 items-center justify-center rounded-md bg-secondary text-secondary-foreground">
-                    <Icono className="size-6" />
+                    <Icono className={cn("size-6", colorIcono)} />
                 </div>
                 <div className="min-w-0">
-                    <p className="text-3xl font-semibold leading-none">{valor}</p>
+                    <p className={cn("text-3xl font-semibold leading-none", colorNumero)}>{valor}</p>
                     <p className="mt-2 text-sm leading-tight text-muted-foreground">{etiqueta}</p>
                 </div>
             </CardContent>
