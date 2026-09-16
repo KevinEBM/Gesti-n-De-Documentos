@@ -202,6 +202,5 @@ La fase A7 contemplará servidor, variables de producción reales, HTTPS, subdom
 
 ## Documentación adicional
 
-- [docs/despliegue/README.md](docs/despliegue/README.md) — preparación A6 y pendientes A7
 - [docs/arquitectura/README.md](docs/arquitectura/README.md) — módulos, endpoints, reglas documentales
 - [docs/base-datos/README.md](docs/base-datos/README.md) — modelo de datos y migraciones
