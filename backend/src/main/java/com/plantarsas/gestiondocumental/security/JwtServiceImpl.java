@@ -14,6 +14,14 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Date;
 import java.util.Locale;
+
+/**
+ * Genera y valida los tokens de sesión (JWT) que usa el sistema para
+ * reconocer a un usuario ya autenticado en cada petición, sin tener
+ * que pedirle de nuevo su contraseña. También revisa que la
+ * configuración del token -la clave secreta, el tiempo de expiración-
+ * sea válida antes de usarla.
+ */
 @Service
 public class JwtServiceImpl implements JwtService {
 
@@ -138,18 +146,6 @@ public class JwtServiceImpl implements JwtService {
     public Long obtenerIdUsuario(String token) {
         Claims claims = parsearClaims(token);
         return extraerId(claims);
-    }
-
-    @Override
-    public String obtenerCorreo(String token) {
-        Claims claims = parsearClaims(token);
-        return extraerCorreo(claims);
-    }
-
-    @Override
-    public RolEnum obtenerRol(String token) {
-        Claims claims = parsearClaims(token);
-        return extraerRol(claims);
     }
 
     @Override
