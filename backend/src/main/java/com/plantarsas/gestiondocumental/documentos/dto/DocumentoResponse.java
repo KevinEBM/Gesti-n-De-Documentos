@@ -6,6 +6,12 @@ import com.plantarsas.gestiondocumental.shared.enums.DocumentoEstado;
 import java.time.Instant;
 import java.util.List;
 
+/**
+ * Toda la información de un documento que se le muestra al usuario en
+ * el detalle: sus datos generales, el área, subprograma y tipo a los
+ * que pertenece, los datos de su versión actual, y si ya está en
+ * condiciones de eliminarse por haber cumplido el tiempo de retención.
+ */
 public record DocumentoResponse(
         Long id,
         String codigo,

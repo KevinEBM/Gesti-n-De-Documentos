@@ -3,6 +3,10 @@ package com.plantarsas.gestiondocumental.areas.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+/**
+ * Datos que envía el administrador para crear o editar un área: su
+ * código, nombre y una descripción opcional.
+ */
 public record AreaRequest(
 
         @NotBlank(message = "El código del área es obligatorio")

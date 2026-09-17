@@ -6,6 +6,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Collection;
 import java.util.List;
 
+/**
+ * Acceso a la base de datos para los subprogramas: comprobar nombres
+ * y códigos repetidos, y listar los subprogramas de una o varias
+ * áreas.
+ */
 public interface SubprogramaRepository extends JpaRepository<Subprograma, Long> {
 
     boolean existsByAreaIdAndNombreIgnoreCase(Long areaId, String nombre);

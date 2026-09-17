@@ -22,6 +22,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Expone por HTTP el inicio de sesión, la consulta del perfil del
+ * usuario autenticado y el cambio de contraseña. Limita los intentos
+ * de cambio de contraseña para evitar que alguien intente adivinar la
+ * contraseña actual de otro usuario.
+ */
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor

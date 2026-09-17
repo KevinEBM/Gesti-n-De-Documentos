@@ -11,6 +11,11 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
+/**
+ * Contrato de las operaciones de solo consulta sobre documentos:
+ * listar, ver el detalle de uno, y descargar tanto la versión vigente
+ * como el historial de versiones anteriores.
+ */
 public interface DocumentoConsultaService {
 
     Page<DocumentoResumenResponse> listar(

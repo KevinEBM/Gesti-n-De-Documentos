@@ -9,6 +9,11 @@ import jakarta.validation.constraints.Size;
 
 import java.util.Set;
 
+/**
+ * Datos que envía el administrador para editar un usuario existente:
+ * nombres, correo, rol y áreas asignadas. No incluye la contraseña,
+ * que se cambia por una operación aparte.
+ */
 public record UsuarioUpdateRequest(
 
         @NotBlank(message = "Los nombres son obligatorios")

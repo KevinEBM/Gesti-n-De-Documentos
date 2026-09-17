@@ -6,6 +6,11 @@ import com.plantarsas.gestiondocumental.subprogramas.entity.Subprograma;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/**
+ * Convierte un subprograma, tal como se guarda en la base de datos,
+ * al formato que se le muestra al usuario, incluyendo los datos de su
+ * área.
+ */
 @Component
 @RequiredArgsConstructor
 public class SubprogramaMapper {

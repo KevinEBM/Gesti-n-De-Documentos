@@ -18,6 +18,14 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * Lugar único donde se atrapan todos los errores que pueden pasar en
+ * el backend -de negocio, de datos mal enviados, de archivos, de
+ * conflictos en la base de datos, o cualquier fallo inesperado- y se
+ * convierten en una respuesta clara y con el mismo formato para el
+ * frontend. Así, ningún controlador necesita manejar errores por su
+ * cuenta.
+ */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {

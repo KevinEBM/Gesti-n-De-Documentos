@@ -3,6 +3,10 @@ package com.plantarsas.gestiondocumental.tiposdocumento.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+/**
+ * Datos que envía el administrador para crear un tipo de documento:
+ * su código, nombre y una descripción opcional.
+ */
 public record TipoDocumentoRequest(
         @NotBlank(message = "El código es obligatorio")
         @Size(max = 20, message = "El código no puede superar los 20 caracteres")

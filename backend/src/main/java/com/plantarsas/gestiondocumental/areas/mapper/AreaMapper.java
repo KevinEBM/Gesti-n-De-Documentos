@@ -4,6 +4,10 @@ import com.plantarsas.gestiondocumental.areas.dto.AreaResponse;
 import com.plantarsas.gestiondocumental.areas.entity.Area;
 import org.springframework.stereotype.Component;
 
+/**
+ * Convierte un área, tal como se guarda en la base de datos, al
+ * formato que se le muestra al usuario.
+ */
 @Component
 public class AreaMapper {
 

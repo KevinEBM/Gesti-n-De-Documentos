@@ -16,6 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+/**
+ * Contiene las reglas de negocio del catálogo de tipos de documento:
+ * evita nombres repetidos y valida que un tipo esté activo antes de
+ * dejarlo usar al publicar un documento.
+ */
 @Service
 @RequiredArgsConstructor
 public class TipoDocumentoServiceImpl implements TipoDocumentoService, TipoDocumentoLookupService {

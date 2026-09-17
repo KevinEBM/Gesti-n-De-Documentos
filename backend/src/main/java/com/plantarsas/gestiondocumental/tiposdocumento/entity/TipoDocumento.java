@@ -15,6 +15,11 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.Locale;
 
+/**
+ * Representa un tipo de documento del catálogo (por ejemplo, un
+ * procedimiento o un formato), usado para clasificar los documentos
+ * que se publican en el sistema.
+ */
 @Entity
 @Table(name = "tipos_documento")
 @Getter

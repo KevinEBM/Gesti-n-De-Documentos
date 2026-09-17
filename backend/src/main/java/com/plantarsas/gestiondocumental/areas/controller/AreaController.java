@@ -23,6 +23,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Expone por HTTP la gestión del catálogo de áreas de la
+ * organización: crear, listar, consultar, editar y activar o
+ * desactivar un área. Crear, editar y desactivar es solo para el
+ * administrador; consultar el catálogo está disponible para los
+ * demás roles según lo que cada uno puede ver.
+ */
 @RestController
 @RequestMapping("/api/areas")
 @RequiredArgsConstructor

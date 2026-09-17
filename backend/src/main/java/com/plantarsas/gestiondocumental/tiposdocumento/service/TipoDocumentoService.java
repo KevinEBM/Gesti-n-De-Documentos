@@ -7,6 +7,11 @@ import com.plantarsas.gestiondocumental.tiposdocumento.dto.TipoDocumentoUpdateRe
 
 import java.util.List;
 
+/**
+ * Contrato de las operaciones sobre el catálogo de tipos de
+ * documento: crear, listar (todos o solo los activos), consultar
+ * uno, editarlo y cambiar su estado.
+ */
 public interface TipoDocumentoService {
 
     TipoDocumentoResponse crear(TipoDocumentoRequest request);

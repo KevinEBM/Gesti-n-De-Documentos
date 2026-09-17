@@ -6,6 +6,11 @@ import com.plantarsas.gestiondocumental.documentos.entity.VersionDocumento;
 import com.plantarsas.gestiondocumental.shared.time.FechaHoraUtc;
 import org.springframework.stereotype.Component;
 
+/**
+ * Convierte una versión de documento en una entrada de actividad
+ * reciente, deduciendo si fue una publicación inicial o una nueva
+ * versión según su número de versión.
+ */
 @Component
 public class DashboardMapper {
 

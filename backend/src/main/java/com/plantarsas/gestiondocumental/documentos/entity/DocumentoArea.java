@@ -18,6 +18,12 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
+/**
+ * Relaciona un documento con una de las áreas que pueden verlo o
+ * gestionarlo: puede ser el área responsable (la principal, siempre
+ * exactamente una por documento) o un área adicional autorizada
+ * cuando el documento tiene alcance de áreas específicas.
+ */
 @Entity
 @Table(name = "documento_area")
 @Getter

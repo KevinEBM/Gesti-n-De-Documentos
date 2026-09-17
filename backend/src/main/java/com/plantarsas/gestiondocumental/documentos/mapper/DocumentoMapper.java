@@ -16,6 +16,12 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Convierte los documentos y sus versiones, tal como se guardan en la
+ * base de datos, al formato que se le entrega al frontend en cada
+ * pantalla: el detalle completo, un resumen para listados, y el
+ * historial de versiones.
+ */
 @Component
 @RequiredArgsConstructor
 public class DocumentoMapper {

@@ -5,6 +5,10 @@ import com.plantarsas.gestiondocumental.auth.dto.LoginResponse;
 import com.plantarsas.gestiondocumental.auth.dto.PerfilUsuarioResponse;
 import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 
+/**
+ * Contrato de las operaciones de autenticación: iniciar sesión y
+ * consultar el perfil vigente del usuario que ya inició sesión.
+ */
 public interface AuthService {
 
     LoginResponse login(LoginRequest request);

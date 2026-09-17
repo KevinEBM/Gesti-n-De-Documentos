@@ -6,6 +6,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Acceso a la base de datos para las relaciones entre documentos y
+ * áreas: encontrar el área responsable de un documento, sus áreas
+ * adicionales, y eliminarlas cuando el documento cambia de área o se
+ * borra.
+ */
 public interface DocumentoAreaRepository extends JpaRepository<DocumentoArea, Long> {
 
     Optional<DocumentoArea> findByDocumento_IdAndEsPrincipalTrue(Long documentoId);

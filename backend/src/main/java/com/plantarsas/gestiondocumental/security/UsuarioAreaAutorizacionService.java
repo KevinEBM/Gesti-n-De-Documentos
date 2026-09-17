@@ -12,6 +12,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Decide a qué áreas tiene acceso un usuario según su rol: un
+ * administrador puede consultar cualquier área, mientras que un jefe
+ * de área o un administrativo solo pueden ver la información de su
+ * propia área principal. Se usa para rechazar, antes de ejecutar la
+ * operación, cualquier intento de consultar un área que no le
+ * corresponde al usuario.
+ */
 @Service
 @RequiredArgsConstructor
 public class UsuarioAreaAutorizacionService {

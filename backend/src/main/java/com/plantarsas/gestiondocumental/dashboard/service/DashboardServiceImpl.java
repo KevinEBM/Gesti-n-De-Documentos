@@ -15,6 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+/**
+ * Calcula las métricas generales del sistema y arma la actividad
+ * reciente a partir de las últimas versiones de documentos publicadas.
+ */
 @Service
 @RequiredArgsConstructor
 public class DashboardServiceImpl implements DashboardService {

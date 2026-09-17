@@ -13,6 +13,12 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * Se encarga de qué le responde el sistema a alguien que intenta usar
+ * la API sin haber iniciado sesión, o con una sesión inválida: un
+ * mensaje de error claro con código 401, en el mismo formato que usa
+ * el resto de la API.
+ */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {

@@ -26,6 +26,14 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Configura las reglas generales de seguridad de la API: qué rutas
+ * requieren haber iniciado sesión (todas, salvo el login), que no se
+ * guarden sesiones en el servidor, desde qué direcciones del frontend
+ * se aceptan peticiones, cómo se cifran las contraseñas, y en qué
+ * orden se ejecutan los filtros que revisan el token y el límite de
+ * intentos de inicio de sesión.
+ */
 @Configuration
 @EnableMethodSecurity
 @RequiredArgsConstructor

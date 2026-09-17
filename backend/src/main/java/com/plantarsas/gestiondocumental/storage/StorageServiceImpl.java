@@ -22,6 +22,12 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * Guarda los archivos de los documentos en disco local, validando su
+ * tamaño y extensión antes de aceptarlos, calculando un hash para
+ * verificar su integridad, y protegiendo contra rutas que intenten
+ * salir de la carpeta de almacenamiento.
+ */
 @Service
 public class StorageServiceImpl implements StorageService {
 

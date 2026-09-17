@@ -69,7 +69,14 @@ class JwtServiceImplTest {
     void generarToken_debeNormalizarCorreoConTrimYMinusculas() {
         String token = servicio.generarToken(1L, "  Correo@Ejemplo.COM  ", RolEnum.ADMINISTRADOR);
 
-        assertThat(servicio.obtenerCorreo(token)).isEqualTo("correo@ejemplo.com");
+        String correoEnClaims = Jwts.parser()
+                .verifyWith(SECRET_KEY)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .get("correo", String.class);
+
+        assertThat(correoEnClaims).isEqualTo("correo@ejemplo.com");
     }
 
     @Test
@@ -77,20 +84,6 @@ class JwtServiceImplTest {
         String token = servicio.generarToken(42L, "correo@ejemplo.com", RolEnum.ADMINISTRADOR);
 
         assertThat(servicio.obtenerIdUsuario(token)).isEqualTo(42L);
-    }
-
-    @Test
-    void obtenerCorreo_debeDevolverCorreoNormalizado() {
-        String token = servicio.generarToken(1L, "correo@ejemplo.com", RolEnum.ADMINISTRADOR);
-
-        assertThat(servicio.obtenerCorreo(token)).isEqualTo("correo@ejemplo.com");
-    }
-
-    @Test
-    void obtenerRol_debeDevolverRolCorrecto() {
-        String token = servicio.generarToken(1L, "correo@ejemplo.com", RolEnum.JEFE_AREA);
-
-        assertThat(servicio.obtenerRol(token)).isEqualTo(RolEnum.JEFE_AREA);
     }
 
     @Test

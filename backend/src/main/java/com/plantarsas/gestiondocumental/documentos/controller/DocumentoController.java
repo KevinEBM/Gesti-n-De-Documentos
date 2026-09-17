@@ -53,6 +53,13 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * Expone por HTTP las operaciones sobre documentos: publicar uno nuevo,
+ * subir una nueva versión, editarlo, cambiar su estado, eliminarlo,
+ * consultarlos con filtros y descargar sus archivos. Cada operación
+ * exige el rol adecuado y delega toda la lógica de negocio en los
+ * servicios del módulo.
+ */
 @RestController
 @RequestMapping("/api/documentos")
 @RequiredArgsConstructor

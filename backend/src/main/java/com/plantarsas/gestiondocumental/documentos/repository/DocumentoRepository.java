@@ -11,6 +11,12 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
+/**
+ * Acceso a la base de datos para los documentos: buscarlos por código
+ * o id, comprobar que un código no esté repetido, y bloquear un
+ * documento durante una operación para evitar que dos publicaciones
+ * de una nueva versión choquen entre sí.
+ */
 public interface DocumentoRepository extends JpaRepository<Documento, Long>, JpaSpecificationExecutor<Documento> {
 
     boolean existsByCodigoIgnoreCase(String codigo);

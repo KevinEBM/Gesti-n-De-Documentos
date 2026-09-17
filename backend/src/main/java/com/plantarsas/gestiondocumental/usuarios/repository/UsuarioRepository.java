@@ -7,6 +7,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 
+/**
+ * Acceso a la base de datos para los usuarios: buscarlos por correo o
+ * id, comprobar que un correo no esté repetido, y contar cuántos
+ * usuarios hay en cada estado.
+ */
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     @EntityGraph(attributePaths = "rol")

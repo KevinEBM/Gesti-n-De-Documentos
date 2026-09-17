@@ -15,6 +15,12 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+/**
+ * Relaciona a un usuario con una de las áreas a las que pertenece,
+ * indicando si esa es su área principal. Un jefe de área o un
+ * administrativo suelen tener una sola área asignada; un usuario
+ * puede tener varias, pero siempre a lo sumo una principal.
+ */
 @Entity
 @Table(name = "usuario_area")
 @Getter

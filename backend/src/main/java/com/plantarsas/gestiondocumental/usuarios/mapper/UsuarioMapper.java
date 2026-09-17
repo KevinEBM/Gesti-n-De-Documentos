@@ -13,6 +13,11 @@ import org.springframework.stereotype.Component;
 import java.util.Comparator;
 import java.util.List;
 
+/**
+ * Convierte un usuario y sus áreas asignadas, tal como se guardan en
+ * la base de datos, al formato que se le muestra al administrador,
+ * incluyendo los datos de su rol y cuál de sus áreas es la principal.
+ */
 @Component
 @RequiredArgsConstructor
 public class UsuarioMapper {

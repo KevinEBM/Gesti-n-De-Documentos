@@ -25,6 +25,13 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
+/**
+ * Representa un documento oficial publicado en el sistema: su código,
+ * título, a qué subprograma y tipo pertenece, y en qué estado y con
+ * qué alcance de visibilidad está. También sabe calcular, una vez que
+ * un documento queda obsoleto, cuándo se cumplen los años de
+ * retención que deben pasar antes de poder eliminarlo para siempre.
+ */
 @Entity
 @Table(name = "documentos")
 @Getter

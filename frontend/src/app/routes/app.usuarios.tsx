@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Search, UserPlus, Pencil, Power, Mail, Users } from "lucide-react";
+import { ArrowDownAZ, ArrowUpZA, Search, UserPlus, Pencil, Power, Mail, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -71,6 +71,14 @@ const OPCIONES_FILTRO_ROL: { value: string; etiqueta: string }[] = [
         value,
         etiqueta,
     })),
+];
+
+type FiltroEstadoUsuario = typeof TODOS | "ACTIVO" | "INACTIVO";
+
+const OPCIONES_FILTRO_ESTADO: { value: FiltroEstadoUsuario; etiqueta: string }[] = [
+    { value: TODOS, etiqueta: "Todos" },
+    { value: "ACTIVO", etiqueta: "Activo" },
+    { value: "INACTIVO", etiqueta: "Inactivo" },
 ];
 
 const formCrearVacio = {
@@ -232,6 +240,8 @@ function GestionUsuarios() {
     const [errorCarga, setErrorCarga] = useState<string | null>(null);
     const [busqueda, setBusqueda] = useState("");
     const [rol, setRol] = useState(TODOS);
+    const [estadoFiltro, setEstadoFiltro] = useState<FiltroEstadoUsuario>(TODOS);
+    const [orden, setOrden] = useState<"az" | "za">("az");
     const [abierto, setAbierto] = useState(false);
     const [modoDialogo, setModoDialogo] = useState<"crear" | "editar">("crear");
     const [formCrear, setFormCrear] = useState(formCrearVacio);
@@ -323,18 +333,27 @@ function GestionUsuarios() {
 
     const lista = useMemo(
         () =>
-            usuarios.filter((u) => {
-                const q = busqueda.trim().toLowerCase();
-                if (
-                    q &&
-                    !`${u.nombreCompleto} ${u.correo}`.toLowerCase().includes(q)
-                ) {
-                    return false;
-                }
-                if (rol !== TODOS && mapRolBackend(u.rolCodigo) !== rol) return false;
-                return true;
-            }),
-        [usuarios, busqueda, rol],
+            usuarios
+                .filter((u) => {
+                    const q = busqueda.trim().toLowerCase();
+                    if (
+                        q &&
+                        !`${u.nombreCompleto} ${u.correo}`.toLowerCase().includes(q)
+                    ) {
+                        return false;
+                    }
+                    if (rol !== TODOS && mapRolBackend(u.rolCodigo) !== rol) return false;
+                    if (estadoFiltro !== TODOS && u.estado !== estadoFiltro) return false;
+                    return true;
+                })
+                .slice()
+                .sort((a, b) => {
+                    const cmp = a.nombreCompleto.localeCompare(b.nombreCompleto, "es", {
+                        sensitivity: "base",
+                    });
+                    return orden === "az" ? cmp : -cmp;
+                }),
+        [usuarios, busqueda, rol, estadoFiltro, orden],
     );
 
     const abrirNuevo = () => {
@@ -551,7 +570,7 @@ function GestionUsuarios() {
             }
         >
             <Card className="border-border/60 shadow-xs">
-                <CardContent className="grid gap-3 py-4 md:grid-cols-[1fr_240px]">
+                <CardContent className="grid gap-3 py-4 md:grid-cols-[1fr_240px_180px_auto]">
                     <div className="relative">
                         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
@@ -590,6 +609,43 @@ function GestionUsuarios() {
                             })}
                         </SelectContent>
                     </Select>
+                    <Select
+                        value={estadoFiltro}
+                        onValueChange={(valor) =>
+                            setEstadoFiltro(valor as FiltroEstadoUsuario)
+                        }
+                        disabled={cargando || !!errorCarga}
+                    >
+                        <SelectTrigger
+                            className={cn("bg-background/50", FILTRO_ROL_SELECT_TRIGGER_CLASS)}
+                            aria-label="Filtrar por estado"
+                        >
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className={FILTRO_ROL_SELECT_CONTENT_CLASS}>
+                            {OPCIONES_FILTRO_ESTADO.map(({ value, etiqueta }) => (
+                                <SelectItem
+                                    key={value}
+                                    value={value}
+                                    className={FILTRO_ROL_SELECT_ITEM_CLASS}
+                                >
+                                    {etiqueta}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="justify-self-start bg-background/50"
+                        onClick={() => setOrden((actual) => (actual === "az" ? "za" : "az"))}
+                        disabled={cargando || !!errorCarga}
+                        aria-label={orden === "az" ? "Ordenar Z-A" : "Ordenar A-Z"}
+                        title={orden === "az" ? "Ordenar Z-A" : "Ordenar A-Z"}
+                    >
+                        {orden === "az" ? <ArrowDownAZ /> : <ArrowUpZA />}
+                    </Button>
                 </CardContent>
             </Card>
 

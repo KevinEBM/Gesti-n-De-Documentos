@@ -17,6 +17,11 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+/**
+ * Representa uno de los roles del sistema (administrador, jefe de
+ * área, administrativo) tal como se guarda en la base de datos,
+ * incluyendo si sigue activo y disponible para asignarse a un usuario.
+ */
 @Entity
 @Table(name = "roles")
 @Getter

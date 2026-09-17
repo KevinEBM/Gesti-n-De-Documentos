@@ -9,6 +9,11 @@ import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 
 import java.io.InputStream;
 
+/**
+ * Contrato de las operaciones que cambian el estado de un documento:
+ * publicarlo, darle una nueva versión, editar sus datos, cambiar su
+ * estado y eliminarlo definitivamente.
+ */
 public interface DocumentoService {
 
     DocumentoResponse publicarInicial(

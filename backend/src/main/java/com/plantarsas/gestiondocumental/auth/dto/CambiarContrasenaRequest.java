@@ -3,6 +3,11 @@ package com.plantarsas.gestiondocumental.auth.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+/**
+ * Datos que envía un usuario para cambiar su propia contraseña: la
+ * contraseña actual (para confirmar que es él), la nueva contraseña y
+ * su confirmación.
+ */
 public record CambiarContrasenaRequest(
 
         @NotBlank(message = "La contraseña actual es obligatoria")

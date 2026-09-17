@@ -9,6 +9,12 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Acceso a la base de datos para las versiones de un documento: cuál
+ * es la vigente, el historial completo, una versión puntual por su
+ * id, y el número de la última versión publicada para poder calcular
+ * el siguiente.
+ */
 public interface VersionDocumentoRepository extends JpaRepository<VersionDocumento, Long> {
 
     Optional<VersionDocumento> findByDocumento_IdAndVigenteTrue(Long documentoId);

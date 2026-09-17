@@ -328,8 +328,6 @@ class JwtAuthenticationFilterTest {
 
         verify(filterChain, times(1)).doFilter(request, response);
         verify(usuarioRepository, times(1)).findWithRolById(1L);
-        verify(jwtService, never()).obtenerCorreo(anyString());
-        verify(jwtService, never()).obtenerRol(anyString());
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         assertThat(authentication).isNotNull();

@@ -50,6 +50,15 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Contiene las reglas de negocio para publicar un documento por
+ * primera vez, subir una nueva versión, editar sus datos, cambiar su
+ * estado y eliminarlo definitivamente cuando corresponde. Se asegura
+ * de que estas operaciones queden completas o no se apliquen en
+ * absoluto: si algo falla a mitad de camino, tanto el archivo
+ * guardado como los datos en la base de datos quedan consistentes
+ * entre sí.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor

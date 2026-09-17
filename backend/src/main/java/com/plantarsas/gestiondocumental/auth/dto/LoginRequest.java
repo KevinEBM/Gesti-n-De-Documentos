@@ -3,6 +3,9 @@ package com.plantarsas.gestiondocumental.auth.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
+/**
+ * Correo y contraseña que envía un usuario para iniciar sesión.
+ */
 public record LoginRequest(
 
         @NotBlank(message = "El correo es obligatorio")

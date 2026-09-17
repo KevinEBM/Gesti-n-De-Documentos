@@ -19,6 +19,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Contiene las reglas de negocio del catálogo de áreas: evita códigos
+ * y nombres repetidos, filtra el listado según lo que cada usuario
+ * puede ver por su rol, y valida que un área esté activa antes de
+ * dejarla usar en otros módulos.
+ */
 @Service
 @RequiredArgsConstructor
 public class AreaServiceImpl implements AreaService, AreaLookupService {
