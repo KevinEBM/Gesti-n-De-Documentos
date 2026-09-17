@@ -22,6 +22,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Expone por HTTP la gestión del catálogo de tipos de documento:
+ * crear, listar, consultar, editar y cambiar su estado. Crear, editar
+ * y desactivar es solo para el administrador.
+ */
 @RestController
 @RequestMapping("/api/tipos-documento")
 @RequiredArgsConstructor

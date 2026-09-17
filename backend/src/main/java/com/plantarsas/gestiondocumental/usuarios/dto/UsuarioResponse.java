@@ -7,6 +7,11 @@ import com.plantarsas.gestiondocumental.usuarios.entity.EstadoUsuario;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Datos de un usuario que se le muestran al administrador: su
+ * información personal, su rol, su estado de cuenta y las áreas a las
+ * que pertenece.
+ */
 public record UsuarioResponse(
         Long id,
         String nombres,

@@ -5,6 +5,12 @@ import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 
+/**
+ * Lleva la cuenta de cuántas veces ha fallado un usuario al intentar
+ * cambiar su contraseña equivocando la actual, para bloquear
+ * temporalmente nuevos intentos y dificultar que alguien adivine la
+ * contraseña de otra persona.
+ */
 @Component
 public class PasswordChangeRateLimiter {
 

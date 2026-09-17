@@ -4,6 +4,10 @@ import com.plantarsas.gestiondocumental.tiposdocumento.dto.TipoDocumentoResponse
 import com.plantarsas.gestiondocumental.tiposdocumento.entity.TipoDocumento;
 import org.springframework.stereotype.Component;
 
+/**
+ * Convierte un tipo de documento, tal como se guarda en la base de
+ * datos, al formato que se le muestra al usuario.
+ */
 @Component
 public class TipoDocumentoMapper {
 

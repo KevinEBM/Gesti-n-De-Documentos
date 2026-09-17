@@ -19,6 +19,13 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.Locale;
 
+/**
+ * Representa un subprograma: una subdivisión de trabajo que pertenece
+ * siempre a una única área y bajo la cual se publican documentos. Su
+ * código sirve para identificarlo en el código documental, así que se
+ * normaliza siempre de la misma forma para poder compararlo de manera
+ * consistente.
+ */
 @Entity
 @Table(name = "subprogramas")
 @Getter

@@ -11,6 +11,11 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Acceso a la base de datos para las asignaciones de áreas de un
+ * usuario: consultar todas las de un usuario, encontrar cuál es su
+ * área principal, y borrarlas todas cuando se actualizan sus áreas.
+ */
 public interface UsuarioAreaRepository extends JpaRepository<UsuarioArea, UsuarioAreaId> {
 
     List<UsuarioArea> findByUsuario_Id(Long usuarioId);

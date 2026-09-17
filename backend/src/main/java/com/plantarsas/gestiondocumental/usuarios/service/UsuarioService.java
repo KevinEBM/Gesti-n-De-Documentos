@@ -7,6 +7,10 @@ import com.plantarsas.gestiondocumental.usuarios.dto.UsuarioUpdateRequest;
 
 import java.util.List;
 
+/**
+ * Contrato de las operaciones sobre usuarios: crear, listar, consultar
+ * uno, editarlo, cambiar su estado y cambiar su contraseña.
+ */
 public interface UsuarioService {
 
     UsuarioResponse crear(UsuarioRequest request);

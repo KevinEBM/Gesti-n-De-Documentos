@@ -22,6 +22,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Expone por HTTP la gestión de usuarios del sistema: crearlos,
+ * listarlos, consultar uno, editar sus datos y activar o desactivar
+ * su cuenta. Solo el administrador puede usar estas operaciones.
+ */
 @RestController
 @RequestMapping("/api/usuarios")
 @RequiredArgsConstructor

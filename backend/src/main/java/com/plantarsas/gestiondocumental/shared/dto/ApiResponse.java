@@ -3,6 +3,13 @@ package com.plantarsas.gestiondocumental.shared.dto;
 import java.time.LocalDateTime;
 import java.util.Map;
 
+/**
+ * Formato único en el que el backend responde siempre, sea la operación
+ * exitosa o fallida, para que el frontend no tenga que interpretar una
+ * forma distinta de respuesta en cada pantalla. Incluye si hubo éxito,
+ * un mensaje, los datos cuando corresponde, y qué campos fallaron si
+ * el error fue de validación.
+ */
 public record ApiResponse<T>(
         boolean exito,
         String mensaje,

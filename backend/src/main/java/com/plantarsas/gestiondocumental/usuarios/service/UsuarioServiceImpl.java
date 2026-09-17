@@ -27,6 +27,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+/**
+ * Contiene las reglas de negocio para crear y editar usuarios: valida
+ * que el correo no esté repetido, que el rol y las áreas asignadas
+ * sean coherentes entre sí (por ejemplo, un jefe de área debe tener
+ * exactamente una única área principal), y gestiona el cambio de
+ * contraseña verificando primero la actual.
+ */
 @Service
 @RequiredArgsConstructor
 public class UsuarioServiceImpl implements UsuarioService {

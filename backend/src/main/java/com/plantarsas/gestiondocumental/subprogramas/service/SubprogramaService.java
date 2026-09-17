@@ -8,6 +8,11 @@ import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 
 import java.util.List;
 
+/**
+ * Contrato de las operaciones sobre el catálogo de subprogramas:
+ * crear, listar (todos, los que puede ver un usuario, o los activos
+ * de un área), consultar uno, editarlo y cambiar su estado.
+ */
 public interface SubprogramaService {
 
     SubprogramaResponse crear(SubprogramaRequest request);

@@ -10,6 +10,11 @@ import lombok.Setter;
 
 import java.io.Serializable;
 
+/**
+ * Identificador compuesto de la relación entre un usuario y un área
+ * (la pareja usuario-área), necesario porque esa relación no tiene un
+ * id propio en la base de datos.
+ */
 @Embeddable
 @Getter
 @Setter

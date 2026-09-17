@@ -12,6 +12,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Expone por HTTP la consulta de los roles del sistema. Solo el
+ * administrador puede verlos; no permite crear, editar ni eliminar
+ * roles porque son un catálogo fijo definido por el sistema.
+ */
 @RestController
 @RequestMapping("/api/roles")
 @RequiredArgsConstructor

@@ -8,6 +8,12 @@ import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
+/**
+ * Datos que envía el administrador para editar la información de un
+ * documento ya publicado: código, título, descripción, área,
+ * subprograma, tipo y alcance. No incluye el archivo ni la versión,
+ * que se manejan por separado.
+ */
 public record DocumentoActualizacionRequest(
 
         @NotBlank(message = "El código es obligatorio")

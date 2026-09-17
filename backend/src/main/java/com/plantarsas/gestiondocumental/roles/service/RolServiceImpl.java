@@ -10,6 +10,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * Resuelve la consulta de roles y valida que un rol siga activo antes
+ * de que otro módulo lo use, por ejemplo al asignarlo a un usuario.
+ */
 @Service
 @RequiredArgsConstructor
 public class RolServiceImpl implements RolService, RolLookupService {

@@ -15,6 +15,12 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.Locale;
 
+/**
+ * Representa una de las áreas en las que se organiza la empresa. Los
+ * documentos, los usuarios y los subprogramas se agrupan por área, y
+ * un área inactiva deja de poder usarse en nuevas asignaciones aunque
+ * lo que ya existía con ella se conserve.
+ */
 @Entity
 @Table(name = "areas")
 @Getter

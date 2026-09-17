@@ -18,6 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Locale;
 
+/**
+ * Verifica el correo y la contraseña al iniciar sesión, genera el
+ * token de sesión, y resuelve el perfil actual del usuario autenticado
+ * a partir de la base de datos, no del token, para reflejar cambios
+ * recientes de rol o de cuenta.
+ */
 @Service
 @Transactional(readOnly = true)
 public class AuthServiceImpl implements AuthService {

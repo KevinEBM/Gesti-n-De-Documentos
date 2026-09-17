@@ -23,6 +23,13 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Revisa, en cada petición que llega a la API, si trae un token de
+ * sesión válido en la cabecera y, si lo trae, busca en la base de
+ * datos al usuario dueño de ese token para confirmar que sigue activo.
+ * Si todo está en orden, deja marcada la sesión como iniciada para el
+ * resto de la petición; si algo falla, simplemente la deja sin iniciar.
+ */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {

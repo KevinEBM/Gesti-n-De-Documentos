@@ -5,6 +5,10 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
+/**
+ * Datos que envía el administrador para editar un subprograma
+ * existente: código, nombre, descripción y área.
+ */
 public record SubprogramaUpdateRequest(
         @NotBlank(message = "El código es obligatorio")
         @Size(max = 20, message = "El código no puede superar los 20 caracteres")

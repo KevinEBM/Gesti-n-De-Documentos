@@ -12,6 +12,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Expone por HTTP las métricas y la actividad reciente que ve el
+ * administrador al entrar al sistema: cuántos documentos, usuarios y
+ * áreas hay, y las últimas publicaciones o nuevas versiones.
+ */
 @RestController
 @RequestMapping("/api/dashboard")
 @RequiredArgsConstructor

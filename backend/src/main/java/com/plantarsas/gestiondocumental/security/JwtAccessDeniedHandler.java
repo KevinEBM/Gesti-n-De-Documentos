@@ -13,6 +13,12 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * Se encarga de qué le responde el sistema a un usuario que sí inició
+ * sesión pero intenta algo para lo que no tiene permiso: un mensaje de
+ * error claro con código 403, en el mismo formato que usa el resto de
+ * la API.
+ */
 @Component
 @RequiredArgsConstructor
 public class JwtAccessDeniedHandler implements AccessDeniedHandler {

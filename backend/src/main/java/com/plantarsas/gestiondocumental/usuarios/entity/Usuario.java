@@ -22,6 +22,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.time.LocalDateTime;
 import java.util.Locale;
 
+/**
+ * Representa la cuenta de una persona que usa el sistema: sus datos
+ * personales, su correo de acceso, su contraseña cifrada, su rol y el
+ * estado de su cuenta. También sabe comprobar si una contraseña
+ * coincide con la que tiene guardada, sin exponer nunca la contraseña
+ * real.
+ */
 @Entity
 @Table(name = "usuarios")
 @Getter

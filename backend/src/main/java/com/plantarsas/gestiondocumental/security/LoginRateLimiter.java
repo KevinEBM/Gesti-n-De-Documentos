@@ -5,6 +5,12 @@ import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 
+/**
+ * Lleva la cuenta de cuántas veces ha fallado el inicio de sesión
+ * desde una misma dirección de red en poco tiempo, para poder
+ * bloquear temporalmente los intentos repetidos y dificultar que
+ * alguien adivine una contraseña a la fuerza.
+ */
 @Component
 public class LoginRateLimiter {
 

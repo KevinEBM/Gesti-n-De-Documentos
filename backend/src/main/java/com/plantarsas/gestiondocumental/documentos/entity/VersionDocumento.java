@@ -18,6 +18,12 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
+/**
+ * Representa una versión concreta del archivo de un documento: el
+ * archivo en sí, su número de versión, quién la publicó y cuándo, y
+ * si es la versión vigente. Un documento puede acumular varias
+ * versiones a lo largo del tiempo, pero solo una está vigente a la vez.
+ */
 @Entity
 @Table(name = "versiones_documento")
 @Getter

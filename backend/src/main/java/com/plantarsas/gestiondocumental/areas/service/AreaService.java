@@ -7,6 +7,11 @@ import com.plantarsas.gestiondocumental.security.AuthenticatedUser;
 
 import java.util.List;
 
+/**
+ * Contrato de las operaciones sobre el catálogo de áreas: crear,
+ * listar (todas o solo las que puede ver un usuario según su rol),
+ * consultar una, editarla y cambiar su estado.
+ */
 public interface AreaService {
 
     AreaResponse crear(AreaRequest request);

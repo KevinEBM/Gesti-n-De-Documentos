@@ -9,6 +9,13 @@ import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
+/**
+ * Datos que envía el administrador para publicar un documento por
+ * primera vez: su código, título, descripción, a qué área,
+ * subprograma y tipo pertenece, el alcance de visibilidad, y los
+ * datos de esa primera versión del archivo (descripción del cambio y
+ * número de versión inicial).
+ */
 public record DocumentoPublicacionInicialRequest(
 
         @NotBlank(message = "El código es obligatorio")

@@ -4,6 +4,13 @@ import org.springframework.data.domain.Page;
 
 import java.util.List;
 
+/**
+ * Formato en el que el backend entrega un listado dividido en páginas
+ * -por ejemplo, la lista de documentos o de usuarios- para que el
+ * frontend sepa cuántos resultados hay en total y en qué página está
+ * el usuario. Se arma a partir del resultado interno de la consulta a
+ * la base de datos, sin exponer ese detalle técnico hacia afuera.
+ */
 public record PageResponse<T>(
         List<T> contenido,
         int pagina,

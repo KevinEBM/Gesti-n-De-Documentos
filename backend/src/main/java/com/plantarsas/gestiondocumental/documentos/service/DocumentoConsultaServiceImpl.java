@@ -33,6 +33,14 @@ import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Resuelve las consultas de documentos que hace cada usuario:
+ * listarlos con filtros, ver el detalle de uno, y descargar tanto la
+ * versión vigente como versiones anteriores. En todos los casos
+ * aplica primero la regla de qué documentos puede ver ese usuario
+ * según su rol y sus áreas, antes de aplicar cualquier filtro
+ * adicional.
+ */
 @Service
 @RequiredArgsConstructor
 public class DocumentoConsultaServiceImpl implements DocumentoConsultaService {

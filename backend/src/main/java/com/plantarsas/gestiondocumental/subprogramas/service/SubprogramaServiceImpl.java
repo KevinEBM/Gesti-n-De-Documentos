@@ -21,6 +21,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+/**
+ * Contiene las reglas de negocio del catálogo de subprogramas: evita
+ * nombres repetidos dentro de la misma área y códigos repetidos en
+ * todo el sistema, impide cambiar de área a un subprograma que ya
+ * tiene documentos asociados, y filtra el listado según lo que cada
+ * usuario puede ver por su rol.
+ */
 @Service
 @RequiredArgsConstructor
 public class SubprogramaServiceImpl implements SubprogramaService, SubprogramaLookupService {

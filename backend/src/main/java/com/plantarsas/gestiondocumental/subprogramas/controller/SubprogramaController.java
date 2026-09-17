@@ -24,6 +24,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Expone por HTTP la gestión del catálogo de subprogramas: crear,
+ * listar, consultar, editar, cambiar su estado y consultar los
+ * activos de una área puntual. Crear, editar y desactivar es solo
+ * para el administrador.
+ */
 @RestController
 @RequestMapping("/api/subprogramas")
 @RequiredArgsConstructor

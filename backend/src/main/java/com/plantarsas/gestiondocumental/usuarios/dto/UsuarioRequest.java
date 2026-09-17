@@ -9,6 +9,11 @@ import jakarta.validation.constraints.Size;
 
 import java.util.Set;
 
+/**
+ * Datos que envía el administrador para crear un usuario nuevo: sus
+ * nombres, correo, contraseña inicial, rol y las áreas a las que
+ * queda asignado, incluyendo cuál es su área principal.
+ */
 public record UsuarioRequest(
 
         @NotBlank(message = "Los nombres son obligatorios")
